@@ -4040,105 +4040,6 @@ h1, h2, h3 {
   font-weight: 800;
 }
 
-/* Página inicial */
-.lp {
-  width: min(1280px, 100%);
-  margin-inline: auto;
-  padding: 1.2rem clamp(1rem, 4vw, 3.2rem) 4rem;
-}
-
-.lp-nav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.8rem 1.2rem;
-  border: 1px solid var(--border);
-  border-radius: 99px;
-  background: rgba(18, 18, 22, 0.7);
-}
-
-.lp-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
-  align-items: center;
-  gap: 3rem;
-  padding: clamp(3.5rem, 9vw, 7.5rem) 0;
-}
-
-.lp-hero h1 {
-  margin: 1rem 0;
-  font-size: clamp(3.2rem, 7.6vw, 7rem);
-  font-weight: 700;
-  letter-spacing: -0.05em;
-  line-height: 0.98;
-}
-
-.lp-hero h1 span {
-  background: linear-gradient(90deg, #d6d8de, var(--brand));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-.lp-hero > div > p:not(.zx-tag) {
-  max-width: 40rem;
-  color: var(--muted);
-  font-size: 1.3rem;
-  line-height: 1.55;
-}
-
-.lp-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.8rem;
-  margin-top: 1.8rem;
-}
-
-.lp-orb {
-  display: grid;
-  place-items: center;
-}
-
-.lp-orb .zx-orb {
-  width: min(290px, 70vw);
-  height: min(290px, 70vw);
-  border-radius: 76px;
-}
-
-.lp-orb .zx-orb span {
-  font-size: 10rem;
-}
-
-.lp-orb .zx-orb::after {
-  top: 32px;
-  right: 34px;
-  width: 26px;
-  height: 26px;
-}
-
-.lp-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
-  gap: 1rem;
-}
-
-.lp-grid article {
-  display: grid;
-  gap: 0.6rem;
-  padding: 1.9rem;
-}
-
-.lp-grid h2 {
-  margin: 0;
-  font-size: 1.7rem;
-}
-
-.lp-grid p:last-child {
-  margin: 0;
-  color: var(--muted);
-  font-size: 1.05rem;
-}
-
 @media (max-width: 1180px) {
   .zest-sell {
     grid-template-columns: 1fr;
@@ -4193,7 +4094,6 @@ h1, h2, h3 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .lp-hero,
   .upload-pair {
     grid-template-columns: 1fr;
   }
@@ -4508,12 +4408,6 @@ body {
 
 .zx-brand-mark {
   box-shadow: inset 0 1px 0 #fff;
-}
-
-.lp-hero h1 span {
-  background: none;
-  -webkit-text-fill-color: var(--brand);
-  color: var(--brand);
 }
 
 .admin-brand span {

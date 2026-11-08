@@ -2,7 +2,7 @@
 
 Plataforma comercial de cardápio digital, pedidos, pagamentos, atendimento automatizado, controle de estoque e funcionalidades fiscais da **Veloso Solution**.
 
-- **Domínio:** https://tonorango.velososolution.com.br
+- **Domínio:** https://to-no-rango.velososolution.com.br
 - **Repositório:** https://github.com/VelosoSolutionP/To-No-Rrango.git
 
 ## Fase atual

@@ -1,0 +1,38 @@
+# Produção: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+services:
+  api:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Admin__ApiKey: "${TNR_ADMIN_KEY:?defina TNR_ADMIN_KEY no .env}"
+      App__PublicWebUrl: "https://to-no-rango.velososolution.com.br"
+      App__PublicApiUrl: "https://to-no-rango.velososolution.com.br"
+      Cors__AllowedOrigins__0: "https://to-no-rango.velososolution.com.br"
+      Network__TrustForwardedHeaders: "true"
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: "https://to-no-rango.velososolution.com.br"
+    image: tonorango-web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+    ports: !override
+      - "127.0.0.1:3011:3000"
+    volumes: !reset []
+    command: ["npm", "run", "start"]
+    depends_on:
+      - api
+
+  # Túnel próprio do To-No-Rango: não depende do túnel dos outros sites.
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    user: "1000:1000"
+    command: ["tunnel", "--no-autoupdate", "--config", "/etc/cloudflared/config.yml", "run"]
+    volumes:
+      - ${HOME}/.cloudflared/tonorango:/etc/cloudflared:ro
+    depends_on:
+      - api
+      - web
