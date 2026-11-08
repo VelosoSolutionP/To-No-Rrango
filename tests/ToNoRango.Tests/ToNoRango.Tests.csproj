@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>ToNoRango.Tests</RootNamespace>
+    <AssemblyName>ToNoRango.Tests</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Shouldly" />
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="NetArchTest.Rules" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ToNoRango.Application\ToNoRango.Application.csproj" />
+    <ProjectReference Include="..\..\src\ToNoRango.Domain\ToNoRango.Domain.csproj" />
+    <ProjectReference Include="..\..\src\ToNoRango.Infrastructure\ToNoRango.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\ToNoRango.SharedKernel\ToNoRango.SharedKernel.csproj" />
+  </ItemGroup>
+
+</Project>

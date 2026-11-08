@@ -1,0 +1,54 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.40307.106
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ToNoRango.Api", "src\ToNoRango.Api\ToNoRango.Api.csproj", "{027b5fea-c1c0-4ceb-a3b7-0b7a7075555a}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ToNoRango.Application", "src\ToNoRango.Application\ToNoRango.Application.csproj", "{2fdce9d8-1be8-4eb6-b6a0-dd95ca5b797c}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ToNoRango.Domain", "src\ToNoRango.Domain\ToNoRango.Domain.csproj", "{ca863d26-930f-42cf-9932-14b8c7484642}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ToNoRango.Infrastructure", "src\ToNoRango.Infrastructure\ToNoRango.Infrastructure.csproj", "{74602b03-78f6-4ea0-9ace-88181a353e20}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ToNoRango.SharedKernel", "src\ToNoRango.SharedKernel\ToNoRango.SharedKernel.csproj", "{495bda43-2fda-4cbb-a4cf-4636dbd8f0f1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ToNoRango.Tests", "tests\ToNoRango.Tests\ToNoRango.Tests.csproj", "{d37da8b3-0bb3-4f39-8d1f-e42e6120ee3c}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{027b5fea-c1c0-4ceb-a3b7-0b7a7075555a}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{027b5fea-c1c0-4ceb-a3b7-0b7a7075555a}.Debug|Any CPU.Build.0 = True
+		{027b5fea-c1c0-4ceb-a3b7-0b7a7075555a}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{027b5fea-c1c0-4ceb-a3b7-0b7a7075555a}.Release|Any CPU.Build.0 = True
+		{2fdce9d8-1be8-4eb6-b6a0-dd95ca5b797c}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2fdce9d8-1be8-4eb6-b6a0-dd95ca5b797c}.Debug|Any CPU.Build.0 = True
+		{2fdce9d8-1be8-4eb6-b6a0-dd95ca5b797c}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2fdce9d8-1be8-4eb6-b6a0-dd95ca5b797c}.Release|Any CPU.Build.0 = True
+		{ca863d26-930f-42cf-9932-14b8c7484642}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ca863d26-930f-42cf-9932-14b8c7484642}.Debug|Any CPU.Build.0 = True
+		{ca863d26-930f-42cf-9932-14b8c7484642}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ca863d26-930f-42cf-9932-14b8c7484642}.Release|Any CPU.Build.0 = True
+		{74602b03-78f6-4ea0-9ace-88181a353e20}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{74602b03-78f6-4ea0-9ace-88181a353e20}.Debug|Any CPU.Build.0 = True
+		{74602b03-78f6-4ea0-9ace-88181a353e20}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{74602b03-78f6-4ea0-9ace-88181a353e20}.Release|Any CPU.Build.0 = True
+		{495bda43-2fda-4cbb-a4cf-4636dbd8f0f1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{495bda43-2fda-4cbb-a4cf-4636dbd8f0f1}.Debug|Any CPU.Build.0 = True
+		{495bda43-2fda-4cbb-a4cf-4636dbd8f0f1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{495bda43-2fda-4cbb-a4cf-4636dbd8f0f1}.Release|Any CPU.Build.0 = True
+		{d37da8b3-0bb3-4f39-8d1f-e42e6120ee3c}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{d37da8b3-0bb3-4f39-8d1f-e42e6120ee3c}.Debug|Any CPU.Build.0 = True
+		{d37da8b3-0bb3-4f39-8d1f-e42e6120ee3c}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{d37da8b3-0bb3-4f39-8d1f-e42e6120ee3c}.Release|Any CPU.Build.0 = True
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {a9f0caa4-90b5-40df-b412-f1f987f5bf8c}
+	EndGlobalSection
+EndGlobal

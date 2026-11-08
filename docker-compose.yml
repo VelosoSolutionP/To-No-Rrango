@@ -1,0 +1,119 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: tonorango
+      POSTGRES_USER: tonorango
+      POSTGRES_PASSWORD: tonorango
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tonorango -d tonorango"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: src/ToNoRango.Api/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Admin__ApiKey: dev-admin-key
+      ConnectionStrings__Postgres: "Host=postgres;Port=5432;Database=tonorango;Username=tonorango;Password=tonorango"
+      ConnectionStrings__Redis: "redis:6379"
+      App__PublicWebUrl: "http://localhost:3001"
+      Jwt__Key: "${TNR_JWT_KEY:-}"
+      Security__EncryptionKey: "${TNR_ENCRYPTION_KEY:-}"
+      Evolution__BaseUrl: "http://evolution:8080"
+      Evolution__ApiKey: "${EVOLUTION_API_KEY:-}"
+      Evolution__WebhookBaseUrl: "http://api:8080"
+      Llm__BaseUrl: "http://ollama-proxy:11434/v1"
+      Llm__Model: "qwen2.5:3b"
+      Zest__BaseUrl: "https://zest.velososolution.com.br"
+      Zest__Email: "${ZEST_EMAIL:-}"
+      Zest__Password: "${ZEST_PASSWORD:-}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Reaches the local model without putting the API on the other project's network,
+  # where service names such as "postgres" would resolve to the wrong containers.
+  ollama-proxy:
+    image: alpine/socat:1.8.0.3
+    restart: unless-stopped
+    command: "tcp-listen:11434,fork,reuseaddr tcp-connect:alexandra-ollama-1:11434"
+    networks:
+      - default
+      - alexandra
+
+  evolution:
+    image: evoapicloud/evolution-api:v2.3.7
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8101:8080"
+    environment:
+      SERVER_URL: "http://evolution:8080"
+      AUTHENTICATION_API_KEY: "${EVOLUTION_API_KEY:-}"
+      DEL_INSTANCE: "false"
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: "postgresql://tonorango:tonorango@postgres:5432/evolution?schema=public"
+      DATABASE_CONNECTION_CLIENT_NAME: tonorango
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: "redis://redis:6379/6"
+      CACHE_REDIS_PREFIX_KEY: tonorango-evolution
+      CACHE_LOCAL_ENABLED: "false"
+      CONFIG_SESSION_PHONE_CLIENT: "To-No-Rango"
+      CONFIG_SESSION_PHONE_NAME: Chrome
+      LOG_LEVEL: "ERROR,WARN"
+      TZ: America/Sao_Paulo
+    volumes:
+      - evolution_instances:/evolution/instances
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    image: node:22-alpine
+    restart: unless-stopped
+    working_dir: /app
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+    command: sh -c "npm install && npm run dev"
+
+networks:
+  alexandra:
+    external: true
+    name: alexandra_default
+
+volumes:
+  postgres_data:
+  evolution_instances:

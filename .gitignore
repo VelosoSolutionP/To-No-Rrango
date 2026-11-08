@@ -1,0 +1,45 @@
+## Build results
+bin/
+obj/
+out/
+
+## Test results
+TestResults/
+coverage/
+
+## Publish
+*.pubxml
+*.publishproj
+
+## Env
+.env
+.env.*
+!.env.example
+
+## Secrets
+*.pem
+*.key
+secrets*.json
+appsettings.Development.json.bak
+
+## IDEs
+.vs/
+.vscode/
+.idea/
+
+## Rider
+.idea/
+
+## User-specific
+*.rsuser
+
+## Azure
+.azure/
+
+## Misc
+.DS_Store
+Thumbs.db
+*.log
+
+# Anotações locais com credenciais
+k
