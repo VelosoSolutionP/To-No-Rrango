@@ -17,7 +17,17 @@ interface TrackingData {
   updatedAt: string | null;
   distanceKm: number | null;
   etaMinutes: number | null;
+  stage: TrackingStage | null;
 }
+
+type TrackingStage = "Left" | "Midway" | "Close" | "Arrived";
+
+const journey: Array<{ stage: TrackingStage; label: string }> = [
+  { stage: "Left", label: "Saiu" },
+  { stage: "Midway", label: "No meio do caminho" },
+  { stage: "Close", label: "A 2 min" },
+  { stage: "Arrived", label: "Chegou" },
+];
 
 const refreshMs = 10_000;
 const staleSeconds = 90;
@@ -26,7 +36,7 @@ function icon(leaflet: typeof import("leaflet"), label: string, className: strin
   return leaflet.divIcon({ className: "", html: `<span class="map-pin ${className}">${label}</span>`, iconSize: [36, 36], iconAnchor: [18, 18] });
 }
 
-export function DeliveryMap({ code }: { code: string }) {
+export function DeliveryMap({ code, dispatched }: { code: string; dispatched: boolean }) {
   const [data, setData] = useState<TrackingData | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const host = useRef<HTMLDivElement>(null);
@@ -121,11 +131,25 @@ export function DeliveryMap({ code }: { code: string }) {
 
   const age = data.updatedAt ? Math.max(0, Math.round((now - new Date(data.updatedAt).getTime()) / 1000)) : null;
   const isStale = age !== null && age > staleSeconds;
+  const arrived = data.stage === "Arrived";
+  const reached = journey.findIndex((step) => step.stage === data.stage);
 
   return (
     <section className="tracking-card delivery-map-card">
       <h2>Sua entrega no mapa</h2>
-      {data.etaMinutes !== null && !isStale ? (
+      {dispatched && reached >= 0 ? (
+        <ol className="journey">
+          {journey.map((step, index) => (
+            <li className={`${index < reached ? "is-done" : ""} ${index === reached ? "is-current" : ""}`} key={step.stage}>
+              <i aria-hidden="true" />
+              <span>{step.label}</span>
+            </li>
+          ))}
+        </ol>
+      ) : null}
+      {dispatched && arrived ? (
+        <p className="delivery-eta"><strong>O entregador chegou</strong></p>
+      ) : data.etaMinutes !== null && !isStale ? (
         <p className="delivery-eta">
           <strong>Chega em cerca de {data.etaMinutes} min</strong>
           {data.distanceKm !== null ? <span>Faltam cerca de {data.distanceKm.toLocaleString("pt-BR")} km</span> : null}

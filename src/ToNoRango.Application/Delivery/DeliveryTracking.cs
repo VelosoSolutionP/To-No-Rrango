@@ -10,7 +10,23 @@ public sealed record GeoPoint(double Latitude, double Longitude);
 
 public sealed record CourierPosition(double Latitude, double Longitude, DateTimeOffset At);
 
-public sealed record TrackingSession(string Token, Guid OrderId, string OrderCode, string StoreName, string Destination, GeoPoint? DestinationPoint);
+public enum TrackingStage
+{
+    Left = 1,
+    Midway = 2,
+    Close = 3,
+    Arrived = 4
+}
+
+public sealed record TrackingSession(
+    string Token,
+    Guid OrderId,
+    string OrderCode,
+    string StoreName,
+    string Destination,
+    GeoPoint? DestinationPoint,
+    double? StartKm = null,
+    TrackingStage Stage = TrackingStage.Left);
 
 /// <summary>Short-lived storage: positions expire by themselves and are never written to the database.</summary>
 public interface IDeliveryTrackingStore
@@ -46,7 +62,8 @@ public sealed record PublicTrackingDto(
     GeoPoint? Destination = null,
     DateTimeOffset? UpdatedAt = null,
     double? DistanceKm = null,
-    int? EtaMinutes = null);
+    int? EtaMinutes = null,
+    TrackingStage? Stage = null);
 
 public sealed record LiveDeliveryDto(
     Guid OrderId,
@@ -66,6 +83,10 @@ public static class TrackingEstimate
     private const double StreetFactor = 1.35;
     private const double AverageSpeedKmh = 25;
 
+    private const double ArrivedKm = 0.15;
+    private const int CloseMinutes = 2;
+    private const double MidwayShare = 0.6;
+
     public const double MaxPlausibleKm = 60;
 
     public static double DistanceKm(GeoPoint from, GeoPoint to)
@@ -79,6 +100,30 @@ public static class TrackingEstimate
     }
 
     public static int EtaMinutes(double distanceKm) => Math.Max(1, (int)Math.Ceiling(distanceKm / AverageSpeedKmh * 60));
+
+    /// <summary>The stage only moves forward, so GPS noise never takes "2 min away" back to "on the way".</summary>
+    public static TrackingSession Advance(TrackingSession session, CourierPosition position)
+    {
+        if (session.DestinationPoint is null)
+        {
+            return session;
+        }
+
+        var distance = DistanceKm(new GeoPoint(position.Latitude, position.Longitude), session.DestinationPoint);
+
+        if (distance > MaxPlausibleKm)
+        {
+            return session;
+        }
+
+        var start = session.StartKm ?? distance;
+        var stage = distance <= ArrivedKm ? TrackingStage.Arrived
+            : EtaMinutes(distance) <= CloseMinutes ? TrackingStage.Close
+            : distance <= start * MidwayShare ? TrackingStage.Midway
+            : TrackingStage.Left;
+
+        return session with { StartKm = start, Stage = stage > session.Stage ? stage : session.Stage };
+    }
 
     public static PublicTrackingDto Snapshot(TrackingSession session, CourierPosition? position)
     {
@@ -102,7 +147,7 @@ public static class TrackingEstimate
             return new PublicTrackingDto(true, courier, UpdatedAt: position.At);
         }
 
-        return new PublicTrackingDto(true, courier, session.DestinationPoint, position.At, Math.Round(distance, 1), EtaMinutes(distance));
+        return new PublicTrackingDto(true, courier, session.DestinationPoint, position.At, Math.Round(distance, 1), EtaMinutes(distance), session.Stage);
     }
 
     private static double Radians(double degrees) => degrees * Math.PI / 180;
@@ -188,7 +233,16 @@ public sealed class DeliveryTrackingService(
             return Finished;
         }
 
-        await store.SavePositionAsync(session.OrderCode, new CourierPosition(request.Latitude, request.Longitude, clock.GetUtcNow()));
+        var position = new CourierPosition(request.Latitude, request.Longitude, clock.GetUtcNow());
+        await store.SavePositionAsync(session.OrderCode, position);
+
+        var advanced = TrackingEstimate.Advance(session, position);
+
+        if (advanced != session)
+        {
+            await store.SaveAsync(advanced);
+        }
+
         return new CourierSessionDto(true, session.OrderCode, session.StoreName, session.Destination);
     }
 

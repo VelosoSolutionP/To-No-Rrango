@@ -22,6 +22,34 @@ public class DeliveryTrackingTests
 
     private static TrackingSession Session(GeoPoint? destination) => new("token", Guid.NewGuid(), "TR-1", "Loja", "Rua A", destination);
 
+    private static CourierPosition KmFromHome(double km) =>
+        new(Home.Latitude, Home.Longitude - (km / 1.35 / 104.6), DateTimeOffset.UtcNow);
+
+    [Theory]
+    [InlineData(4.0, TrackingStage.Left)]
+    [InlineData(2.0, TrackingStage.Midway)]
+    [InlineData(0.7, TrackingStage.Close)]
+    [InlineData(0.05, TrackingStage.Arrived)]
+    public void Stage_follows_the_share_of_the_route_left(double km, TrackingStage expected)
+    {
+        var started = TrackingEstimate.Advance(Session(Home), KmFromHome(5));
+
+        Assert.Equal(expected, TrackingEstimate.Advance(started, KmFromHome(km)).Stage);
+    }
+
+    [Fact]
+    public void Stage_does_not_go_back_when_the_gps_jumps()
+    {
+        var started = TrackingEstimate.Advance(Session(Home), KmFromHome(5));
+        var close = TrackingEstimate.Advance(started, KmFromHome(0.7));
+
+        Assert.Equal(TrackingStage.Close, TrackingEstimate.Advance(close, KmFromHome(3)).Stage);
+    }
+
+    [Fact]
+    public void Stage_is_not_promised_without_a_destination()
+        => Assert.Null(TrackingEstimate.Snapshot(Session(null), KmFromHome(1)).Stage);
+
     [Fact]
     public void Snapshot_without_position_is_waiting_for_the_courier()
     {

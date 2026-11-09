@@ -136,7 +136,7 @@ export function OrderTrackingClient({ code }: OrderTrackingClientProps) {
 
       <OrderPaymentPanel onPaid={reload} order={order} />
 
-      {order.fulfillmentType === "Delivery" && order.status !== "Cancelled" && order.status !== "Delivered" ? <DeliveryMap code={order.code} /> : null}
+      {order.fulfillmentType === "Delivery" && order.status !== "Cancelled" && order.status !== "Delivered" ? <DeliveryMap code={order.code} dispatched={order.status === "OutForDelivery"} /> : null}
 
       {order.status === "Cancelled" ? (
         <section className="tracking-card cancellation-card">

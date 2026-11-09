@@ -4678,6 +4678,63 @@ body {
   background: var(--surface-2);
 }
 
+.journey {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin: 0.6rem 0 0.9rem;
+  padding: 0;
+  list-style: none;
+}
+
+.journey li {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.journey li + li::before {
+  content: "";
+  position: absolute;
+  top: 0.4rem;
+  right: 50%;
+  width: 100%;
+  height: 2px;
+  background: currentColor;
+  opacity: 0.35;
+}
+
+.journey i {
+  position: relative;
+  z-index: 1;
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.journey .is-done,
+.journey .is-current {
+  color: var(--brand);
+}
+
+.journey .is-done + li::before,
+.journey .is-current::before {
+  opacity: 1;
+}
+
+.journey .is-current {
+  font-weight: 700;
+}
+
+.journey .is-current i {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand) 30%, transparent);
+}
+
 .delivery-eta {
   display: flex;
   flex-wrap: wrap;
