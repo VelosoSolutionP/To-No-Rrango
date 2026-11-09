@@ -770,8 +770,8 @@
   display: flex;
   flex-direction: column;
   gap: 1.1rem;
-  width: min(100%, 680px);
-  margin: auto;
+  width: min(100%, 820px);
+  margin: 0 auto;
 }
 
 .vx-login-showcase h2 {
@@ -789,8 +789,11 @@
   font-size: 1.02rem;
 }
 
+/* Os cartões dividem a altura que sobra: o lado esquerdo vai de cima a baixo em qualquer tela. */
 .vx-login-modules {
   display: grid;
+  flex: 1;
+  grid-auto-rows: 1fr;
   gap: 0.65rem;
   margin: 0;
   padding: 0;
@@ -883,36 +886,103 @@
   background: var(--tone);
 }
 
-.vx-login-preview {
-  display: none;
-  margin: 0;
-}
-
-.vx-login-preview figcaption {
-  margin-bottom: 0.5rem;
+.vx-login-section h3 {
+  margin: 0 0 0.55rem;
   color: var(--muted);
   font-family: var(--mono);
   font-size: 0.72rem;
+  font-weight: 500;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
-/* object-fit recorta o excesso: a imagem nunca estica, em nenhum tamanho de tela. */
-.vx-login-shot {
-  display: block;
-  width: 100%;
-  height: clamp(170px, calc(100vh - 41rem), 340px);
-  height: clamp(170px, calc(100dvh - 41rem), 340px);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  object-fit: cover;
-  object-position: 100% 30%;
+.vx-login-steps,
+.vx-login-products {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.vx-login-note {
-  margin: 0;
+.vx-login-steps li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.vx-login-steps b {
+  margin-bottom: 0.2rem;
+  color: var(--brand);
+  font-family: var(--mono);
+  font-size: 0.85rem;
+}
+
+.vx-login-steps strong {
+  font-size: 0.93rem;
+}
+
+.vx-login-steps small {
   color: var(--muted);
-  font-size: 0.84rem;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.vx-login-products li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.vx-login-products li[data-current="true"] {
+  border-color: var(--border-strong);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.vx-login-products span {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 9px;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.vx-login-products div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.vx-login-products strong {
+  overflow: hidden;
+  font-size: 0.85rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vx-login-products small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.73rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vx-login-products small[data-live="true"] {
+  color: var(--success);
 }
 
 .vx-login-panel {
@@ -1019,9 +1089,15 @@
   font-size: 0.8rem;
 }
 
-@media (min-width: 961px) and (min-height: 830px) {
-  .vx-login-preview {
-    display: block;
+@media (min-width: 961px) and (max-height: 760px) {
+  .vx-login-family {
+    display: none;
+  }
+}
+
+@media (min-width: 961px) and (max-height: 590px) {
+  .vx-login-section {
+    display: none;
   }
 }
 
@@ -1047,6 +1123,11 @@
 
   .vx-login-count em {
     display: none;
+  }
+
+  .vx-login-steps,
+  .vx-login-products {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

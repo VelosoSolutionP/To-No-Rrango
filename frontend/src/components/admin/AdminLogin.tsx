@@ -3,7 +3,6 @@
 import "./admin.css";
 import Link from "next/link";
 import { FormEvent, useState } from "react";
-import painel from "./login-painel.jpg";
 
 interface AdminLoginProps {
   onLogin: (email: string, password: string) => Promise<void>;
@@ -40,6 +39,18 @@ const modules = [
     count: 4,
     icon: "M3 3v18h18M8 17v-5M13 17V7M18 17v-8",
   },
+];
+
+const steps = [
+  { title: "O cliente pede", text: "Pelo cardápio ou pelo WhatsApp." },
+  { title: "A cozinha prepara", text: "Cada pedido na fila, em tempo real." },
+  { title: "A moto entrega", text: "Com o trajeto acompanhado no mapa." },
+];
+
+const products = [
+  { name: "To-No-Rango", color: "#ff6a13", live: true, current: true },
+  { name: "ZEST", color: "#7c3aed", live: true, current: false },
+  { name: "Quebra-Galho", color: "#3a3a43", live: false, current: false },
 ];
 
 export function AdminLogin({ onLogin, busy, error }: AdminLoginProps) {
@@ -84,13 +95,33 @@ export function AdminLogin({ onLogin, busy, error }: AdminLoginProps) {
             ))}
           </ul>
 
-          <figure className="vx-login-preview">
-            <figcaption>Veja o painel</figcaption>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img alt="Painel do To-No-Rango com entregas em andamento no mapa" className="vx-login-shot" height={painel.height} src={painel.src} width={painel.width} />
-          </figure>
+          <section className="vx-login-section">
+            <h3>Como funciona</h3>
+            <ol className="vx-login-steps">
+              {steps.map((step, index) => (
+                <li key={step.title}>
+                  <b>{index + 1}</b>
+                  <strong>{step.title}</strong>
+                  <small>{step.text}</small>
+                </li>
+              ))}
+            </ol>
+          </section>
 
-          <p className="vx-login-note">Acesso restrito · dados da sua loja</p>
+          <section className="vx-login-section vx-login-family">
+            <h3>Produtos Veloso Solution</h3>
+            <ul className="vx-login-products">
+              {products.map((product) => (
+                <li data-current={product.current} key={product.name}>
+                  <span style={{ background: product.color }}>{product.name[0]}</span>
+                  <div>
+                    <strong>{product.name}</strong>
+                    <small data-live={product.live}>{product.live ? "No ar" : "Em desenvolvimento"}</small>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
         </div>
       </aside>
 
