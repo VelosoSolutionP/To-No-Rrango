@@ -2,40 +2,25 @@
 
 import "./admin.css";
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
-import { WHATSAPP_URL } from "@/lib/site";
+import { FormEvent, useState } from "react";
+import cena from "./login-cena.webp";
 
 interface AdminLoginProps {
   onLogin: (email: string, password: string) => Promise<void>;
   busy: boolean;
   error: string | null;
   /** Entering through the Portal. Absent while the Veloso ID is not configured. */
-  onVelosoId?: () => void;
+  onVelosoId?: (document: string) => void;
   /** Off only after the customers have been migrated. */
   passwordLogin?: boolean;
 }
 
-type Theme = "dark" | "light";
-
-const THEME_KEY = "tonorango.login.theme";
-
-const modules = [
-  { tone: "orange", title: "Pedidos e cozinha", text: "Do cardápio à cozinha, em tempo real.", items: ["Cardápio digital", "Pedidos", "Cozinha"], icon: "M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4ZM3 6h18M16 10a4 4 0 0 1-8 0" },
-  { tone: "green", title: "Entregas no mapa", text: "Cada moto acompanhada até o cliente.", items: ["Rastreio ao vivo", "Entregadores", "Taxas por bairro"], icon: "M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0ZM12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" },
-  { tone: "lilac", title: "WhatsApp com a ZEST", text: "Atendimento e venda direto na conversa.", items: ["Atendimento", "Venda na conversa"], icon: "M21 12a9 9 0 0 1-13.3 7.9L3 21l1.2-4.6A9 9 0 1 1 21 12Z" },
-  { tone: "silver", title: "Gestão da loja", text: "Os números do negócio em um só lugar.", items: ["Estoque", "Financeiro", "Clientes", "Fiscal"], icon: "M3 3v18h18M8 17v-5M13 17V7M18 17v-8" },
-];
-
-const steps = [
-  { title: "O cliente pede", text: "Pelo cardápio ou pelo WhatsApp." },
-  { title: "A cozinha prepara", text: "Cada pedido na fila, em tempo real." },
-  { title: "A moto entrega", text: "Com o trajeto acompanhado no mapa." },
-];
-
-const products = [
-  { name: "To-No-Rango", color: "#ff6a13", live: true, current: true },
-  { name: "ZEST", color: "#7c3aed", live: true, current: false },
-  { name: "Quebra-Galho", color: "#62626e", live: false, current: false },
+const tiles = [
+  { label: "Pedidos", path: "M3 18h18M5 18a7 7 0 0 1 14 0M12 8.5V6M10 6h4" },
+  { label: "Cozinha", path: "M7 14a4 4 0 1 1 1-7.9 4.5 4.5 0 0 1 8 0 4 4 0 1 1 1 7.9v5a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1ZM7 16h10" },
+  { label: "Estoque", path: "m12 3 8 4.5v9L12 21l-8-4.5v-9ZM4 7.5l8 4.5 8-4.5M12 12v9" },
+  { label: "Financeiro", path: "M5 20v-6M12 20V9M19 20V4" },
+  { label: "Cardápio Digital", path: "M4 4h6v6H4ZM14 4h6v6h-6ZM4 14h6v6H4ZM14 14h3v3h-3ZM20 14v2M14 20h2M20 20h.01", accent: true },
 ];
 
 function formatDocument(value: string): string {
@@ -55,34 +40,21 @@ function formatDocument(value: string): string {
     .replace(/(\d{4})(\d)/, "$1-$2");
 }
 
+function Icon({ path, size = 22 }: { path: string; size?: number }) {
+  return (
+    <svg aria-hidden="true" fill="none" height={size} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" viewBox="0 0 24 24" width={size}>
+      <path d={path} />
+    </svg>
+  );
+}
+
 export function AdminLogin({ onLogin, busy, error, onVelosoId, passwordLogin = true }: AdminLoginProps) {
-  const [theme, setTheme] = useState<Theme>("dark");
   const [usingEmail, setUsingEmail] = useState(false);
   const [document, setDocument] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-
-  useEffect(() => {
-    try {
-      if (window.localStorage.getItem(THEME_KEY) === "light") {
-        setTheme("light");
-      }
-    } catch {
-      // Sem acesso ao armazenamento, fica no tema padrão.
-    }
-  }, []);
-
-  function chooseTheme(next: Theme) {
-    setTheme(next);
-
-    try {
-      window.localStorage.setItem(THEME_KEY, next);
-    } catch {
-      // A escolha vale só para esta visita.
-    }
-  }
 
   function handleContinue(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -95,7 +67,7 @@ export function AdminLogin({ onLogin, busy, error, onVelosoId, passwordLogin = t
 
     if (onVelosoId) {
       setNotice(null);
-      onVelosoId();
+      onVelosoId(digits);
       return;
     }
 
@@ -111,146 +83,130 @@ export function AdminLogin({ onLogin, busy, error, onVelosoId, passwordLogin = t
   const showEmail = usingEmail && passwordLogin;
 
   return (
-    <main className="vx-login" data-theme={theme}>
-      <aside className="vx-login-side">
-        <header className="vx-login-welcome">
-          <h2>Que bom ter você de volta.</h2>
-          <p>Cardápio, pedidos, entregas e gestão no mesmo ritmo.</p>
-        </header>
+    <main className="vx-login">
+      <header className="vx-login-top">
+        <Link className="vx-login-brand" href="/">
+          <span>TR</span>
+          <div>
+            <strong>TO-NO-<b>RANGO</b></strong>
+            <small>por Veloso Solution</small>
+          </div>
+        </Link>
+        <Link className="vx-login-product" href="/">
+          <i aria-hidden="true">▶</i>
+          Conheça o produto
+        </Link>
+      </header>
 
-        <ul className="vx-login-modules">
-          {modules.map((module) => (
-            <li data-tone={module.tone} key={module.title}>
-              <span className="vx-login-icon">
-                <svg aria-hidden="true" fill="none" height="19" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24" width="19">
-                  <path d={module.icon} />
-                </svg>
-              </span>
-              <div>
-                <strong>{module.title}</strong>
-                <small>{module.text}</small>
-                <p className="vx-login-chips">{module.items.map((item) => <span key={item}>{item}</span>)}</p>
-              </div>
-              <span className="vx-login-count">
-                <b>{String(module.items.length).padStart(2, "0")}</b>
-                <em>recursos</em>
-              </span>
-            </li>
-          ))}
-        </ul>
-
-        <section className="vx-login-block vx-login-how">
-          <h3>Como funciona</h3>
-          <ol className="vx-login-steps">
-            {steps.map((step, index) => (
-              <li key={step.title}>
-                <b>{index + 1}</b>
-                <strong>{step.title}</strong>
-                <small>{step.text}</small>
-              </li>
-            ))}
-          </ol>
-        </section>
-
-        <section className="vx-login-block vx-login-family">
-          <h3>Produtos Veloso Solution</h3>
-          <ul className="vx-login-products">
-            {products.map((product) => (
-              <li data-current={product.current} key={product.name}>
-                <span style={{ background: product.color }}>{product.name[0]}</span>
-                <div>
-                  <strong>{product.name}</strong>
-                  <small data-live={product.live}>{product.live ? "No ar" : "Em desenvolvimento"}</small>
-                </div>
+      <div className="vx-login-stage">
+        <section className="vx-login-copy">
+          <p className="vx-login-kicker">Gestão para restaurantes</p>
+          <h2>Seu negócio funcionando. <em>Seu controle na palma da mão.</em></h2>
+          <p className="vx-login-lead">Cardápio, pedidos, cozinha, entregas e gestão em um só lugar.</p>
+          <ul className="vx-login-tiles">
+            {tiles.map((tile) => (
+              <li data-accent={tile.accent ? "true" : undefined} key={tile.label}>
+                <Icon path={tile.path} size={30} />
+                <span>{tile.label}</span>
               </li>
             ))}
           </ul>
         </section>
-      </aside>
 
-      <section className="vx-login-main">
-        <div aria-label="Tema da tela" className="vx-login-theme" role="group">
-          <button aria-pressed={theme === "light"} onClick={() => chooseTheme("light")} type="button">Claro</button>
-          <button aria-pressed={theme === "dark"} onClick={() => chooseTheme("dark")} type="button">Escuro</button>
+        <div aria-hidden="true" className="vx-login-art">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img alt="" height={cena.height} src={cena.src} width={cena.width} />
         </div>
 
-        <div className="vx-login-card">
-          <Link className="vx-login-hero" href="/">
-            <span>TR</span>
-            <strong>To-No-Rango</strong>
-            <small>por Veloso Solution</small>
-            <em>Peça. Prepare. Entregue.</em>
-          </Link>
-
+        <section className="vx-login-card">
           <div className="vx-login-id">
-            <svg aria-hidden="true" fill="none" height="20" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24" width="20">
-              <path d="M12 3 5 6v5c0 4.5 2.9 8.3 7 10 4.1-1.7 7-5.5 7-10V6Z" />
-              <path d="m9 12 2 2 4-4" />
+            <svg aria-hidden="true" fill="none" height="46" viewBox="0 0 24 24" width="40">
+              <defs>
+                <linearGradient id="vx-shield" x1="0" x2="1" y1="0" y2="1">
+                  <stop offset="0" stopColor="#8b5cf6" />
+                  <stop offset="1" stopColor="#ff6a13" />
+                </linearGradient>
+              </defs>
+              <path d="M12 2.5 4.5 5.4v6c0 4.7 3.1 8.4 7.5 10.1 4.4-1.7 7.5-5.4 7.5-10.1v-6Z" stroke="url(#vx-shield)" strokeLinejoin="round" strokeWidth="1.7" />
+              <path d="M12 7.5 8 9v2.7c0 2.3 1.6 4.2 4 5.1 2.4-.9 4-2.8 4-5.1V9Z" fill="url(#vx-shield)" />
             </svg>
             <span>
               <strong>Veloso ID</strong>
-              <small>Um acesso para os produtos Veloso Solution</small>
+              <small>Acesso unificado e seguro</small>
             </span>
           </div>
 
+          <h1>{showEmail ? "Entrar com e-mail" : "Acessar o To-No-Rango"}</h1>
+
           {showEmail ? (
-            <div className="vx-login-entry">
-              <h1>Entrar com e-mail</h1>
-              <form className="vx-login-form" onSubmit={handleEmail}>
-                <label className="field">
-                  <span>E-mail</span>
-                  <input autoComplete="username" onChange={(event) => setEmail(event.target.value)} placeholder="voce@sualoja.com.br" required type="email" value={email} />
-                </label>
+            <form className="vx-login-form" onSubmit={handleEmail}>
+              <label className="vx-login-input">
+                <Icon path="M3 6h18v12H3ZM3 7l9 6 9-6" />
+                <input aria-label="E-mail" autoComplete="username" onChange={(event) => setEmail(event.target.value)} placeholder="E-mail" required type="email" value={email} />
+              </label>
+              <label className="vx-login-input">
+                <Icon path="M6 11h12v9H6ZM8.5 11V8a3.5 3.5 0 0 1 7 0v3" />
+                <input aria-label="Senha" autoComplete="current-password" onChange={(event) => setPassword(event.target.value)} placeholder="Senha" required type={showPassword ? "text" : "password"} value={password} />
+                <button aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"} aria-pressed={showPassword} onClick={() => setShowPassword((shown) => !shown)} type="button">
+                  {showPassword ? "Ocultar" : "Mostrar"}
+                </button>
+              </label>
 
-                <label className="field">
-                  <span>Senha</span>
-                  <div className="vx-login-password">
-                    <input autoComplete="current-password" onChange={(event) => setPassword(event.target.value)} required type={showPassword ? "text" : "password"} value={password} />
-                    <button aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"} aria-pressed={showPassword} onClick={() => setShowPassword((shown) => !shown)} type="button">
-                      {showPassword ? "Ocultar" : "Mostrar"}
-                    </button>
-                  </div>
-                </label>
+              {notice ? <p className="vx-login-notice">{notice}</p> : null}
+              {error ? <p className="form-error" role="alert">{error}</p> : null}
 
-                {notice ? <p className="vx-login-notice">{notice}</p> : null}
-                {error ? <p className="form-error" role="alert">{error}</p> : null}
-
-                <button className="vx-login-submit" disabled={busy} type="submit">{busy ? "Validando acesso..." : "Entrar"}</button>
-              </form>
-              <button className="vx-login-switch" onClick={() => { setUsingEmail(false); setNotice(null); }} type="button">Voltar para CPF ou CNPJ</button>
-            </div>
+              <button className="vx-login-submit" disabled={busy} type="submit">{busy ? "Validando acesso..." : "Entrar"}</button>
+              <button className="vx-login-alt" onClick={() => { setUsingEmail(false); setNotice(null); }} type="button">Voltar para CPF ou CNPJ</button>
+            </form>
           ) : (
-            <div className="vx-login-entry">
-              <h1>Acesse sua loja</h1>
+            <>
+              <p className="vx-login-sub">Identifique seu estabelecimento para continuar.</p>
               <form className="vx-login-form" noValidate onSubmit={handleContinue}>
-                <label className="field">
-                  <span>CPF ou CNPJ</span>
-                  <input autoComplete="username" inputMode="numeric" onChange={(event) => { setDocument(formatDocument(event.target.value)); setNotice(null); }} placeholder="000.000.000-00" value={document} />
+                <label className="vx-login-input">
+                  <Icon path="M3 5h18v14H3ZM8.5 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM5.5 16c.4-1.8 1.5-2.6 3-2.6s2.6.8 3 2.6M14 9h4M14 12.5h4" />
+                  <input aria-label="CPF ou CNPJ" autoComplete="username" inputMode="numeric" onChange={(event) => { setDocument(formatDocument(event.target.value)); setNotice(null); }} placeholder="CPF ou CNPJ" value={document} />
                 </label>
 
                 {notice ? <p className="form-error" role="alert">{notice}</p> : null}
                 {error ? <p className="form-error" role="alert">{error}</p> : null}
 
-                <button className="vx-login-submit" disabled={busy} type="submit">{busy ? "Aguarde..." : "Continuar"}</button>
+                <button className="vx-login-submit" disabled={busy} type="submit">
+                  {busy ? "Aguarde..." : <>Continuar <Icon path="M5 12h14M13 6l6 6-6 6" /></>}
+                </button>
+
+                {passwordLogin ? (
+                  <>
+                    <p className="vx-login-or"><span>ou</span></p>
+                    <button className="vx-login-alt" onClick={() => { setUsingEmail(true); setNotice(null); }} type="button">Entrar com e-mail</button>
+                  </>
+                ) : null}
               </form>
-              {passwordLogin ? <button className="vx-login-switch" onClick={() => { setUsingEmail(true); setNotice(null); }} type="button">Entrar com e-mail</button> : null}
-            </div>
+            </>
           )}
 
-          <nav aria-label="Ajuda" className="vx-login-links">
-            <Link href="/">
-              <span><strong>Ainda não é cliente?</strong><small>Conheça o To-No-Rango</small></span>
-              <i aria-hidden="true">→</i>
-            </Link>
-            <a href={WHATSAPP_URL} rel="noreferrer" target="_blank">
-              <span><strong>Precisa de ajuda?</strong><small>Fale com a Veloso no WhatsApp</small></span>
-              <i aria-hidden="true">→</i>
-            </a>
-          </nav>
+          <p className="vx-login-safe">
+            <Icon path="M6 11h12v9H6ZM8.5 11V8a3.5 3.5 0 0 1 7 0v3" size={18} />
+            Acesso protegido pelo <b>Veloso ID</b>
+          </p>
+        </section>
+      </div>
 
-          <small className="vx-login-foot">To-No-Rango · Veloso Solution · 2026</small>
+      <footer className="vx-login-foot">
+        <div>
+          <svg aria-hidden="true" height="30" viewBox="0 0 34 28" width="36">
+            <defs>
+              <linearGradient id="vx-v" x1="0" x2="1" y1="0" y2="1">
+                <stop offset="0" stopColor="#ff6a13" />
+                <stop offset="1" stopColor="#8b5cf6" />
+              </linearGradient>
+            </defs>
+            <path d="M1 2h9l7 13 7-13h9L17 27Z" fill="url(#vx-v)" />
+          </svg>
+          <strong>VELOSO <span>SOLUTION</span></strong>
+          <small>Ecossistema de gestão, vendas e atendimento.</small>
         </div>
-      </section>
+        <p><i aria-hidden="true">⚡</i> Tecnologia para o seu crescimento.</p>
+      </footer>
     </main>
   );
 }
