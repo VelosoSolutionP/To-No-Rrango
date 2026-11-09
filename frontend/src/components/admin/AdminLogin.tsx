@@ -9,9 +9,9 @@ interface AdminLoginProps {
   onLogin: (email: string, password: string) => Promise<void>;
   busy: boolean;
   error: string | null;
-  /** Entering through the Portal. Absent while the Veloso ID is not configured. */
-  onVelosoId?: (document: string) => void;
-  /** Off only after the customers have been migrated. */
+  /** Back to the Portal after a failed return. Absent while the Veloso ID is not configured. */
+  onVelosoId?: () => void;
+  /** Only where there is no Portal to go to, such as a local copy. */
   passwordLogin?: boolean;
 }
 
@@ -23,23 +23,6 @@ const tiles = [
   { label: "Cardápio Digital", path: "M4 4h6v6H4ZM14 4h6v6h-6ZM4 14h6v6H4ZM14 14h3v3h-3ZM20 14v2M14 20h2M20 20h.01", accent: true },
 ];
 
-function formatDocument(value: string): string {
-  const digits = value.replace(/\D/g, "").slice(0, 14);
-
-  if (digits.length <= 11) {
-    return digits
-      .replace(/^(\d{3})(\d)/, "$1.$2")
-      .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
-      .replace(/\.(\d{3})(\d)/, ".$1-$2");
-  }
-
-  return digits
-    .replace(/^(\d{2})(\d)/, "$1.$2")
-    .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
-    .replace(/\.(\d{3})(\d)/, ".$1/$2")
-    .replace(/(\d{4})(\d)/, "$1-$2");
-}
-
 function Icon({ path, size = 22 }: { path: string; size?: number }) {
   return (
     <svg aria-hidden="true" fill="none" height={size} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" viewBox="0 0 24 24" width={size}>
@@ -48,39 +31,17 @@ function Icon({ path, size = 22 }: { path: string; size?: number }) {
   );
 }
 
-export function AdminLogin({ onLogin, busy, error, onVelosoId, passwordLogin = true }: AdminLoginProps) {
-  const [usingEmail, setUsingEmail] = useState(false);
-  const [document, setDocument] = useState("");
-  const [notice, setNotice] = useState<string | null>(null);
+export function AdminLogin({ onLogin, busy, error, onVelosoId, passwordLogin = false }: AdminLoginProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-
-  function handleContinue(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const digits = document.replace(/\D/g, "");
-
-    if (digits.length !== 11 && digits.length !== 14) {
-      setNotice("Informe um CPF ou CNPJ completo.");
-      return;
-    }
-
-    if (onVelosoId) {
-      setNotice(null);
-      onVelosoId(digits);
-      return;
-    }
-
-    setNotice("O Veloso ID ainda não está ativo nesta loja. Entre com seu e-mail por enquanto.");
-    setUsingEmail(passwordLogin);
-  }
 
   async function handleEmail(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await onLogin(email.trim(), password);
   }
 
-  const showEmail = usingEmail && passwordLogin;
+  const showEmail = passwordLogin && !onVelosoId;
 
   return (
     <main className="vx-login">
@@ -152,36 +113,17 @@ export function AdminLogin({ onLogin, busy, error, onVelosoId, passwordLogin = t
                 </button>
               </label>
 
-              {notice ? <p className="vx-login-notice">{notice}</p> : null}
               {error ? <p className="form-error" role="alert">{error}</p> : null}
 
               <button className="vx-login-submit" disabled={busy} type="submit">{busy ? "Validando acesso..." : "Entrar"}</button>
-              <button className="vx-login-alt" onClick={() => { setUsingEmail(false); setNotice(null); }} type="button">Voltar para CPF ou CNPJ</button>
             </form>
           ) : (
-            <>
-              <p className="vx-login-sub">Identifique seu estabelecimento para continuar.</p>
-              <form className="vx-login-form" noValidate onSubmit={handleContinue}>
-                <label className="vx-login-input">
-                  <Icon path="M3 5h18v14H3ZM8.5 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM5.5 16c.4-1.8 1.5-2.6 3-2.6s2.6.8 3 2.6M14 9h4M14 12.5h4" />
-                  <input aria-label="CPF ou CNPJ" autoComplete="username" inputMode="numeric" onChange={(event) => { setDocument(formatDocument(event.target.value)); setNotice(null); }} placeholder="CPF ou CNPJ" value={document} />
-                </label>
-
-                {notice ? <p className="form-error" role="alert">{notice}</p> : null}
-                {error ? <p className="form-error" role="alert">{error}</p> : null}
-
-                <button className="vx-login-submit" disabled={busy} type="submit">
-                  {busy ? "Aguarde..." : <>Continuar <Icon path="M5 12h14M13 6l6 6-6 6" /></>}
-                </button>
-
-                {passwordLogin ? (
-                  <>
-                    <p className="vx-login-or"><span>ou</span></p>
-                    <button className="vx-login-alt" onClick={() => { setUsingEmail(true); setNotice(null); }} type="button">Entrar com e-mail</button>
-                  </>
-                ) : null}
-              </form>
-            </>
+            <div className="vx-login-form">
+              <p className="form-error" role="alert">{error ?? "Não foi possível abrir o Veloso ID agora. Tente novamente."}</p>
+              <button className="vx-login-submit" disabled={busy || !onVelosoId} onClick={onVelosoId} type="button">
+                Entrar com CPF ou CNPJ <Icon path="M5 12h14M13 6l6 6-6 6" />
+              </button>
+            </div>
           )}
 
           <p className="vx-login-safe">

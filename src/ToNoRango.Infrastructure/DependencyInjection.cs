@@ -47,6 +47,9 @@ public static class DependencyInjection
         services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
         services.AddSingleton<ISecretProtector, AesGcmSecretProtector>();
         services.AddSingleton<IAppUrls, AppUrls>();
+        services.AddMemoryCache();
+        services.AddSingleton(configuration.GetSection(ToNoRango.Application.Identity.VelosoIdOptions.SectionName).Get<ToNoRango.Application.Identity.VelosoIdOptions>() ?? new ToNoRango.Application.Identity.VelosoIdOptions());
+        services.AddHttpClient<ToNoRango.Application.Identity.IVelosoIdGateway, Security.VelosoIdGateway>(client => client.Timeout = TimeSpan.FromSeconds(8));
         services.AddSingleton<IOrderEvents, RedisOrderEvents>();
         services.AddSingleton<ToNoRango.Application.Delivery.IDeliveryTrackingStore, RedisDeliveryTrackingStore>();
         services.AddHttpClient<ToNoRango.Application.Delivery.IGeocoder, NominatimGeocoder>(client =>

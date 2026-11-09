@@ -29,6 +29,7 @@ public static class DependencyInjection
         services.AddScoped<ContractService>();
         services.AddScoped<Abstractions.IModuleAccess>(provider => provider.GetRequiredService<ContractService>());
         services.AddScoped<AuthService>();
+        services.AddScoped<VelosoIdService>();
         services.AddScoped<DeliveryService>();
         services.AddScoped<CourierService>();
         services.AddScoped<DeliveryTrackingService>();

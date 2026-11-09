@@ -143,10 +143,24 @@ public sealed class JwtTokenIssuer(IConfiguration configuration) : ITokenIssuer
 {
     private static readonly TimeSpan Lifetime = TimeSpan.FromHours(10);
 
-    public (string Token, DateTimeOffset ExpiresAt) Issue(Guid userId, Guid tenantId, string name, string email, string role)
+    public (string Token, DateTimeOffset ExpiresAt) Issue(Guid userId, Guid tenantId, string name, string email, string role, string? velosoSession = null)
     {
         var expiresAt = DateTimeOffset.UtcNow.Add(Lifetime);
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["Jwt:Key"]!));
+
+        var claims = new Dictionary<string, object>
+        {
+            [JwtRegisteredClaimNames.Sub] = userId.ToString(),
+            [JwtRegisteredClaimNames.Email] = email,
+            [JwtRegisteredClaimNames.Name] = name,
+            ["role"] = role,
+            [Access.TenantClaim] = tenantId.ToString()
+        };
+
+        if (velosoSession is not null)
+        {
+            claims[VelosoIdEndpoints.SessionClaim] = velosoSession;
+        }
 
         var token = new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
         {
@@ -154,14 +168,7 @@ public sealed class JwtTokenIssuer(IConfiguration configuration) : ITokenIssuer
             Audience = configuration["Jwt:Audience"],
             Expires = expiresAt.UtcDateTime,
             SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256),
-            Claims = new Dictionary<string, object>
-            {
-                [JwtRegisteredClaimNames.Sub] = userId.ToString(),
-                [JwtRegisteredClaimNames.Email] = email,
-                [JwtRegisteredClaimNames.Name] = name,
-                ["role"] = role,
-                [Access.TenantClaim] = tenantId.ToString()
-            }
+            Claims = claims
         });
 
         return (token, expiresAt);

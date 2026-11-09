@@ -126,6 +126,7 @@ app.UseExceptionHandler(exceptionHandlerApp => exceptionHandlerApp.Run(async con
 app.UseCors();
 
 app.UseAuthentication();
+app.Use(VelosoIdEndpoints.GuardAsync);
 app.Use(Access.ResolveTenantAsync);
 app.UseAuthorization();
 app.UseRateLimiter();
@@ -148,6 +149,7 @@ if (app.Environment.IsDevelopment() || app.Configuration["OpenApi:Exposed"] == "
 app.MapPublicEndpoints();
 app.MapAdminEndpoints();
 app.MapAuthEndpoints();
+app.MapVelosoIdEndpoints();
 app.MapPlatformEndpoints();
 app.MapModuleEndpoints();
 app.MapWebhookEndpoints();

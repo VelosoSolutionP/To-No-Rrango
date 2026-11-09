@@ -24,8 +24,10 @@ internal static class ModuleEndpoints
 
     public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapPost("/api/auth/login", async (LoginRequest request, AuthService service, CancellationToken ct) =>
-            (await service.LoginAsync(request, ct)).ToHttpResult())
+        app.MapPost("/api/auth/login", async (LoginRequest request, AuthService service, VelosoIdOptions veloso, CancellationToken ct) =>
+            veloso.Enabled && !veloso.PasswordLoginEnabled
+                ? Results.NotFound()
+                : (await service.LoginAsync(request, ct)).ToHttpResult())
             .WithTags("Autenticação")
             .RequireRateLimiting("login")
             .AllowAnonymous();

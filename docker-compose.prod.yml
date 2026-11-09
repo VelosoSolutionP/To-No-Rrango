@@ -8,6 +8,11 @@ services:
       App__PublicApiUrl: "https://to-no-rango.velososolution.com.br"
       Cors__AllowedOrigins__0: "https://to-no-rango.velososolution.com.br"
       Network__TrustForwardedHeaders: "true"
+      VelosoId__PortalWebUrl: "https://velososolution.com.br"
+      VelosoId__PortalApiUrl: "http://172.17.0.1:8081"
+      VelosoId__RootSecret: "${TNR_VELOSO_ID_RAIZ:-}"
+      VelosoId__RedirectUri: "https://to-no-rango.velososolution.com.br/admin"
+      VelosoId__PasswordLoginEnabled: "false"
 
   web:
     build:

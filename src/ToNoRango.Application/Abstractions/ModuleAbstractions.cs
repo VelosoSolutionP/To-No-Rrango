@@ -36,7 +36,7 @@ public interface IPasswordHasher
 
 public interface ITokenIssuer
 {
-    (string Token, DateTimeOffset ExpiresAt) Issue(Guid userId, Guid tenantId, string name, string email, string role);
+    (string Token, DateTimeOffset ExpiresAt) Issue(Guid userId, Guid tenantId, string name, string email, string role, string? velosoSession = null);
 }
 
 public interface ISecretProtector

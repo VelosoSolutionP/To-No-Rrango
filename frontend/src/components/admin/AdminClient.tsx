@@ -5,6 +5,7 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { UNAUTHORIZED_EVENT, adminApi, createAdminHttp, loadModules, login } from "@/lib/admin-api";
 import { clearAdminSession, loadAdminSession, saveAdminSession } from "@/lib/admin-session";
+import { completeVelosoId, endVelosoId, enterThroughPortal, isVelosoIdReturn, loadVelosoOptions, markVelosoLeft, startVelosoId, type VelosoOptions } from "@/lib/veloso-id";
 import type {
   AdminOrder,
   AdminSession,
@@ -71,6 +72,7 @@ export function AdminClient() {
   const [booting, setBooting] = useState(true);
   const [authBusy, setAuthBusy] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [velosoOptions, setVelosoOptions] = useState<VelosoOptions>({ velosoId: false, passwordLogin: false });
   const [establishments, setEstablishments] = useState<Establishment[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [tab, setTab] = useState<Tab>("overview");
@@ -144,11 +146,37 @@ export function AdminClient() {
     }
   }, []);
 
+  const goToPortal = useCallback(() => {
+    setBooting(true);
+    void enterThroughPortal().then((leaving) => {
+      if (!leaving) {
+        setBooting(false);
+      }
+    });
+  }, []);
+
   useEffect(() => {
+    void loadVelosoOptions().then(setVelosoOptions);
+  }, []);
+
+  useEffect(() => {
+    if (isVelosoIdReturn()) {
+      void completeVelosoId()
+        .then(async (next) => {
+          saveAdminSession(next);
+          setSession(next);
+          setTab(next.role === "Kitchen" ? "kitchen" : "overview");
+          await loadWorkspace(next);
+        })
+        .catch((error: unknown) => setAuthError(messageOf(error)))
+        .finally(() => setBooting(false));
+      return;
+    }
+
     const stored = loadAdminSession();
 
     if (!stored) {
-      setBooting(false);
+      goToPortal();
       return;
     }
 
@@ -161,17 +189,18 @@ export function AdminClient() {
       })
       .catch(() => loadWorkspace(stored))
       .finally(() => setBooting(false));
-  }, [loadWorkspace]);
+  }, [goToPortal, loadWorkspace]);
 
   useEffect(() => {
     const expire = () => {
       clearAdminSession();
       setSession(null);
+      goToPortal();
     };
 
     window.addEventListener(UNAUTHORIZED_EVENT, expire);
     return () => window.removeEventListener(UNAUTHORIZED_EVENT, expire);
-  }, []);
+  }, [goToPortal]);
 
   useEffect(() => {
     if (session && visibleTabs.length > 0 && !visibleTabs.some((item) => item.id === tab)) {
@@ -237,6 +266,10 @@ export function AdminClient() {
   }
 
   function handleLogout() {
+    const ending = session ? endVelosoId(session) : Promise.resolve();
+
+    markVelosoLeft();
+
     clearAdminSession();
     setSession(null);
     setEstablishments([]);
@@ -247,6 +280,8 @@ export function AdminClient() {
     setDataError(null);
     setMutationError(null);
     setTab("overview");
+    setBooting(true);
+    void ending.then(goToPortal);
   }
 
   async function handleEstablishmentChange(establishmentId: string) {
@@ -405,7 +440,15 @@ export function AdminClient() {
   }
 
   if (!session) {
-    return <AdminLogin busy={authBusy} error={authError} onLogin={handleLogin} />;
+    return (
+      <AdminLogin
+        busy={authBusy}
+        error={authError}
+        onLogin={handleLogin}
+        onVelosoId={velosoOptions.velosoId ? () => void startVelosoId().catch((error: unknown) => setAuthError(messageOf(error))) : undefined}
+        passwordLogin={velosoOptions.passwordLogin}
+      />
+    );
   }
 
   const hasEstablishment = Boolean(selectedEstablishment);
