@@ -5,7 +5,7 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { UNAUTHORIZED_EVENT, adminApi, createAdminHttp, loadModules, login } from "@/lib/admin-api";
 import { clearAdminSession, loadAdminSession, saveAdminSession } from "@/lib/admin-session";
-import { completeVelosoId, endVelosoId, enterThroughPortal, isOwnerDoor, isVelosoIdReturn, loadVelosoOptions, markVelosoLeft, startVelosoId, type VelosoOptions } from "@/lib/veloso-id";
+import { completeVelosoId, endVelosoId, enterThroughPortal, isVelosoIdReturn, loadVelosoOptions, markVelosoLeft, startVelosoId, type VelosoOptions } from "@/lib/veloso-id";
 import type {
   AdminOrder,
   AdminSession,
@@ -72,7 +72,6 @@ export function AdminClient() {
   const [booting, setBooting] = useState(true);
   const [authBusy, setAuthBusy] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [ownerDoor, setOwnerDoor] = useState(false);
   const [velosoOptions, setVelosoOptions] = useState<VelosoOptions>({ velosoId: false, passwordLogin: false });
   const [establishments, setEstablishments] = useState<Establishment[]>([]);
   const [selectedId, setSelectedId] = useState("");
@@ -177,12 +176,6 @@ export function AdminClient() {
     const stored = loadAdminSession();
 
     if (!stored) {
-      if (isOwnerDoor()) {
-        setOwnerDoor(true);
-        setBooting(false);
-        return;
-      }
-
       goToPortal();
       return;
     }
@@ -452,7 +445,6 @@ export function AdminClient() {
         busy={authBusy}
         error={authError}
         onLogin={handleLogin}
-        ownerDoor={ownerDoor}
         onVelosoId={velosoOptions.velosoId ? () => void startVelosoId().catch((error: unknown) => setAuthError(messageOf(error))) : undefined}
         passwordLogin={velosoOptions.passwordLogin}
       />
