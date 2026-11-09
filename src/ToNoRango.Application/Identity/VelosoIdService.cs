@@ -22,12 +22,19 @@ public sealed class VelosoIdOptions
     /// <summary>The old e-mail and password form. Only turned off after the customers have been migrated.</summary>
     public bool PasswordLoginEnabled { get; set; } = true;
 
+    /// <summary>Customers enter through the Portal only; the owner of the platform keeps a password, as in ZEST.</summary>
+    public string OwnerEmail { get; set; } = string.Empty;
+
     /// <summary>How often an open session is confirmed with the Portal.</summary>
     public int CheckSeconds { get; set; } = 300;
 
     public bool Enabled =>
         !string.IsNullOrWhiteSpace(PortalWebUrl) && !string.IsNullOrWhiteSpace(PortalApiUrl) &&
         !string.IsNullOrWhiteSpace(RootSecret) && !string.IsNullOrWhiteSpace(RedirectUri);
+
+    public bool AllowsPassword(string? email) =>
+        !Enabled || PasswordLoginEnabled
+        || (!string.IsNullOrWhiteSpace(email) && !string.IsNullOrWhiteSpace(OwnerEmail) && User.NormalizeEmail(email) == User.NormalizeEmail(OwnerEmail));
 }
 
 public sealed record VelosoPerson(Guid Id, string Name, string Email);

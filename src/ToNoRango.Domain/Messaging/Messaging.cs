@@ -52,22 +52,6 @@ public sealed class WhatsAppSettings : AggregateRoot
         UpdatedAt = now;
     }
 
-    public void AttachBrain(string botId, string botName, string prompt, DateTimeOffset now)
-    {
-        HotelBotId = Ensure.NotNullOrWhiteSpace(botId, nameof(botId));
-        HotelBotName = botName;
-        HotelBotPrompt = prompt;
-        UpdatedAt = now;
-    }
-
-    public void DetachBrain(DateTimeOffset now)
-    {
-        HotelBotId = null;
-        HotelBotName = null;
-        HotelBotPrompt = null;
-        UpdatedAt = now;
-    }
-
     public void SetAutomation(bool enabled, DateTimeOffset now)
     {
         AutoReply = enabled;

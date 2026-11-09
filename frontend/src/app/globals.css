@@ -4204,63 +4204,6 @@ h1, h2, h3 {
   margin: 0;
 }
 
-.zest-brain {
-  display: grid;
-  gap: 0.8rem;
-  padding: 1.7rem;
-}
-
-.zest-bots {
-  display: grid;
-  gap: 0.7rem;
-}
-
-.zest-bot {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.9rem;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: rgba(0, 0, 0, 0.26);
-}
-
-.zest-bot.is-active {
-  border-color: var(--brand);
-}
-
-.zest-bot img,
-.zest-bot-avatar {
-  flex: none;
-  width: 58px;
-  height: 58px;
-  border-radius: 16px;
-  object-fit: cover;
-}
-
-.zest-bot-avatar {
-  display: grid;
-  place-items: center;
-  background: var(--surface-3);
-  font-family: var(--display);
-  font-size: 1.5rem;
-}
-
-.zest-bot > div {
-  flex: 1;
-  min-width: 0;
-}
-
-.zest-bot small {
-  display: block;
-  color: var(--muted);
-}
-
-.zest-bot p {
-  margin: 0.25rem 0 0;
-  font-size: 0.92rem;
-}
-
 /* Cardápio: a capa ocupa a largura toda e a identidade da loja vem logo abaixo dela. */
 .store-hero {
   position: static;

@@ -66,6 +66,35 @@ public class ZestSalesFlowTests
         Assert.Equal(expected, ZestSalesFlow.WantsToOrder(message, Catalog()));
 
     [Fact]
+    public async Task AdicionalForaDoCardapio_ERecusadoSemPerderOCarrinho()
+    {
+        var turn = await Conversation("quero 2 x burger", "com bacon extra");
+
+        Assert.Equal(SalesStep.CartReview, turn.State.Step);
+        Assert.Contains("não está no nosso cardápio", turn.Reply);
+        Assert.Equal(2, turn.State.Cart[0].Quantity);
+    }
+
+    [Fact]
+    public async Task SegundoErro_NaoRepeteAMesmaPergunta()
+    {
+        var primeira = await Conversation("quero 2 x burger", "asdfgh");
+        var segunda = await Say(primeira.State, "asdfgh");
+
+        Assert.NotEqual(primeira.Reply, segunda.Reply);
+        Assert.Contains("atendente", segunda.Reply);
+    }
+
+    [Fact]
+    public async Task RespostaEntendida_ZeraOsErros()
+    {
+        var erro = await Conversation("quero 2 x burger", "asdfgh");
+        var certa = await Say(erro.State, "carrinho");
+
+        Assert.Equal(0, certa.State.Misses);
+    }
+
+    [Fact]
     public async Task PedidoDireto_ComQuantidadeVaiParaOCarrinho()
     {
         var turn = await Conversation("quero 2 x burger");

@@ -70,20 +70,6 @@ public static class DependencyInjection
             client.DefaultRequestHeaders.UserAgent.ParseAdd("ToNoRango/1.0");
         });
 
-        services.AddHttpClient<ILlmClient, OpenAiCompatibleLlmClient>(client => client.Timeout = TimeSpan.FromSeconds(25));
-
-        var zestBaseUrl = configuration["Zest:BaseUrl"];
-
-        services.AddHttpClient<ToNoRango.Application.Zest.IHotelClient, ZestHotelClient>(client =>
-        {
-            if (!string.IsNullOrWhiteSpace(zestBaseUrl))
-            {
-                client.BaseAddress = new Uri($"{zestBaseUrl.TrimEnd('/')}/");
-            }
-
-            client.Timeout = TimeSpan.FromSeconds(10);
-        });
-
         var evolutionBaseUrl = configuration["Evolution:BaseUrl"];
 
         services.AddHttpClient<IWhatsAppSender, EvolutionWhatsAppSender>(client =>

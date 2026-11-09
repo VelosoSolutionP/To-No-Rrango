@@ -47,7 +47,7 @@ export function Overview({ http, establishment, orders, modules, onNavigate }: P
         {hasWhatsApp ? (
           <article className="card vx-box">
             <div className="vx-panel-title">
-              <h3>WhatsApp e IA</h3>
+              <h3>WhatsApp</h3>
               <button className="link-button" onClick={() => onNavigate("whatsapp")} type="button">Gerenciar</button>
             </div>
             <p><span className={`vx-state ${connection.data?.connected ? "is-on" : ""}`}><i />{connection.data?.connected ? `Conectado${connection.data.number ? ` · +${connection.data.number}` : ""}` : "Sem conexão"}</span></p>

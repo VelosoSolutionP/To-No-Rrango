@@ -13,6 +13,8 @@ interface AdminLoginProps {
   onVelosoId?: () => void;
   /** Only where there is no Portal to go to, such as a local copy. */
   passwordLogin?: boolean;
+  /** /admin?acesso=email: the owner of the platform, never a customer. */
+  ownerDoor?: boolean;
 }
 
 const tiles = [
@@ -31,7 +33,7 @@ function Icon({ path, size = 22 }: { path: string; size?: number }) {
   );
 }
 
-export function AdminLogin({ onLogin, busy, error, onVelosoId, passwordLogin = false }: AdminLoginProps) {
+export function AdminLogin({ onLogin, busy, error, onVelosoId, passwordLogin = false, ownerDoor = false }: AdminLoginProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -41,7 +43,7 @@ export function AdminLogin({ onLogin, busy, error, onVelosoId, passwordLogin = f
     await onLogin(email.trim(), password);
   }
 
-  const showEmail = passwordLogin && !onVelosoId;
+  const showEmail = ownerDoor || (passwordLogin && !onVelosoId);
 
   return (
     <main className="vx-login">

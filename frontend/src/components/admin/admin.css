@@ -651,8 +651,7 @@
   font-weight: 600;
 }
 
-.vx .zest-connect,
-.vx .zest-brain {
+.vx .zest-connect {
   padding: 1rem;
 }
 
@@ -669,11 +668,6 @@
 .vx .zest-qr img {
   width: 200px;
   border-radius: 10px;
-}
-
-.vx .zest-bot {
-  border-radius: 10px;
-  background: #121215;
 }
 
 .vx-checks {

@@ -28,9 +28,6 @@ public static class Modules
     public const string Relatorios = "relatorios";
     public const string Rastreio = "rastreio";
     public const string Ia = "ia";
-
-    /// <summary>Paid add-on: lets ZEST fall back to an LLM when its own rules have no answer.</summary>
-    public const string IaLlm = "ia_llm";
 }
 
 public sealed record PublishContractRequest(

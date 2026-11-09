@@ -25,9 +25,9 @@ internal static class ModuleEndpoints
     public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPost("/api/auth/login", async (LoginRequest request, AuthService service, VelosoIdOptions veloso, CancellationToken ct) =>
-            veloso.Enabled && !veloso.PasswordLoginEnabled
-                ? Results.NotFound()
-                : (await service.LoginAsync(request, ct)).ToHttpResult())
+            veloso.AllowsPassword(request.Email)
+                ? (await service.LoginAsync(request, ct)).ToHttpResult()
+                : Results.NotFound())
             .WithTags("Autenticação")
             .RequireRateLimiting("login")
             .AllowAnonymous();
@@ -333,15 +333,6 @@ internal static class ModuleEndpoints
 
         managers.MapPut($"{Establishment}/whatsapp/automation", async (Guid establishmentId, SetAutomationRequest request, WhatsAppService service, CancellationToken ct) =>
             (await service.SetAutomationAsync(establishmentId, request.Enabled, ct)).ToHttpResult());
-
-        group.MapGet($"{Establishment}/zest/brain", async (Guid establishmentId, WhatsAppService service, CancellationToken ct) =>
-            (await service.GetBrainAsync(establishmentId, ct)).ToHttpResult());
-
-        managers.MapPut($"{Establishment}/zest/brain", async (Guid establishmentId, AttachBrainRequest request, WhatsAppService service, CancellationToken ct) =>
-            (await service.AttachBrainAsync(establishmentId, request.BotId, ct)).ToHttpResult());
-
-        managers.MapDelete($"{Establishment}/zest/brain", async (Guid establishmentId, WhatsAppService service, CancellationToken ct) =>
-            (await service.DetachBrainAsync(establishmentId, ct)).ToHttpResult());
 
         group.MapGet($"{Establishment}/whatsapp/connection", async (Guid establishmentId, WhatsAppService service, CancellationToken ct) =>
             (await service.GetConnectionAsync(establishmentId, ct)).ToHttpResult());

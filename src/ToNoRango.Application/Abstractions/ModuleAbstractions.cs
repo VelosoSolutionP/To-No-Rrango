@@ -173,13 +173,6 @@ public interface ILookupClient
     Task<CepData?> FindCepAsync(string cep, CancellationToken cancellationToken);
 }
 
-public interface ILlmClient
-{
-    bool IsConfigured { get; }
-
-    Task<string?> CompleteAsync(string systemPrompt, string userMessage, CancellationToken cancellationToken);
-}
-
 public sealed record DashboardTopItem(string Name, int Quantity, long RevenueInCents);
 
 public sealed record DashboardStatusCount(OrderStatus Status, int Count);

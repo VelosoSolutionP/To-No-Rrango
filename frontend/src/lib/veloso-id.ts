@@ -79,6 +79,11 @@ export async function enterThroughPortal(): Promise<boolean> {
   }
 }
 
+/** A porta do dono da plataforma, igual ao /entrar?acesso=email do Portal. Cliente não tem senha. */
+export function isOwnerDoor(): boolean {
+  return new URLSearchParams(window.location.search).get("acesso") === "email";
+}
+
 export function isVelosoIdReturn(): boolean {
   if (typeof window === "undefined") {
     return false;

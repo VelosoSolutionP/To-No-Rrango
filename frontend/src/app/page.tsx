@@ -37,7 +37,7 @@ const pillars = [
 ];
 
 const zestPoints = [
-  { title: "Você escolhe quem atende", text: "Selecione uma IA homologada para assumir o cardápio e troque quando quiser." },
+  { title: "Responde com os dados da loja", text: "Preço, taxa de entrega e situação do pedido saem do seu cardápio, sem inventar nada." },
   { title: "Conexão pelo seu número", text: "Liga por número ou QR Code e desconecta em um clique, direto no painel." },
   { title: "Só atende quando você mandar", text: "A resposta automática começa desligada e fica nas suas mãos." },
   { title: "Proteção contra conversa em loop", text: "Se outro robô responder sem parar, a ZEST identifica e pausa o atendimento." },
@@ -66,7 +66,7 @@ const questions = [
   { q: "Meu cliente precisa instalar alguma coisa?", a: "Não. O cardápio abre no navegador do celular, a partir do link da sua loja." },
   { q: "Como eu recebo o dinheiro das vendas?", a: "Você conecta a sua conta do Mercado Pago no painel. Pix e cartão caem direto nela." },
   { q: "Posso usar meu número de WhatsApp?", a: "Sim. Você conecta o número pelo painel e pode desconectar quando quiser." },
-  { q: "A IA já sai respondendo sozinha?", a: "Não. O atendimento automático só começa depois que a conexão e a IA estiverem prontas e você ligar." },
+  { q: "O WhatsApp já sai respondendo sozinho?", a: "Não. O atendimento automático só começa depois que a conexão estiver pronta e você ligar." },
   { q: "Controla estoque e financeiro também?", a: "Sim. Os pedidos alimentam o estoque pela ficha técnica, o financeiro e os relatórios." },
 ];
 
@@ -103,7 +103,7 @@ export default function Home() {
           <p className="zx-tag"><i />Alimentação · Inteligência · Gestão</p>
           <h1>Seu delivery <span>vendendo sozinho.</span></h1>
           <p className="lx-lead">
-            Cardápio digital, pedidos, pagamentos e uma IA própria para o seu negócio, atendendo e vendendo pelo WhatsApp a qualquer hora.
+            Cardápio digital, pedidos, pagamentos e atendimento automático, vendendo pelo WhatsApp a qualquer hora.
           </p>
           <SlugForm />
           <div className="lx-hero-links">
@@ -175,9 +175,9 @@ export default function Home() {
             </div>
           </div>
           <div data-reveal>
-            <p className="lx-eyebrow">02 / IA própria</p>
+            <p className="lx-eyebrow">02 / WhatsApp</p>
             <h2>Uma atendente que <span>conhece o seu cardápio.</span></h2>
-            <p className="lx-copy">A ZEST usa os seus produtos e preços para atender no WhatsApp, enquanto você e a equipe cuidam do preparo.</p>
+            <p className="lx-copy">O atendimento usa os seus produtos e preços para responder no WhatsApp, enquanto você e a equipe cuidam do preparo.</p>
             <ul className="lx-points">
               {zestPoints.map((point) => (
                 <li key={point.title}>

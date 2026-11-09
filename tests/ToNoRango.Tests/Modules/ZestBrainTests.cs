@@ -55,36 +55,3 @@ public class ZestBrainTests
     public void PalavraParcial_NaoDisparaIntencao() =>
         Assert.NotEqual(ZestIntent.Greeting, ZestBrain.Answer(Context(), "noite passada").Intent);
 }
-
-public class HotelCatalogTests
-{
-    private static string Bot(string id, string state = "homologado", string profession = "delivery", string validated = "true", string failures = "[]") => $$$"""
-        {"agenteId":"{{{id}}}","nome":"Rita","estado":"{{{state}}}","profissao":"{{{profession}}}","validacao":{"validado":{{{validated}}}},"falhas":{{{failures}}},"lacunas":[],
-         "perfil":{"foto":"data:image/png;base64,AA","persona":"Você é {nome}.","mensagemInicial":"Oi, sou {nome}","regrasAdicionais":["Sem gírias"]},
-         "nos":[{"estado":"homologado","categoria":"Tom","conteudo":"Cordial"},{"estado":"rascunho","categoria":"X","conteudo":"Oculto"}] }
-        """;
-
-    private static IReadOnlyList<HotelBot> Parse(params string[] bots) =>
-        HotelCatalog.Parse(System.Text.Json.JsonDocument.Parse($"{{\"bots\":[{string.Join(',', bots)}]}}").RootElement);
-
-    [Fact]
-    public void SoEntraBotTotalmenteHomologado()
-    {
-        var list = Parse(Bot("ok"), Bot("a", state: "rascunho"), Bot("c", validated: "false"), Bot("d", failures: "[\"x\"]"));
-
-        Assert.Equal("ok", Assert.Single(list).Id);
-    }
-
-    [Fact]
-    public void PromptUsaPersonaRegrasEApenasConhecimentoHomologado()
-    {
-        var bot = Parse(Bot("ok"))[0];
-
-        Assert.Equal("Oi, sou Rita", bot.FirstMessage);
-        Assert.Equal(1, bot.KnowledgeNodes);
-        Assert.Contains("Você é Rita.", bot.Prompt);
-        Assert.Contains("Regra: Sem gírias", bot.Prompt);
-        Assert.Contains("Tom: Cordial", bot.Prompt);
-        Assert.DoesNotContain("Oculto", bot.Prompt);
-    }
-}

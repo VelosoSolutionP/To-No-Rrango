@@ -8,6 +8,24 @@ public sealed class VelosoIdProtocolTests
     private const string Nonce = "nonce-do-navegador-123";
     private static readonly DateTimeOffset Now = new(2026, 11, 9, 15, 0, 0, TimeSpan.Zero);
 
+    private static VelosoIdOptions Portal(bool password) => new()
+    {
+        PortalWebUrl = "https://p", PortalApiUrl = "http://a", RootSecret = Root, RedirectUri = "https://r/admin",
+        PasswordLoginEnabled = password, OwnerEmail = "Dono@Loja.com",
+    };
+
+    [Fact]
+    public void Com_o_Portal_so_o_dono_usa_senha()
+    {
+        Assert.True(Portal(false).AllowsPassword("dono@loja.com"));
+        Assert.False(Portal(false).AllowsPassword("cliente@loja.com"));
+        Assert.False(Portal(false).AllowsPassword(null));
+    }
+
+    [Fact]
+    public void Sem_Portal_a_senha_continua()
+        => Assert.True(new VelosoIdOptions().AllowsPassword("cliente@loja.com"));
+
     [Fact]
     public void Estado_valido_devolve_o_valor_aleatorio()
     {

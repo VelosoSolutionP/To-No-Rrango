@@ -170,62 +170,6 @@ interface Connection {
   number: string | null;
 }
 
-interface BrainBot {
-  id: string;
-  name: string;
-  profession: string | null;
-  photo: string | null;
-  persona: string | null;
-  firstMessage: string | null;
-  knowledgeNodes: number;
-}
-
-interface Brain {
-  configured: boolean;
-  attachedId: string | null;
-  attachedName: string | null;
-  available: BrainBot[];
-  problem: string | null;
-}
-
-function BrainCard({ http, establishmentId }: Props) {
-  const brain = useLoad(() => http.get<Brain>(`/establishments/${establishmentId}/zest/brain`), [establishmentId]);
-  const action = useAction(brain.reload);
-  const data = brain.data;
-
-  return (
-    <article className="zx-card zest-brain">
-      <h2>{data?.attachedName ? `${data.attachedName} assumiu o cardápio` : "IA do Hotel dos Bots"}</h2>
-      <p className="zx-status"><i className={data?.attachedName ? "is-on" : ""} />{data?.attachedName ? "IA vinculada" : "Escolha quem assume o cardápio"}</p>
-      {data?.problem ? <p className="form-error">{data.problem}</p> : null}
-      {brain.error ? <p className="form-error">{brain.error}</p> : null}
-      <ErrorText message={action.error} />
-      {data && data.available.length > 0 ? (
-        <div className="zest-bots">
-          {data.available.map((bot) => (
-            <div className={`zest-bot ${bot.id === data.attachedId ? "is-active" : ""}`} key={bot.id}>
-              {bot.photo ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img alt="" src={bot.photo} />
-              ) : <span className="zest-bot-avatar">{bot.name.slice(0, 1)}</span>}
-              <div>
-                <strong>{bot.name}</strong>
-                <small>{bot.profession ? `${bot.profession} · ` : ""}{bot.knowledgeNodes} conhecimento(s) homologado(s)</small>
-                {bot.firstMessage ? <p className="muted">“{bot.firstMessage}”</p> : null}
-              </div>
-              {bot.id === data.attachedId ? (
-                <button className="secondary-button secondary-button-small" disabled={action.busy} onClick={() => action.run(() => http.del(`/establishments/${establishmentId}/zest/brain`))} type="button">Retirar</button>
-              ) : (
-                <button className="primary-button" disabled={action.busy} onClick={() => action.run(() => http.put(`/establishments/${establishmentId}/zest/brain`, { botId: bot.id }))} type="button">Assumir</button>
-              )}
-            </div>
-          ))}
-        </div>
-      ) : null}
-    </article>
-  );
-}
-
 interface Stats {
   conversations: number;
   ordersByZest: number;
@@ -335,15 +279,12 @@ function ConnectCard({ http, establishmentId }: Props) {
 function Automation({ http, establishmentId }: Props) {
   const settings = useLoad(() => http.get<{ autoReply: boolean }>(`/establishments/${establishmentId}/whatsapp`), [establishmentId]);
   const connection = useLoad(() => http.get<Connection>(`/establishments/${establishmentId}/whatsapp/connection`), [establishmentId]);
-  const brain = useLoad(() => http.get<Brain>(`/establishments/${establishmentId}/zest/brain`), [establishmentId]);
   const action = useAction(settings.reload);
   const connected = connection.data?.connected ?? false;
-  const attached = Boolean(brain.data?.attachedId);
-  const homologated = attached && (brain.data?.available.some((bot) => bot.id === brain.data?.attachedId) ?? false);
   const active = settings.data?.autoReply ?? false;
 
   function turnOn() {
-    if (window.confirm("Ativar o atendimento automático? A IA passa a responder os clientes reais deste número.")) {
+    if (window.confirm("Ativar o atendimento automático? As respostas automáticas passam a ir para os clientes reais deste número.")) {
       void action.run(() => http.put(`/establishments/${establishmentId}/whatsapp/automation`, { enabled: true }));
     }
   }
@@ -356,14 +297,13 @@ function Automation({ http, establishmentId }: Props) {
       </div>
       <ul className="vx-checks">
         <li className={connected ? "is-ok" : ""}><b>{connected ? "✓" : "–"}</b>WhatsApp conectado</li>
-        <li className={homologated ? "is-ok" : ""}><b>{homologated ? "✓" : "–"}</b>IA homologada vinculada</li>
         <li className="is-ok"><b>✓</b>Trava contra conversa entre robôs</li>
       </ul>
       <ErrorText message={action.error} />
       {active ? (
         <button className="secondary-button" disabled={action.busy} onClick={() => action.run(() => http.put(`/establishments/${establishmentId}/whatsapp/automation`, { enabled: false }))} type="button">Desligar atendimento</button>
       ) : (
-        <button className="primary-button" disabled={action.busy || !connected || !homologated} onClick={turnOn} type="button">Ativar atendimento</button>
+        <button className="primary-button" disabled={action.busy || !connected} onClick={turnOn} type="button">Ativar atendimento</button>
       )}
     </article>
   );
@@ -375,8 +315,8 @@ function Sell({ storeName, ...props }: Props & { storeName: string }) {
   return (
     <>
       <div className="zest-stats">
-        <div className="zx-card"><span>Pedidos pela IA</span><strong>{stats.data?.ordersByZest ?? 0}</strong><small>30 dias</small></div>
-        <div className="zx-card"><span>Vendido pela IA</span><strong>{formatBRL(stats.data?.revenueByZestInCents ?? 0)}</strong><small>30 dias</small></div>
+        <div className="zx-card"><span>Pedidos pelo WhatsApp</span><strong>{stats.data?.ordersByZest ?? 0}</strong><small>30 dias</small></div>
+        <div className="zx-card"><span>Vendido pelo WhatsApp</span><strong>{formatBRL(stats.data?.revenueByZestInCents ?? 0)}</strong><small>30 dias</small></div>
         <div className="zx-card"><span>Conversas</span><strong>{stats.data?.conversations ?? 0}</strong><small>30 dias</small></div>
         <div className="zx-card"><span>Vendas em andamento</span><strong>{stats.data?.activeSales ?? 0}</strong><small>agora</small></div>
       </div>
@@ -384,7 +324,6 @@ function Sell({ storeName, ...props }: Props & { storeName: string }) {
         <ConnectCard {...props} />
         <Automation {...props} />
       </div>
-      <BrainCard {...props} />
     </>
   );
 }
@@ -479,7 +418,7 @@ function Inbox({ http, establishmentId }: Props) {
 export function Zest({ canTeach, canInbox, storeName, ...props }: Props & { canTeach: boolean; canInbox: boolean; storeName: string }) {
   type View = "connection" | "inbox" | "teach" | "test";
   const options: Array<{ value: View; label: string }> = [
-    ...(canTeach && canInbox ? [{ value: "connection" as View, label: "Conexão e IA" }] : []),
+    ...(canTeach && canInbox ? [{ value: "connection" as View, label: "Conexão" }] : []),
     ...(canInbox ? [{ value: "inbox" as View, label: "Conversas" }] : []),
     ...(canTeach ? [{ value: "teach" as View, label: "Conhecimento da loja" }, { value: "test" as View, label: "Testar venda" }] : []),
   ];
@@ -487,7 +426,7 @@ export function Zest({ canTeach, canInbox, storeName, ...props }: Props & { canT
 
   return (
     <section className="admin-section">
-      <ModuleHeading eyebrow="Inteligência" title="WhatsApp e IA" hint="Conexão do número, IA do Hotel dos Bots e atendimento." />
+      <ModuleHeading eyebrow="Inteligência" title="WhatsApp" hint="Conexão do número e atendimento." />
       <SubTabs onChange={setView} options={options} value={view} />
       {view === "connection" ? <Sell {...props} storeName={storeName} /> : null}
       {view === "inbox" ? <Inbox {...props} /> : null}

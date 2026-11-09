@@ -31,12 +31,6 @@ public sealed record WhatsAppSettingsDto(
 
 public sealed record WhatsAppConnectionDto(bool Connected, string? QrCodeBase64, bool CanProvision, string? Problem, string? PairingCode = null, string? Number = null);
 
-public sealed record BrainBotDto(string Id, string Name, string? Profession, string? Photo, string? Persona, string? FirstMessage, int KnowledgeNodes);
-
-public sealed record BrainDto(bool Configured, string? AttachedId, string? AttachedName, IReadOnlyList<BrainBotDto> Available, string? Problem);
-
-public sealed record AttachBrainRequest(string BotId);
-
 public sealed record SetAutomationRequest(bool Enabled);
 
 public sealed record ConnectWhatsAppRequest(string? Phone);
@@ -140,7 +134,6 @@ public sealed class WhatsAppService(
     IEstablishmentRepository establishments,
     ZestService zest,
     ZestSalesService sales,
-    IHotelClient hotel,
     IWhatsAppSender sender,
     IModuleAccess modules,
     ISecretProtector protector,
@@ -315,27 +308,20 @@ public sealed class WhatsAppService(
             return "Conecte um WhatsApp antes de ativar o atendimento.";
         }
 
-        if (settings.HotelBotId is null)
-        {
-            return "Escolha uma IA homologada no Hotel dos Bots antes de ativar o atendimento.";
-        }
-
         try
         {
             var (connected, _) = await sender.GetStateAsync(settings.InstanceName, cancellationToken);
 
             if (!connected)
             {
-                return "O WhatsApp não está conectado.";
+                    return "O WhatsApp não está conectado.";
             }
 
-            var bots = await hotel.ListAvailableAsync(cancellationToken);
-
-            return bots.Any(bot => bot.Id == settings.HotelBotId) ? null : "A IA escolhida não está mais homologada no Hotel dos Bots.";
+            return null;
         }
         catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
         {
-            return "Não consegui confirmar a conexão e a IA. Tente novamente.";
+            return "Não consegui confirmar a conexão. Tente novamente.";
         }
     }
 
@@ -362,82 +348,6 @@ public sealed class WhatsAppService(
             await unitOfWork.SaveChangesAsync(cancellationToken);
 
             return new WhatsAppConnectionDto(false, null, true, null);
-        });
-
-    public async Task<Result<BrainDto>> GetBrainAsync(Guid establishmentId, CancellationToken cancellationToken)
-    {
-        if (await establishments.GetByIdAsync(establishmentId, cancellationToken) is null)
-        {
-            return Result<BrainDto>.Failure(CommonErrors.EstablishmentNotFound);
-        }
-
-        var settings = await settingsRepository.FirstOrDefaultAsync(item => item.EstablishmentId == establishmentId, cancellationToken);
-
-        if (!hotel.IsConfigured)
-        {
-            return new BrainDto(false, settings?.HotelBotId, settings?.HotelBotName, [], "A conexão com o Hotel dos Bots ainda não foi configurada.");
-        }
-
-        try
-        {
-            var bots = await hotel.ListAvailableAsync(cancellationToken);
-            var list = bots.Select(bot => new BrainBotDto(bot.Id, bot.Name, bot.Profession, bot.Photo, bot.Persona, bot.FirstMessage, bot.KnowledgeNodes)).ToList();
-
-            return new BrainDto(true, settings?.HotelBotId, settings?.HotelBotName, list, list.Count == 0 ? "O Hotel ainda não tem IA homologada." : null);
-        }
-        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
-        {
-            return new BrainDto(true, settings?.HotelBotId, settings?.HotelBotName, [], "Não consegui falar com o Hotel dos Bots.");
-        }
-    }
-
-    public Task<Result<BrainDto>> AttachBrainAsync(Guid establishmentId, string botId, CancellationToken cancellationToken) =>
-        Guarded.RunAsync<BrainDto>(async () =>
-        {
-            var establishment = await establishments.GetByIdAsync(establishmentId, cancellationToken);
-
-            if (establishment is null)
-            {
-                return Result<BrainDto>.Failure(CommonErrors.EstablishmentNotFound);
-            }
-
-            if (!hotel.IsConfigured)
-            {
-                return Result<BrainDto>.Failure(AppErrors.Validation("A conexão com o Hotel dos Bots ainda não foi configurada."));
-            }
-
-            // Checked against the Hotel at the moment of choosing, so an unapproved bot can never take over.
-            var bot = (await hotel.ListAvailableAsync(cancellationToken)).FirstOrDefault(item => item.Id == botId);
-
-            if (bot is null)
-            {
-                return Result<BrainDto>.Failure(AppErrors.Validation("Esta IA não está homologada no Hotel dos Bots."));
-            }
-
-            var settings = await settingsRepository.FirstOrDefaultAsync(item => item.EstablishmentId == establishmentId, cancellationToken);
-
-            if (settings is null)
-            {
-                var token = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(24));
-                settings = new WhatsAppSettings(establishment.TenantId, establishment.Id, protector.Protect(token), clock.UtcNow);
-                settingsRepository.Add(settings);
-            }
-
-            settings.AttachBrain(bot.Id, bot.Name, bot.Prompt, clock.UtcNow);
-            await unitOfWork.SaveChangesAsync(cancellationToken);
-
-            return await GetBrainAsync(establishmentId, cancellationToken);
-        });
-
-    public Task<Result<BrainDto>> DetachBrainAsync(Guid establishmentId, CancellationToken cancellationToken) =>
-        Guarded.RunAsync<BrainDto>(async () =>
-        {
-            var settings = await settingsRepository.FirstOrDefaultAsync(item => item.EstablishmentId == establishmentId, cancellationToken);
-
-            settings?.DetachBrain(clock.UtcNow);
-            await unitOfWork.SaveChangesAsync(cancellationToken);
-
-            return await GetBrainAsync(establishmentId, cancellationToken);
         });
 
     public async Task<Result<IReadOnlyList<ConversationDto>>> ListConversationsAsync(Guid establishmentId, CancellationToken cancellationToken)

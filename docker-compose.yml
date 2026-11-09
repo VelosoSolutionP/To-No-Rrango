@@ -45,15 +45,10 @@ services:
       Evolution__BaseUrl: "http://evolution:8080"
       Evolution__ApiKey: "${EVOLUTION_API_KEY:-}"
       Evolution__WebhookBaseUrl: "http://api:8080"
-      Llm__BaseUrl: "http://ollama-proxy:11434/v1"
-      Llm__Model: "qwen2.5:3b"
-      Zest__BaseUrl: "https://zest.velososolution.com.br"
       Acbr__Mode: "${ACBR_MODE:-Off}"
       Acbr__Host: "${ACBR_HOST:-host.docker.internal}"
       Acbr__Port: "${ACBR_PORT:-3434}"
       Acbr__Environment: "${ACBR_ENVIRONMENT:-2}"
-      Zest__Email: "${ZEST_EMAIL:-}"
-      Zest__Password: "${ZEST_PASSWORD:-}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -61,16 +56,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-
-  # Reaches the local model without putting the API on the other project's network,
-  # where service names such as "postgres" would resolve to the wrong containers.
-  ollama-proxy:
-    image: alpine/socat:1.8.0.3
-    restart: unless-stopped
-    command: "tcp-listen:11434,fork,reuseaddr tcp-connect:alexandra-ollama-1:11434"
-    networks:
-      - default
-      - alexandra
 
   evolution:
     image: evoapicloud/evolution-api:v2.3.7
@@ -112,11 +97,6 @@ services:
     volumes:
       - ./frontend:/app
     command: sh -c "npm install && npm run dev"
-
-networks:
-  alexandra:
-    external: true
-    name: alexandra_default
 
 volumes:
   postgres_data:

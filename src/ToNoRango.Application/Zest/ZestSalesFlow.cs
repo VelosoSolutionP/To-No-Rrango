@@ -35,6 +35,7 @@ public sealed class SalesLine
 public sealed class SalesState
 {
     public SalesStep Step { get; set; }
+    public int Misses { get; set; }
     public int? CategoryIndex { get; set; }
     public Guid? PendingItemId { get; set; }
     public int PendingGroup { get; set; }
@@ -115,6 +116,24 @@ public static class ZestSalesFlow
     }
 
     public static async Task<SalesTurn> HandleAsync(
+        SalesState state,
+        string message,
+        SalesCatalog catalog,
+        ISalesLookups lookups,
+        string? customerName,
+        CancellationToken cancellationToken)
+    {
+        var turn = await TakeTurnAsync(state, message, catalog, lookups, customerName, cancellationToken);
+
+        if (!turn.Unrecognized)
+        {
+            turn.State.Misses = 0;
+        }
+
+        return turn;
+    }
+
+    private static async Task<SalesTurn> TakeTurnAsync(
         SalesState state,
         string message,
         SalesCatalog catalog,
@@ -208,8 +227,21 @@ public static class ZestSalesFlow
 
     private static SalesTurn Reply(SalesState state, string text, bool unrecognized = false) => new(state, text, Unrecognized: unrecognized);
 
-    private static SalesTurn Retry(SalesState state, SalesCatalog catalog, string hint) =>
-        Reply(state, $"{hint}\n\n{Prompt(state, catalog)}", unrecognized: true);
+    /// <summary>The same question twice in a row is what reads as a robot, so the second miss changes the sentence.</summary>
+    private static SalesTurn Retry(SalesState state, SalesCatalog catalog, string hint)
+    {
+        state.Misses++;
+
+        return state.Misses == 1
+            ? Reply(state, $"{hint}\n\n{Prompt(state, catalog)}", unrecognized: true)
+            : Reply(state, $"{hint} Pode me responder com uma das opções que mandei? Se preferir falar com alguém, é só escrever *atendente*.", unrecognized: true);
+    }
+
+    /// <summary>An extra that is not on the menu gets a plain no; the customer is never left guessing.</summary>
+    private static string NotUnderstood(string text) =>
+        HasAny(text, "extra", "adicional", "acrescenta", "acrescentar", "coloca mais", "bota mais")
+            ? "Esse adicional não está no nosso cardápio, então não consigo incluir."
+            : "Não entendi.";
 
     private static SalesTurn Start(SalesState state, string text, SalesCatalog catalog)
     {
@@ -444,7 +476,7 @@ public static class ZestSalesFlow
             return BeginItem(state, mentioned, catalog, null);
         }
 
-        return Retry(state, catalog, "Não entendi.");
+        return Retry(state, catalog, NotUnderstood(text));
     }
 
     private static SalesTurn ToFulfillment(SalesState state, SalesCatalog catalog, string? customerName)
@@ -675,7 +707,7 @@ public static class ZestSalesFlow
             return Reply(state, $"{CartText(state)}\n\nPara tirar um item escreva *remover 1*.\n*1* Adicionar mais itens\n*2* Finalizar pedido");
         }
 
-        return Retry(state, catalog, "Não entendi.");
+        return Retry(state, catalog, NotUnderstood(text));
     }
 
     private static void ClearPending(SalesState state)

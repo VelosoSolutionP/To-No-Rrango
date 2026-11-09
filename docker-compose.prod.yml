@@ -13,6 +13,7 @@ services:
       VelosoId__RootSecret: "${TNR_VELOSO_ID_RAIZ:-}"
       VelosoId__RedirectUri: "https://to-no-rango.velososolution.com.br/admin"
       VelosoId__PasswordLoginEnabled: "false"
+      VelosoId__OwnerEmail: "dono@tonorango.velososolution.com.br"
 
   web:
     build:

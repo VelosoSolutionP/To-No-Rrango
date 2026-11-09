@@ -14,7 +14,7 @@ Plataforma comercial de cardápio digital, pedidos, pagamentos, atendimento auto
 | 3 — Estabelecimentos e catálogo | Estabelecimento, categorias, itens, grupos/opções, cardápio público | **Backend + frontend público concluídos** |
 | 4 — Pedidos e tracking | Carrinho/checkout, criação de pedido, status, rastreio público | **Backend + frontend público concluídos** |
 | 5 — Operação | Login JWT, cozinha, Mercado Pago, clientes/fornecedores, estoque, compras, financeiro, relatórios | **Entregue** |
-| 6 — ZEST | Venda completa pelo WhatsApp, conexão por QR Code, atendimento e conhecimento por estabelecimento, LLM opcional | **Texto entregue**; áudio pendente |
+| 6 — ZEST | Venda completa pelo WhatsApp, conexão por QR Code, atendimento e conhecimento por estabelecimento | **Texto entregue**; áudio pendente |
 | 7 — Fiscal | Importação de NF-e de entrada | **Entrada entregue**; emissão via ACBr, SPED e SINTEGRA pendentes |
 
 ## Stack
@@ -115,7 +115,7 @@ A referência completa fica em `/scalar/v1`.
 - **Plataforma** (`/api/platform/tenants/{tenantId}`, `X-Admin-Key`): `PUT /contract` para o Portal publicar módulos, vigência e limites, e `POST /users` para criar o primeiro usuário.
 - **Webhooks**: `POST /api/webhooks/mercadopago/{establishmentId}` e `POST /api/webhooks/evolution/{establishmentId}/{token}`.
 
-Códigos de módulo: `cardapio`, `pedidos`, `pagamentos`, `clientes`, `estoque`, `financeiro`, `relatorios`, `fiscal`, `whatsapp`, `ia` e `ia_llm` (adicional pago). Sem contrato vigente, o painel e os novos pedidos ficam bloqueados.
+Códigos de módulo: `cardapio`, `pedidos`, `pagamentos`, `clientes`, `estoque`, `financeiro`, `relatorios`, `fiscal`, `whatsapp`, e `ia`. Sem contrato vigente, o painel e os novos pedidos ficam bloqueados.
 
 ## Regras de operação adotadas
 
@@ -140,8 +140,6 @@ Definições provisórias, porque o escopo ainda as lista como abertas:
 - `MercadoPago:BaseUrl` — opcional, para testes.
 - `Evolution:BaseUrl` e `Evolution:ApiKey` — servidor Evolution e sua chave global; vazios mantêm o WhatsApp desligado.
 - `Evolution:WebhookBaseUrl` — endereço que a Evolution usa para chegar nesta API; por padrão usa `App:PublicApiUrl`.
-- `Zest:BaseUrl`, `Zest:Email`, `Zest:Password` — leitura das IAs homologadas no Hotel dos Bots (no Compose: `ZEST_EMAIL` e `ZEST_PASSWORD` no `.env`).
-- `Llm:BaseUrl`, `Llm:ApiKey`, `Llm:Model` — endpoint compatível com OpenAI (Ollama serve); usado só com o módulo `ia_llm`.
 - `Network:TrustForwardedHeaders` — ligar atrás de proxy reverso, para o limite de requisições ver o IP real.
 
 ## Testes

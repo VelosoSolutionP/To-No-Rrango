@@ -157,16 +157,8 @@ public sealed class ZestSalesService(
         }
 
         var ports = new Lookups(establishment, delivery, lookups);
-        var turn = await ZestSalesFlow.HandleAsync(state, message, catalog, ports, customerName, cancellationToken);
 
-        if (!turn.Unrecognized)
-        {
-            return turn;
-        }
-
-        var option = await zest.ChooseOptionAsync(establishment.Id, ZestSalesFlow.Prompt(turn.State, catalog), message, cancellationToken);
-
-        return option is null ? turn : await ZestSalesFlow.HandleAsync(turn.State, option, catalog, ports, customerName, cancellationToken);
+        return await ZestSalesFlow.HandleAsync(state, message, catalog, ports, customerName, cancellationToken);
     }
 
     /// <summary>A question asked in the middle of a sale is answered without losing the sale.</summary>
@@ -177,7 +169,7 @@ public sealed class ZestSalesService(
             return turn.Reply;
         }
 
-        var answer = await zest.AnswerAsync(establishment, phone, message, cancellationToken, allowLlm: false);
+        var answer = await zest.AnswerAsync(establishment, phone, message, cancellationToken);
 
         if (answer.Intent is ZestIntent.Unknown or ZestIntent.Greeting or ZestIntent.Thanks)
         {
