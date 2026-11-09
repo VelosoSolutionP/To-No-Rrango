@@ -35,9 +35,8 @@ import { LiveDeliveries } from "./modules/LiveDeliveries";
 import { Overview } from "./modules/Overview";
 import { Customers } from "./modules/Parties";
 import { Settings } from "./modules/Settings";
-import { Zest } from "./modules/Zest";
 
-type Tab = "overview" | "orders" | "tracking" | "kitchen" | "menu" | "inventory" | "customers" | "distribution" | "finance" | "fiscal" | "whatsapp" | "settings";
+type Tab = "overview" | "orders" | "tracking" | "kitchen" | "menu" | "inventory" | "customers" | "distribution" | "finance" | "fiscal" | "settings";
 
 const roleName: Record<UserRole, string> = { Owner: "Dono", Manager: "Gerente", Attendant: "Atendente", Kitchen: "Cozinha" };
 
@@ -55,7 +54,6 @@ const tabs: Array<{ id: Tab; group: string; label: string; roles: UserRole[]; mo
   { id: "distribution", group: "Gestão", label: "Distribuição", roles: management, modules: ["pedidos"] },
   { id: "finance", group: "Gestão", label: "Financeiro", roles: management, modules: ["financeiro"] },
   { id: "fiscal", group: "Gestão", label: "Fiscal", roles: management, modules: ["fiscal", "fiscal_nfce"] },
-  { id: "whatsapp", group: "Inteligência", label: "WhatsApp", roles: ["Owner", "Manager", "Attendant"], modules: ["ia", "whatsapp"] },
   { id: "settings", group: "Ajustes", label: "Configurações", roles: management },
 ];
 
@@ -558,16 +556,6 @@ export function AdminClient() {
             {tab === "distribution" && hasEstablishment && http ? <Distribution establishmentId={selectedId} http={http} modules={session.modules} /> : null}
             {tab === "finance" && hasEstablishment && http ? <Finance establishmentId={selectedId} http={http} /> : null}
             {tab === "fiscal" && hasEstablishment && http ? <Fiscal establishmentId={selectedId} http={http} modules={session.modules} onOpenInventory={() => goTo("inventory")} /> : null}
-
-            {tab === "whatsapp" && hasEstablishment && http ? (
-              <Zest
-                canInbox={session.modules.includes("whatsapp")}
-                canTeach={session.modules.includes("ia") && canManage}
-                establishmentId={selectedId}
-                http={http}
-                storeName={selectedEstablishment?.name ?? "Sua loja"}
-              />
-            ) : null}
 
             {tab === "settings" ? (
               <Settings
