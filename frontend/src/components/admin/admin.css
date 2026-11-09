@@ -749,7 +749,7 @@
 /* Login */
 .vx-login {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(420px, 0.65fr);
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
   min-height: 100vh;
   min-height: 100dvh;
   background: var(--background);
@@ -758,154 +758,295 @@
 .vx-login-stage {
   display: flex;
   min-width: 0;
-  padding: clamp(1.5rem, 3.5vw, 3.5rem);
-  background: radial-gradient(90% 70% at 80% 0%, rgba(255, 106, 19, 0.16), transparent 65%), #0e0e12;
+  padding: clamp(1.5rem, 3vw, 2.75rem);
+  border-right: 1px solid var(--border);
+  background:
+    radial-gradient(70% 45% at 0% 0%, rgba(255, 106, 19, 0.2), transparent 70%),
+    radial-gradient(70% 45% at 100% 100%, rgba(124, 58, 237, 0.16), transparent 70%),
+    #101014;
 }
 
 .vx-login-showcase {
   display: flex;
   flex-direction: column;
-  gap: clamp(1rem, 2.6vh, 1.75rem);
-  width: min(100%, 1120px);
+  gap: 1.1rem;
+  width: min(100%, 680px);
   margin: auto;
-}
-
-.vx-login-showcase .eyebrow {
-  margin: 0 0 0.5rem;
 }
 
 .vx-login-showcase h2 {
   margin: 0;
   font-family: var(--display);
-  font-size: clamp(1.9rem, 3vw, 2.9rem);
-  line-height: 1.08;
+  font-size: clamp(1.9rem, 2.7vw, 2.6rem);
+  line-height: 1.1;
   letter-spacing: -0.03em;
   text-wrap: balance;
 }
 
-/* Largura e altura automáticas: a imagem só encolhe, sempre na proporção original. */
-.vx-login-shot {
-  display: block;
-  align-self: flex-start;
-  width: auto;
-  height: auto;
-  max-width: 100%;
-  max-height: calc(100vh - 21rem);
-  max-height: calc(100dvh - 21rem);
-  border: 1px solid var(--border-strong);
-  border-radius: 14px;
-  box-shadow: 0 30px 60px -30px rgba(0, 0, 0, 0.9);
+.vx-login-showcase header p {
+  margin: 0.55rem 0 0;
+  color: var(--muted);
+  font-size: 1.02rem;
 }
 
-.vx-login-showcase ul {
+.vx-login-modules {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1rem;
+  gap: 0.65rem;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.vx-login-showcase li {
+.vx-login-modules li {
+  --tone: var(--brand);
   display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 0;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.vx-login-modules li[data-tone="green"] { --tone: var(--success); }
+.vx-login-modules li[data-tone="lilac"] { --tone: var(--brand-2); }
+.vx-login-modules li[data-tone="silver"] { --tone: var(--silver-text); }
+
+.vx-login-icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 1px solid color-mix(in srgb, var(--tone) 40%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--tone) 12%, transparent);
+  color: var(--tone);
+}
+
+.vx-login-modules li > div {
+  display: flex;
+  flex: 1;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 0.1rem;
+  min-width: 0;
 }
 
-.vx-login-showcase li strong {
-  font-size: 0.95rem;
+.vx-login-modules strong {
+  font-size: 0.97rem;
 }
 
-.vx-login-showcase li span {
+.vx-login-modules small {
   color: var(--muted);
   font-size: 0.84rem;
-  line-height: 1.4;
+}
+
+.vx-login-count {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid color-mix(in srgb, var(--tone) 30%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--tone) 9%, transparent);
+}
+
+.vx-login-count b {
+  color: var(--tone);
+  font-family: var(--mono);
+  font-size: 1.05rem;
+}
+
+.vx-login-count em {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-style: normal;
+}
+
+.vx-login-count i {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 16px;
+}
+
+.vx-login-count u {
+  width: 4px;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--border-strong);
+}
+
+.vx-login-count u[data-on="true"] {
+  background: var(--tone);
+}
+
+.vx-login-preview {
+  display: none;
+  margin: 0;
+}
+
+.vx-login-preview figcaption {
+  margin-bottom: 0.5rem;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* object-fit recorta o excesso: a imagem nunca estica, em nenhum tamanho de tela. */
+.vx-login-shot {
+  display: block;
+  width: 100%;
+  height: clamp(170px, calc(100vh - 41rem), 340px);
+  height: clamp(170px, calc(100dvh - 41rem), 340px);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  object-fit: cover;
+  object-position: 100% 30%;
+}
+
+.vx-login-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
 }
 
 .vx-login-panel {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
-  padding: clamp(1.5rem, 3.5vw, 3rem);
-  border-left: 1px solid var(--border);
-  background: var(--surface);
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  padding: 1.5rem;
+  background: radial-gradient(60% 50% at 50% 45%, rgba(255, 106, 19, 0.07), transparent 75%), var(--background);
 }
 
-.vx-login-body {
-  width: min(400px, 100%);
-  margin: auto;
+.vx-login-card {
+  position: relative;
+  width: min(420px, 100%);
+  padding: 1.9rem;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 20px;
+  background: linear-gradient(180deg, #1a1a20, var(--surface));
+  box-shadow: 0 30px 70px -35px rgba(0, 0, 0, 0.95);
 }
 
-.vx-login-body .eyebrow {
-  margin: 0 0 0.5rem;
+.vx-login-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--brand), var(--brand-2), transparent);
 }
 
-.vx-login-body h1 {
-  margin: 0 0 0.6rem;
+.vx-login-card h1 {
+  margin: 1.5rem 0 0.35rem;
   font-family: var(--display);
-  font-size: clamp(1.75rem, 2.4vw, 2.15rem);
-  line-height: 1.12;
+  font-size: 1.6rem;
   letter-spacing: -0.02em;
 }
 
-.vx-login-body .muted {
-  margin: 0 0 1.75rem;
+.vx-login-lead {
+  margin: 0 0 1.25rem;
+  color: var(--muted);
+  font-size: 0.93rem;
   line-height: 1.5;
 }
 
-.vx-login-back {
-  color: var(--muted);
-  font-size: 0.86rem;
+.vx-login-password {
+  position: relative;
 }
 
-.vx-login-back:hover {
-  color: var(--foreground);
+.vx-login-password input {
+  width: 100%;
+  padding-right: 5rem;
+}
+
+.vx-login-password button {
+  position: absolute;
+  top: 50%;
+  right: 0.5rem;
+  padding: 0.3rem 0.5rem;
+  border: 0;
+  background: none;
+  color: var(--brand-2);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  transform: translateY(-50%);
+}
+
+.vx-login-more {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.1rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  transition: border-color 0.15s ease;
+}
+
+.vx-login-more:hover {
+  border-color: var(--border-strong);
+}
+
+.vx-login-more span {
+  display: flex;
+  flex-direction: column;
+}
+
+.vx-login-more strong {
+  font-size: 0.9rem;
+}
+
+.vx-login-more small,
+.vx-login-more em {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-style: normal;
+}
+
+.vx-login-foot {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+@media (min-width: 961px) and (min-height: 830px) {
+  .vx-login-preview {
+    display: block;
+  }
 }
 
 @media (max-width: 960px) {
   .vx-login {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto 1fr;
   }
 
   .vx-login-stage {
-    padding: 1.25rem 1.25rem 0;
-  }
-
-  .vx-login-showcase ul,
-  .vx-login-showcase .eyebrow {
-    display: none;
+    order: 2;
+    padding: 1.5rem 1.25rem;
+    border-top: 1px solid var(--border);
+    border-right: 0;
   }
 
   .vx-login-showcase h2 {
-    font-size: 1.6rem;
-  }
-
-  /* No celular mostra só o topo do painel; object-fit recorta sem deformar. */
-  .vx-login-shot {
-    width: 100%;
-    height: 200px;
-    max-height: none;
-    border-bottom: 0;
-    border-radius: 14px 14px 0 0;
-    object-fit: cover;
-    object-position: 100% 0;
+    font-size: 1.5rem;
   }
 
   .vx-login-panel {
-    gap: 1.5rem;
-    padding: 1.5rem 1.25rem;
-    border-top: 1px solid var(--border);
-    border-left: 0;
+    padding: 1.25rem;
   }
 
-  .vx-login-body {
-    margin: 0 auto;
-  }
-
-  .vx-login-back {
-    margin-top: auto;
-    text-align: center;
+  .vx-login-count em {
+    display: none;
   }
 }
 
