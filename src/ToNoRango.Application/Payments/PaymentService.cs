@@ -24,7 +24,11 @@ public sealed record PaymentSettingsDto(
     bool IsCardEnabled,
     string? WebhookUrl);
 
-public sealed record CheckoutOptionsDto(bool PixOnline, bool CardOnline, string? PublicKey, bool HasDeliveryZones);
+public sealed record CheckoutOptionsDto(bool PixOnline, bool CardOnline, string? PublicKey, bool HasDeliveryZones, bool CheckoutLink = false);
+
+public sealed record CheckoutLinkDto(string Url);
+
+public sealed record ConfirmCheckoutRequest(string PaymentId);
 
 public sealed record CreatePixRequest(string? PayerEmail);
 
@@ -71,6 +75,8 @@ public sealed class PaymentService(
     IClock clock)
 {
     private static readonly TimeSpan GatewayPollInterval = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan CheckoutLifetime = TimeSpan.FromHours(2);
+    private const string CheckoutReferencePrefix = "checkout:";
     private static readonly Error OrderNotFound = Error.NotFound("order.not_found", "Pedido não encontrado.");
     private static readonly Error GatewayUnavailable =
         Error.External("payment.gateway", "Não foi possível falar com o Mercado Pago. Tente novamente em instantes.");
@@ -129,7 +135,8 @@ public sealed class PaymentService(
             allowed && settings is { CanChargePix: true },
             allowed && settings is { CanChargeCard: true },
             allowed && settings is { CanChargeCard: true } ? settings.PublicKey : null,
-            hasZones);
+            hasZones,
+            allowed && settings is { CanChargeCheckout: true });
     }
 
     public Task<Result<PaymentDto>> CreatePixAsync(string orderCode, CreatePixRequest request, CancellationToken cancellationToken) =>
@@ -197,6 +204,83 @@ public sealed class PaymentService(
 
             payments.Add(payment);
             await unitOfWork.SaveChangesAsync(cancellationToken);
+
+            return PaymentDto.From(payment);
+        });
+
+    /// <summary>The payment only exists once the customer pays on the link, so it is recorded when Mercado Pago reports it.</summary>
+    public Task<Result<CheckoutLinkDto>> CreateCheckoutLinkAsync(string orderCode, CancellationToken cancellationToken) =>
+        Guarded.RunAsync<CheckoutLinkDto>(async () =>
+        {
+            var (order, settings, error) = await PrepareAsync(orderCode, cancellationToken);
+
+            if (error is not null)
+            {
+                return Result<CheckoutLinkDto>.Failure(error);
+            }
+
+            if (!settings!.CanChargeCheckout)
+            {
+                return Result<CheckoutLinkDto>.Failure(AppErrors.Validation("Pagamento online indisponível neste estabelecimento."));
+            }
+
+            try
+            {
+                var checkout = await gateway.CreateCheckoutAsync(
+                    protector.Unprotect(settings.EncryptedAccessToken!),
+                    new CheckoutCharge(
+                        order!.TotalInCents,
+                        $"Pedido {order.Code}",
+                        CheckoutReference(order.Code),
+                        urls.TrackingUrl(order.Code),
+                        clock.UtcNow.Add(CheckoutLifetime),
+                        WebhookUrlOf(order.EstablishmentId)),
+                    cancellationToken);
+
+                return new CheckoutLinkDto(checkout.Url);
+            }
+            catch (PaymentGatewayException)
+            {
+                return Result<CheckoutLinkDto>.Failure(GatewayUnavailable);
+            }
+        });
+
+    /// <summary>The customer came back from the link. Covers a notification that was lost or has not arrived yet.</summary>
+    public Task<Result<PaymentDto?>> ConfirmCheckoutAsync(string orderCode, ConfirmCheckoutRequest request, CancellationToken cancellationToken) =>
+        Guarded.RunAsync<PaymentDto?>(async () =>
+        {
+            var order = await orders.GetByCodeAsync(orderCode, cancellationToken);
+
+            if (order is null)
+            {
+                return Result<PaymentDto?>.Failure(OrderNotFound);
+            }
+
+            var settings = await settingsRepository.FirstOrDefaultAsync(item => item.EstablishmentId == order.EstablishmentId, cancellationToken);
+
+            if (settings?.EncryptedAccessToken is null || string.IsNullOrWhiteSpace(request.PaymentId))
+            {
+                return Result<PaymentDto?>.Success(null);
+            }
+
+            GatewayPayment remote;
+
+            try
+            {
+                remote = await gateway.GetAsync(protector.Unprotect(settings.EncryptedAccessToken), request.PaymentId, cancellationToken);
+            }
+            catch (PaymentGatewayException)
+            {
+                return Result<PaymentDto?>.Failure(GatewayUnavailable);
+            }
+
+            if (OrderCodeOfCheckout(remote.ExternalReference) != order.Code)
+            {
+                return Result<PaymentDto?>.Failure(AppErrors.Validation("Este pagamento não pertence a este pedido."));
+            }
+
+            var payment = await SettleCheckoutAsync(order, remote, cancellationToken);
+            await events.PublishAsync(order.Code);
 
             return PaymentDto.From(payment);
         });
@@ -373,6 +457,21 @@ public sealed class PaymentService(
                 item => item.ProviderPaymentId == remote.Id && item.EstablishmentId == establishmentId,
                 cancellationToken);
 
+            if (payment is null && OrderCodeOfCheckout(remote.ExternalReference) is { } checkoutCode)
+            {
+                var checkoutOrder = await orders.GetByCodeAsync(checkoutCode, cancellationToken);
+
+                if (checkoutOrder is null || checkoutOrder.EstablishmentId != establishmentId)
+                {
+                    return Result<bool>.Failure(OrderNotFound);
+                }
+
+                await SettleCheckoutAsync(checkoutOrder, remote, cancellationToken);
+                await events.PublishAsync(checkoutOrder.Code);
+
+                return true;
+            }
+
             if (payment is null)
             {
                 // A notification can arrive before the charge is saved; a 404 makes Mercado Pago retry.
@@ -459,6 +558,45 @@ public sealed class PaymentService(
         "refunded" or "charged_back" => ChargeStatus.Refunded,
         _ => ChargeStatus.Pending
     };
+
+    public static string CheckoutReference(string orderCode) => $"{CheckoutReferencePrefix}{orderCode}";
+
+    /// <summary>Only links carry this prefix: a Pix or card reported before its own row is saved must keep waiting for it.</summary>
+    public static string? OrderCodeOfCheckout(string? externalReference) =>
+        externalReference is not null && externalReference.StartsWith(CheckoutReferencePrefix, StringComparison.Ordinal)
+            ? externalReference[CheckoutReferencePrefix.Length..]
+            : null;
+
+    private Task<Payment> SettleCheckoutAsync(Order order, GatewayPayment remote, CancellationToken cancellationToken) =>
+        unitOfWork.ExecuteInTransactionAsync(async token =>
+        {
+            var payment = await payments.FirstOrDefaultAsync(
+                item => item.ProviderPaymentId == remote.Id && item.EstablishmentId == order.EstablishmentId,
+                token);
+
+            if (payment is null)
+            {
+                payment = new Payment(
+                    order.TenantId,
+                    order.EstablishmentId,
+                    order.Id,
+                    remote.Id,
+                    PaymentChannel.Checkout,
+                    ChargeStatus.Pending,
+                    remote.StatusDetail,
+                    order.TotalInCents,
+                    null,
+                    null,
+                    null,
+                    clock.UtcNow);
+
+                payments.Add(payment);
+            }
+
+            await ApplyGatewayStateAsync(payment, order, remote, token);
+
+            return payment;
+        }, cancellationToken);
 
     private async Task ApplyGatewayStateAsync(Payment payment, Order order, GatewayPayment remote, CancellationToken cancellationToken)
     {

@@ -77,7 +77,9 @@ public sealed record SalesCatalog(
     long MinimumOrderInCents,
     string? City,
     string? State,
-    string? PostalCode);
+    string? PostalCode,
+    bool PixOnline = false,
+    bool CheckoutLink = false);
 
 public interface ISalesLookups
 {
@@ -202,7 +204,7 @@ public static class ZestSalesFlow
         SalesStep.Cep => "Qual o seu CEP? Se não souber, escreva *sem cep*.",
         SalesStep.AddressDetails => "Qual o número e o complemento?",
         SalesStep.ManualAddress => "Me manda assim: *rua, número, bairro*.",
-        SalesStep.Payment => PaymentText(),
+        SalesStep.Payment => PaymentText(catalog),
         SalesStep.Change => "Precisa de troco? Escreva para quanto ou *não*.",
         SalesStep.Name => "Qual o seu nome?",
         SalesStep.Confirm => "Responda *1* para confirmar ou *2* para alterar.",
@@ -518,7 +520,7 @@ public static class ZestSalesFlow
         state.Fulfillment = "Pickup";
         state.DeliveryFeeInCents = 0;
 
-        return ToPayment(state, customerName);
+        return ToPayment(state, catalog, customerName);
     }
 
     private static async Task<SalesTurn> ReadCepAsync(SalesState state, string text, SalesCatalog catalog, ISalesLookups lookups, CancellationToken cancellationToken)
@@ -586,7 +588,7 @@ public static class ZestSalesFlow
         state.Number = parts[0];
         state.Complement = parts.Length > 1 ? Truncate(parts[1], 100) : null;
 
-        return ToPayment(state, customerName);
+        return ToPayment(state, catalog, customerName);
     }
 
     private static async Task<SalesTurn> ReadManualAddressAsync(
@@ -626,39 +628,68 @@ public static class ZestSalesFlow
             return Reply(state, "Para este endereço preciso do CEP. Qual é?");
         }
 
-        return ToPayment(state, customerName, $"Taxa de entrega: {Money(state.DeliveryFeeInCents)}.");
+        return ToPayment(state, catalog, customerName, $"Taxa de entrega: {Money(state.DeliveryFeeInCents)}.");
     }
 
-    private static SalesTurn ToPayment(SalesState state, string? customerName, string? intro = null)
+    private static SalesTurn ToPayment(SalesState state, SalesCatalog catalog, string? customerName, string? intro = null)
     {
         state.CustomerName ??= string.IsNullOrWhiteSpace(customerName) ? null : Truncate(customerName.Trim(), 120);
         state.Step = SalesStep.Payment;
 
-        return Reply(state, intro is null ? PaymentText() : $"{intro}\n\n{PaymentText()}");
+        return Reply(state, intro is null ? PaymentText(catalog) : $"{intro}\n\n{PaymentText(catalog)}");
     }
 
     private static SalesTurn ChoosePayment(SalesState state, string text, SalesCatalog catalog, string? customerName)
     {
-        if (text == "1" || HasAny(text, "pix"))
+        var choices = PaymentChoices(catalog);
+        var chosen = int.TryParse(text, out var number) && number >= 1 && number <= choices.Count
+            ? choices[number - 1].Key
+            : PaymentByWords(text, catalog);
+
+        if (chosen is null)
         {
-            state.Payment = "Pix";
+            return Retry(state, catalog, "Não entendi.");
+        }
+
+        state.Payment = chosen;
+
+        if (chosen != "Cash")
+        {
             return AfterPayment(state, catalog);
         }
 
-        if (text == "2" || HasAny(text, "dinheiro"))
+        state.Step = SalesStep.Change;
+        return Reply(state, Prompt(state, catalog));
+    }
+
+    private static string? PaymentByWords(string text, SalesCatalog catalog)
+    {
+        if (catalog.CheckoutLink && HasAny(text, "link", "mercado pago"))
         {
-            state.Payment = "Cash";
-            state.Step = SalesStep.Change;
-            return Reply(state, Prompt(state, catalog));
+            return "Checkout";
         }
 
-        if (text == "3" || HasAny(text, "cartao", "credito", "debito"))
+        if (catalog.CheckoutLink && HasAny(text, "tela", "site", "pagina"))
         {
-            state.Payment = "CardOnDelivery";
-            return AfterPayment(state, catalog);
+            return "Screen";
         }
 
-        return Retry(state, catalog, "Não entendi.");
+        if (HasAny(text, "pix"))
+        {
+            return "Pix";
+        }
+
+        if (HasAny(text, "dinheiro"))
+        {
+            return "Cash";
+        }
+
+        if (HasAny(text, "maquininha", "na entrega"))
+        {
+            return "CardOnDelivery";
+        }
+
+        return HasAny(text, "cartao", "credito", "debito") ? (catalog.CheckoutLink ? "Checkout" : "CardOnDelivery") : null;
     }
 
     private static SalesTurn ReadChange(SalesState state, string message, string text, SalesCatalog catalog, string? customerName)
@@ -689,7 +720,7 @@ public static class ZestSalesFlow
         var receive = state.Fulfillment == "Delivery"
             ? $"Entrega em {state.Street}, {state.Number}{(state.Complement is null ? string.Empty : $" {state.Complement}")} — {state.District}\nTaxa: {Money(state.DeliveryFeeInCents)}"
             : "Retirada no local";
-        var payment = state.Payment switch { "Pix" => "Pix", "Cash" => "Dinheiro", _ => "Cartão na entrega" };
+        var payment = state.Payment switch { "Pix" => "Pix", "Cash" => "Dinheiro", "Checkout" => "Link do Mercado Pago", "Screen" => "Tela do pedido", _ => "Cartão na entrega" };
 
         return Reply(state, $"{CartText(state)}\n{receive}\nPagamento: {payment}\n*Total: {Money(state.SubtotalInCents + state.DeliveryFeeInCents)}*\n\n*1* Confirmar pedido\n*2* Alterar");
     }
@@ -753,7 +784,24 @@ public static class ZestSalesFlow
         return $"*{group.Name}*\n\n{string.Join('\n', lines)}\n\n{hint}{skip}";
     }
 
-    private static string PaymentText() => "Como vai pagar?\n\n*1* Pix\n*2* Dinheiro\n*3* Cartão na entrega";
+    private static List<(string Key, string Label)> PaymentChoices(SalesCatalog catalog)
+    {
+        List<(string Key, string Label)> choices = [("Pix", catalog.PixOnline ? "Pix aqui no WhatsApp" : "Pix")];
+
+        if (catalog.CheckoutLink)
+        {
+            choices.Add(("Checkout", "Link do Mercado Pago (cartão ou Pix)"));
+            choices.Add(("Screen", "Tela do pedido (cartão ou Pix)"));
+        }
+
+        choices.Add(("Cash", "Dinheiro"));
+        choices.Add(("CardOnDelivery", "Cartão na entrega"));
+
+        return choices;
+    }
+
+    private static string PaymentText(SalesCatalog catalog) =>
+        $"Como vai pagar?\n\n{string.Join('\n', PaymentChoices(catalog).Select((choice, index) => $"*{index + 1}* {choice.Label}"))}";
 
     private static List<SalesCategory> SellableCategories(SalesCatalog catalog) =>
         catalog.Categories.Where(category => category.Items.Any(item => item.IsAvailable)).ToList();

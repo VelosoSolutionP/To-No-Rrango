@@ -162,6 +162,20 @@ internal static class PublicEndpoints
         .RequireRateLimiting("public")
         .AllowAnonymous();
 
+        group.MapPost("/orders/{code}/payments/checkout", async (string code, PaymentService payments, CancellationToken cancellationToken) =>
+            (await payments.CreateCheckoutLinkAsync(code, cancellationToken)).ToHttpResult())
+        .RequireRateLimiting("public")
+        .AllowAnonymous();
+
+        group.MapPost("/orders/{code}/payments/checkout/confirm", async (
+            string code,
+            ConfirmCheckoutRequest request,
+            PaymentService payments,
+            CancellationToken cancellationToken) =>
+            (await payments.ConfirmCheckoutAsync(code, request, cancellationToken)).ToHttpResult())
+        .RequireRateLimiting("public")
+        .AllowAnonymous();
+
         group.MapPost("/orders/{code}/payments/card", async (
             string code,
             CreateCardRequest request,

@@ -130,6 +130,46 @@ public sealed class MercadoPagoGateway(HttpClient http, ILogger<MercadoPagoGatew
         return SendAsync(HttpMethod.Post, "v1/payments", accessToken, body, charge.IdempotencyKey, cancellationToken);
     }
 
+    /// <summary>The Mercado Pago hosted page. Boleto and ATM are left out: a meal cannot wait days for the payment.</summary>
+    public async Task<GatewayCheckout> CreateCheckoutAsync(string accessToken, CheckoutCharge charge, CancellationToken cancellationToken)
+    {
+        var body = new JsonObject
+        {
+            ["items"] = new JsonArray(new JsonObject
+            {
+                ["title"] = charge.Description,
+                ["quantity"] = 1,
+                ["unit_price"] = charge.AmountInCents / 100m,
+                ["currency_id"] = "BRL"
+            }),
+            ["external_reference"] = charge.ExternalReference,
+            ["back_urls"] = new JsonObject { ["success"] = charge.ReturnUrl, ["pending"] = charge.ReturnUrl, ["failure"] = charge.ReturnUrl },
+            ["payment_methods"] = new JsonObject
+            {
+                ["excluded_payment_types"] = new JsonArray(new JsonObject { ["id"] = "ticket" }, new JsonObject { ["id"] = "atm" })
+            },
+            ["expires"] = true,
+            ["expiration_date_to"] = charge.ExpiresAt.ToString("yyyy-MM-dd'T'HH:mm:ss.fffzzz", CultureInfo.InvariantCulture)
+        };
+
+        // Mercado Pago refuses auto_return on an address that is not https, as in a local copy.
+        if (charge.ReturnUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            body["auto_return"] = "approved";
+        }
+
+        AddNotificationUrl(body, charge.NotificationUrl);
+
+        using var response = await ExchangeAsync(HttpMethod.Post, "checkout/preferences", accessToken, body, null, cancellationToken);
+        using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(cancellationToken), cancellationToken: cancellationToken);
+        var id = StringOf(document.RootElement, "id");
+        var url = StringOf(document.RootElement, "init_point");
+
+        return id is null || url is null
+            ? throw new PaymentGatewayException("Mercado Pago did not return the checkout link.")
+            : new GatewayCheckout(id, url);
+    }
+
     public Task<GatewayPayment> GetAsync(string accessToken, string paymentId, CancellationToken cancellationToken) =>
         SendAsync(HttpMethod.Get, $"v1/payments/{Uri.EscapeDataString(paymentId)}", accessToken, null, null, cancellationToken);
 

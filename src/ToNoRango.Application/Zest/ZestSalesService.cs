@@ -188,7 +188,7 @@ public sealed class ZestSalesService(
             state.CustomerName!,
             phone,
             delivering ? FulfillmentType.Delivery : FulfillmentType.Pickup,
-            state.Payment switch { "Pix" => PaymentMethod.Pix, "Cash" => PaymentMethod.Cash, _ => PaymentMethod.CardOnDelivery },
+            state.Payment switch { "Pix" => PaymentMethod.Pix, "Cash" => PaymentMethod.Cash, "Checkout" or "Screen" => PaymentMethod.Online, _ => PaymentMethod.CardOnDelivery },
             state.Notes,
             idempotencyKey,
             delivering
@@ -207,6 +207,20 @@ public sealed class ZestSalesService(
 
         var order = created.Value;
         var confirmation = $"Pedido *{order.Code}* recebido! Total: {ZestSalesFlow.Money(order.TotalInCents)}.\nAcompanhe: {urls.TrackingUrl(order.Code)}";
+
+        if (state.Payment == "Screen")
+        {
+            return new ZestSaleResult(new SalesState(), new ZestSaleReply($"Pedido *{order.Code}* recebido! Total: {ZestSalesFlow.Money(order.TotalInCents)}.\nPague com cartão ou Pix e acompanhe aqui:\n{urls.TrackingUrl(order.Code)}"));
+        }
+
+        if (state.Payment == "Checkout")
+        {
+            var link = await payments.CreateCheckoutLinkAsync(order.Code, cancellationToken);
+
+            return new ZestSaleResult(new SalesState(), new ZestSaleReply(link.IsSuccess
+                ? $"{confirmation}\n\nPague pelo Mercado Pago, com cartão ou Pix:\n{link.Value.Url}\nA confirmação é automática."
+                : $"{confirmation}\n\nNão consegui gerar o link agora. Você pode pagar com cartão ou Pix nessa página do pedido."));
+        }
 
         if (order.PaymentMethod != PaymentMethod.Pix)
         {
@@ -249,6 +263,8 @@ public sealed class ZestSalesService(
                     .ToList()))
             .ToList();
 
+        var online = await payments.GetCheckoutOptionsAsync(establishment.TenantId, establishment.Id, false, cancellationToken);
+
         return new SalesCatalog(
             urls.MenuUrl(establishment.Slug),
             sections,
@@ -257,7 +273,9 @@ public sealed class ZestSalesService(
             establishment.MinimumOrderInCents,
             establishment.City,
             establishment.State,
-            establishment.PostalCode);
+            establishment.PostalCode,
+            online.PixOnline,
+            online.CheckoutLink);
     }
 
     private sealed class Lookups(Establishment establishment, DeliveryService delivery, ILookupClient client) : ISalesLookups

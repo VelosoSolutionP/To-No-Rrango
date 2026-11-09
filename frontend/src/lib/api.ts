@@ -93,6 +93,13 @@ export const api = {
     });
   },
 
+  confirmCheckout(code: string, paymentId: string): Promise<OrderPayment | null> {
+    return apiFetch<OrderPayment | null>(`/api/public/orders/${encodeURIComponent(code)}/payments/checkout/confirm`, {
+      method: "POST",
+      body: JSON.stringify({ paymentId }),
+    });
+  },
+
   createCardPayment(code: string, payload: unknown): Promise<OrderPayment> {
     return apiFetch<OrderPayment>(`/api/public/orders/${encodeURIComponent(code)}/payments/card`, {
       method: "POST",

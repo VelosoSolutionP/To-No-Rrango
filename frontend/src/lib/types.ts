@@ -184,12 +184,13 @@ export interface CheckoutOptions {
   cardOnline: boolean;
   publicKey: string | null;
   hasDeliveryZones: boolean;
+  checkoutLink?: boolean;
 }
 
 export type ChargeStatus = "Pending" | "Approved" | "Rejected" | "Cancelled" | "Refunded";
 
 export interface OrderPayment {
-  channel: "Pix" | "Card";
+  channel: "Pix" | "Card" | "Checkout";
   status: ChargeStatus;
   statusDetail: string | null;
   amountInCents: number;

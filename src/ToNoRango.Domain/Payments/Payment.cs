@@ -6,7 +6,8 @@ namespace ToNoRango.Domain.Payments;
 public enum PaymentChannel
 {
     Pix = 1,
-    Card = 2
+    Card = 2,
+    Checkout = 3
 }
 
 public enum ChargeStatus
@@ -107,6 +108,8 @@ public sealed class PaymentSettings : AggregateRoot
     public bool CanChargePix => IsPixEnabled && EncryptedAccessToken is not null;
 
     public bool CanChargeCard => IsCardEnabled && EncryptedAccessToken is not null && PublicKey is not null;
+
+    public bool CanChargeCheckout => EncryptedAccessToken is not null && (IsPixEnabled || IsCardEnabled);
 
     public void Update(
         string? encryptedAccessToken,

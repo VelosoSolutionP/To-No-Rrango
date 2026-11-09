@@ -63,7 +63,7 @@ export function OrderPaymentPanel({ order, onPaid }: OrderPaymentPanelProps) {
   const brickStarted = useRef(false);
 
   const awaitingPayment = order.paymentStatus === "Pending" && order.status !== "Cancelled";
-  const wantsPix = awaitingPayment && order.paymentMethod === "Pix" && options?.pixOnline;
+  const wantsPix = awaitingPayment && (order.paymentMethod === "Pix" || order.paymentMethod === "Online") && options?.pixOnline;
   const wantsCard = awaitingPayment && order.paymentMethod === "Online" && options?.cardOnline;
 
   useEffect(() => {
@@ -96,6 +96,31 @@ export function OrderPaymentPanel({ order, onPaid }: OrderPaymentPanelProps) {
       window.clearInterval(interval);
     };
   }, [awaitingPayment, onPaid, order.code]);
+
+  useEffect(() => {
+    // Back from the Mercado Pago link. Without a payment the page sends the literal "null".
+    const paymentId = new URLSearchParams(window.location.search).get("payment_id");
+
+    if (!paymentId) {
+      return;
+    }
+
+    window.history.replaceState(null, "", window.location.pathname);
+
+    if (!/^\d+$/.test(paymentId)) {
+      return;
+    }
+
+    api.confirmCheckout(order.code, paymentId)
+      .then((confirmed) => {
+        setPayment(confirmed);
+
+        if (confirmed?.status === "Approved") {
+          onPaid();
+        }
+      })
+      .catch(() => undefined);
+  }, [onPaid, order.code]);
 
   useEffect(() => {
     if (!wantsCard || !options?.publicKey || brickStarted.current) {

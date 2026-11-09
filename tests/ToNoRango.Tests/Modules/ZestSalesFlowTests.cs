@@ -13,7 +13,7 @@ public class ZestSalesFlowTests
     private static readonly Guid Granola = Guid.NewGuid();
     private static readonly Guid Soda = Guid.NewGuid();
 
-    private static SalesCatalog Catalog(long minimum = 0, bool delivery = true, bool pickup = true) => new(
+    private static SalesCatalog Catalog(long minimum = 0, bool delivery = true, bool pickup = true, bool online = false) => new(
         "https://x/menu/teste",
         [
             new SalesCategory("Lanches", [new SalesItem(Burger, "X Burger", null, 2000, true, [])]),
@@ -29,7 +29,9 @@ public class ZestSalesFlowTests
         minimum,
         "São Paulo",
         "SP",
-        "01000000");
+        "01000000",
+        online,
+        online);
 
     private sealed class FakeLookups : ISalesLookups
     {
@@ -232,6 +234,65 @@ public class ZestSalesFlowTests
 
         Assert.Equal(SalesStep.Payment, turn.State.Step);
         Assert.Equal("Pickup", turn.State.Fulfillment);
+    }
+
+    [Fact]
+    public async Task SemMercadoPago_MenuDePagamentoContinuaOMesmo()
+    {
+        var turn = await Conversation("quero 1 x burger", "2", "2");
+
+        Assert.Equal(SalesStep.Payment, turn.State.Step);
+        Assert.Equal("Como vai pagar?\n\n*1* Pix\n*2* Dinheiro\n*3* Cartão na entrega", ZestSalesFlow.Prompt(turn.State, Catalog()));
+
+        var linkIgnored = await Say(turn.State, "link");
+        Assert.Null(linkIgnored.State.Payment);
+
+        var card = await Say(linkIgnored.State, "cartão");
+        Assert.Equal("CardOnDelivery", card.State.Payment);
+    }
+
+    [Theory]
+    [InlineData("1", "Pix")]
+    [InlineData("2", "Checkout")]
+    [InlineData("3", "Screen")]
+    [InlineData("5", "CardOnDelivery")]
+    [InlineData("manda o link", "Checkout")]
+    [InlineData("mercado pago", "Checkout")]
+    [InlineData("cartão", "Checkout")]
+    [InlineData("pela tela", "Screen")]
+    [InlineData("pix", "Pix")]
+    [InlineData("cartão na entrega", "CardOnDelivery")]
+    [InlineData("maquininha", "CardOnDelivery")]
+    public async Task ComMercadoPago_EscolheComoPagar(string message, string expected)
+    {
+        var catalog = Catalog(online: true);
+        var turn = await ConversationWith(catalog, "Carla", "quero 1 x burger", "2", "2");
+
+        Assert.Contains("*2* Link do Mercado Pago", ZestSalesFlow.Prompt(turn.State, catalog));
+
+        var chosen = await Say(turn.State, message, catalog);
+
+        Assert.Equal(expected, chosen.State.Payment);
+        Assert.Equal(SalesStep.Confirm, chosen.State.Step);
+    }
+
+    [Fact]
+    public async Task ComMercadoPago_DinheiroAindaPerguntaOTroco()
+    {
+        var catalog = Catalog(online: true);
+        var turn = await ConversationWith(catalog, "Carla", "quero 1 x burger", "2", "2", "4");
+
+        Assert.Equal("Cash", turn.State.Payment);
+        Assert.Equal(SalesStep.Change, turn.State.Step);
+    }
+
+    [Fact]
+    public async Task ComMercadoPago_ResumoMostraOLinkEscolhido()
+    {
+        var catalog = Catalog(online: true);
+        var turn = await ConversationWith(catalog, "Carla", "quero 1 x burger", "2", "2", "2");
+
+        Assert.Contains("Pagamento: Link do Mercado Pago", turn.Reply);
     }
 
     [Fact]

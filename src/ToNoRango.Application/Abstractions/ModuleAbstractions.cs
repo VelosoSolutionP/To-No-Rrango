@@ -116,6 +116,16 @@ public sealed record CardCharge(
     string IdempotencyKey,
     string? NotificationUrl);
 
+public sealed record CheckoutCharge(
+    long AmountInCents,
+    string Description,
+    string ExternalReference,
+    string ReturnUrl,
+    DateTimeOffset ExpiresAt,
+    string? NotificationUrl);
+
+public sealed record GatewayCheckout(string Id, string Url);
+
 public sealed class PaymentGatewayException(string message, Exception? innerException = null)
     : Exception(message, innerException);
 
@@ -124,6 +134,8 @@ public interface IPaymentGateway
     Task<GatewayPayment> CreatePixAsync(string accessToken, PixCharge charge, CancellationToken cancellationToken);
 
     Task<GatewayPayment> CreateCardAsync(string accessToken, CardCharge charge, CancellationToken cancellationToken);
+
+    Task<GatewayCheckout> CreateCheckoutAsync(string accessToken, CheckoutCharge charge, CancellationToken cancellationToken);
 
     Task<GatewayPayment> GetAsync(string accessToken, string paymentId, CancellationToken cancellationToken);
 
