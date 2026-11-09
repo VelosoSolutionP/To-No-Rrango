@@ -21,6 +21,7 @@ interface AdminOrdersProps {
   onRefund?: (orderId: string) => Promise<void>;
   onTrack?: (orderId: string) => Promise<string>;
   onLoadCouriers?: () => Promise<CourierContact[]>;
+  onOpenMap?: () => void;
 }
 
 const paymentLabels: Record<AdminOrder["paymentMethod"], string> = {
@@ -90,6 +91,7 @@ export function AdminOrders({
   onRefund,
   onTrack,
   onLoadCouriers,
+  onOpenMap,
 }: AdminOrdersProps) {
   const [couriers, setCouriers] = useState<CourierContact[] | null>(null);
   const [couriersError, setCouriersError] = useState<string | null>(null);
@@ -152,6 +154,25 @@ export function AdminOrders({
     } catch (trackingFailure) {
       setTracking(null);
       setTrackingError(trackingFailure instanceof Error ? trackingFailure.message : "Não foi possível gerar o link de rastreio.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function openMap(orderId: string) {
+    if (!onTrack || !onOpenMap) {
+      return;
+    }
+
+    setBusyId(orderId);
+    setTrackingError(null);
+
+    try {
+      // Garante que a entrega exista no mapa, mesmo antes de o link ir para o entregador.
+      await onTrack(orderId);
+      onOpenMap();
+    } catch (trackingFailure) {
+      setTrackingError(trackingFailure instanceof Error ? trackingFailure.message : "Não foi possível abrir o mapa.");
     } finally {
       setBusyId(null);
     }
@@ -301,7 +322,7 @@ export function AdminOrders({
             {selected.notes ? <p className="admin-order-note">Obs.: {selected.notes}</p> : null}
 
             {tracking?.orderId === selected.id ? (
-              <p className="admin-order-note">Link do entregador: <a href={tracking.url} rel="noreferrer" target="_blank">{tracking.url}</a></p>
+              <p className="admin-order-note">Link do entregador (tela dele, sem mapa): <a href={tracking.url} rel="noreferrer" target="_blank">{tracking.url}</a></p>
             ) : null}
             {canTrackSelected && couriers ? (
               couriers.some((courier) => courier.isActive) ? (
@@ -321,7 +342,10 @@ export function AdminOrders({
 
             <div className="vx-actions">
               {canTrackSelected ? (
-                <button className="secondary-button" disabled={isBusy} onClick={() => void shareTracking(selected.id)} type="button">Rastrear entrega</button>
+                <button className="secondary-button" disabled={isBusy} onClick={() => void shareTracking(selected.id)} type="button">Copiar link do entregador</button>
+              ) : null}
+              {canTrackSelected && onOpenMap ? (
+                <button className="secondary-button" disabled={isBusy} onClick={() => void openMap(selected.id)} type="button">Ver no mapa</button>
               ) : null}
               {nextStatuses(selected).map((status) => (
                 <button className="primary-button" disabled={isBusy} key={status} onClick={() => advance(selected, status)} type="button">

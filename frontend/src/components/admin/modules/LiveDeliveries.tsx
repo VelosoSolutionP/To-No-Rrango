@@ -94,7 +94,7 @@ export function LiveDeliveries({ http, establishmentId }: { http: AdminHttp; est
 
   useEffect(() => {
     if (!hasMap) {
-      map.current?.remove();
+      map.current?.stop().remove();
       map.current = null;
       couriers.current.clear();
       homes.current.clear();
@@ -110,7 +110,7 @@ export function LiveDeliveries({ http, establishmentId }: { http: AdminHttp; est
       }
 
       if (!map.current) {
-        map.current = leaflet.map(host.current, { scrollWheelZoom: false });
+        map.current = leaflet.map(host.current, { scrollWheelZoom: false, zoomAnimation: false, markerZoomAnimation: false });
         leaflet.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "&copy; OpenStreetMap", maxZoom: 19 }).addTo(map.current);
       }
 
@@ -180,7 +180,7 @@ export function LiveDeliveries({ http, establishmentId }: { http: AdminHttp; est
   }, [hasMap, located]);
 
   useEffect(() => () => {
-    map.current?.remove();
+    map.current?.stop().remove();
     map.current = null;
   }, []);
 
@@ -197,7 +197,7 @@ export function LiveDeliveries({ http, establishmentId }: { http: AdminHttp; est
       <ModuleHeading eyebrow="Operação" title="Rastreio" hint="Entregas em andamento no mapa. Atualiza sozinho a cada 10 segundos." />
       <ErrorMessage message={error} />
       {deliveries === null && !error ? <Empty>Carregando entregas...</Empty> : null}
-      {deliveries?.length === 0 ? <Empty>Nenhuma entrega sendo rastreada agora. Em Pedidos, abra uma entrega e clique em Rastrear entrega.</Empty> : null}
+      {deliveries?.length === 0 ? <Empty>Nenhuma entrega sendo rastreada agora. Em Pedidos, abra uma entrega e clique em Ver no mapa ou envie o link ao entregador.</Empty> : null}
       {deliveries && deliveries.length > 0 ? (
         <div className="vx-live">
           <div className="card vx-order-list">

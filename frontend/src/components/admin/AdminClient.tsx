@@ -486,6 +486,7 @@ export function AdminClient() {
                 onRefund={canManage && session.modules.includes("pagamentos") ? refundOrder : undefined}
                 onTrack={http && session.role !== "Kitchen" && session.modules.includes("rastreio") ? async (orderId) => (await http.post<{ token: string }>(`/orders/${orderId}/tracking`)).token : undefined}
                 onLoadCouriers={http && session.role !== "Kitchen" && session.modules.includes("rastreio") ? () => http.get<CourierContact[]>(`/establishments/${selectedId}/couriers`) : undefined}
+                onOpenMap={session.role !== "Kitchen" && session.modules.includes("rastreio") ? () => goTo("tracking") : undefined}
                 onUpdateStatus={updateOrderStatus}
                 orders={orders}
               />
