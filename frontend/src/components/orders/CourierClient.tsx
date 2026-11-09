@@ -13,6 +13,12 @@ interface CourierSession {
 type Phase = "loading" | "ready" | "tracking" | "ended";
 
 const sendEveryMs = 15_000;
+// Parado, o celular quase não dispara o watchPosition: sem isto o painel acusaria sinal perdido no semáforo.
+const confirmEveryMs = sendEveryMs + 1_000;
+const gpsOptions: PositionOptions = { enableHighAccuracy: true, maximumAge: 5_000, timeout: 30_000 };
+const confirmGpsOptions: PositionOptions = { enableHighAccuracy: true, maximumAge: 10_000, timeout: 12_000 };
+// Sem leitura nova o último ponto ainda vale por este tempo; depois disso o "sem sinal" passa a ser verdade.
+const keepLastFixMs = 120_000;
 
 export function CourierClient({ token }: { token: string }) {
   const [session, setSession] = useState<CourierSession | null>(null);
@@ -20,6 +26,8 @@ export function CourierClient({ token }: { token: string }) {
   const [problem, setProblem] = useState<string | null>(null);
   const [sentAt, setSentAt] = useState<Date | null>(null);
   const watch = useRef<number | null>(null);
+  const confirmTimer = useRef<number | null>(null);
+  const lastFix = useRef<{ latitude: number; longitude: number; at: number } | null>(null);
   const wakeLock = useRef<WakeLockSentinel | null>(null);
   const lastSent = useRef(0);
   const base = `${API_BASE_URL}/api/public/tracking/${encodeURIComponent(token)}`;
@@ -28,6 +36,11 @@ export function CourierClient({ token }: { token: string }) {
     if (watch.current !== null) {
       navigator.geolocation.clearWatch(watch.current);
       watch.current = null;
+    }
+
+    if (confirmTimer.current !== null) {
+      window.clearInterval(confirmTimer.current);
+      confirmTimer.current = null;
     }
 
     void wakeLock.current?.release().catch(() => undefined);
@@ -106,16 +119,34 @@ export function CourierClient({ token }: { token: string }) {
 
     setProblem(null);
     lastSent.current = 0;
+    lastFix.current = null;
+
+    function onFix(position: GeolocationPosition) {
+      lastFix.current = { latitude: position.coords.latitude, longitude: position.coords.longitude, at: Date.now() };
+      setPhase("tracking");
+      void send(position.coords.latitude, position.coords.longitude);
+    }
+
     watch.current = navigator.geolocation.watchPosition(
-      (position) => {
-        setPhase("tracking");
-        void send(position.coords.latitude, position.coords.longitude);
-      },
+      onFix,
       (error) => setProblem(error.code === error.PERMISSION_DENIED
         ? "Permita o acesso à localização nas configurações do navegador e tente de novo."
         : "Não foi possível obter a localização. Vá para um lugar aberto."),
-      { enableHighAccuracy: true, maximumAge: 5_000, timeout: 30_000 },
+      gpsOptions,
     );
+    confirmTimer.current = window.setInterval(() => {
+      navigator.geolocation.getCurrentPosition(
+        onFix,
+        () => {
+          const fix = lastFix.current;
+
+          if (fix && Date.now() - fix.at < keepLastFixMs) {
+            void send(fix.latitude, fix.longitude);
+          }
+        },
+        confirmGpsOptions,
+      );
+    }, confirmEveryMs);
     void keepScreenOn();
   }
 

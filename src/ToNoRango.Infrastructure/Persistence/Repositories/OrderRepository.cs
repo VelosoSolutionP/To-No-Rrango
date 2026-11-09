@@ -41,6 +41,17 @@ public sealed class OrderRepository(ToNoRangoDbContext dbContext) : IOrderReposi
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Order>> ListOpenDeliveriesAsync(Guid establishmentId, int take, CancellationToken cancellationToken) =>
+        await dbContext.Orders
+            .AsNoTracking()
+            .Where(order => order.EstablishmentId == establishmentId
+                && order.FulfillmentType == FulfillmentType.Delivery
+                && order.Status != OrderStatus.Delivered
+                && order.Status != OrderStatus.Cancelled)
+            .OrderByDescending(order => order.CreatedAt)
+            .Take(take)
+            .ToListAsync(cancellationToken);
+
     public Task AddAsync(Order order, CancellationToken cancellationToken)
     {
         dbContext.Orders.Add(order);

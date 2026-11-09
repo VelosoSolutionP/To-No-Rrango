@@ -12,5 +12,7 @@ public interface IOrderRepository
 
     Task<IReadOnlyList<Order>> ListAsync(Guid establishmentId, OrderStatus? status, int take, CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<Order>> ListOpenDeliveriesAsync(Guid establishmentId, int take, CancellationToken cancellationToken);
+
     Task AddAsync(Order order, CancellationToken cancellationToken);
 }

@@ -30,12 +30,13 @@ import { Finance } from "./modules/Finance";
 import { Fiscal } from "./modules/Fiscal";
 import { Inventory } from "./modules/Inventory";
 import { Kitchen } from "./modules/Kitchen";
+import { LiveDeliveries } from "./modules/LiveDeliveries";
 import { Overview } from "./modules/Overview";
 import { Customers } from "./modules/Parties";
 import { Settings } from "./modules/Settings";
 import { Zest } from "./modules/Zest";
 
-type Tab = "overview" | "orders" | "kitchen" | "menu" | "inventory" | "customers" | "distribution" | "finance" | "fiscal" | "whatsapp" | "settings";
+type Tab = "overview" | "orders" | "tracking" | "kitchen" | "menu" | "inventory" | "customers" | "distribution" | "finance" | "fiscal" | "whatsapp" | "settings";
 
 const roleName: Record<UserRole, string> = { Owner: "Dono", Manager: "Gerente", Attendant: "Atendente", Kitchen: "Cozinha" };
 
@@ -45,6 +46,7 @@ const everyone: UserRole[] = ["Owner", "Manager", "Attendant", "Kitchen"];
 const tabs: Array<{ id: Tab; group: string; label: string; roles: UserRole[]; modules?: string[] }> = [
   { id: "overview", group: "Operação", label: "Visão geral", roles: ["Owner", "Manager", "Attendant"] },
   { id: "orders", group: "Operação", label: "Pedidos", roles: everyone, modules: ["pedidos"] },
+  { id: "tracking", group: "Operação", label: "Rastreio", roles: ["Owner", "Manager", "Attendant"], modules: ["rastreio"] },
   { id: "kitchen", group: "Operação", label: "Cozinha", roles: everyone, modules: ["pedidos"] },
   { id: "menu", group: "Gestão", label: "Cardápio", roles: management, modules: ["cardapio"] },
   { id: "inventory", group: "Gestão", label: "Estoque", roles: management, modules: ["estoque"] },
@@ -489,6 +491,7 @@ export function AdminClient() {
               />
             ) : null}
 
+            {tab === "tracking" && hasEstablishment && http ? <LiveDeliveries establishmentId={selectedId} http={http} /> : null}
             {tab === "kitchen" && hasEstablishment ? <Kitchen error={mutationError ?? dataError} onAdvance={updateOrderStatus} orders={orders} /> : null}
 
             {tab === "menu" && hasEstablishment ? (

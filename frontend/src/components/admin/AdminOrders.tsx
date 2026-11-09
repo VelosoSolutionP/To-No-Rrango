@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { formatBRL, formatDateTime } from "@/lib/admin-api";
 import type { AdminOrder, OrderStatus } from "@/lib/types";
 
@@ -92,6 +92,7 @@ export function AdminOrders({
   onLoadCouriers,
 }: AdminOrdersProps) {
   const [couriers, setCouriers] = useState<CourierContact[] | null>(null);
+  const [couriersError, setCouriersError] = useState<string | null>(null);
   const [tracking, setTracking] = useState<{ orderId: string; url: string } | null>(null);
   const [trackingError, setTrackingError] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | OrderStatus>("all");
@@ -147,8 +148,7 @@ export function AdminOrders({
       const token = await onTrack(orderId);
       const url = `${window.location.origin}/entrega/${token}`;
       setTracking({ orderId, url });
-      await navigator.clipboard?.writeText(url).catch(() => undefined);
-      setCouriers(onLoadCouriers ? await onLoadCouriers().catch(() => null) : null);
+      void navigator.clipboard?.writeText(url).catch(() => undefined);
     } catch (trackingFailure) {
       setTracking(null);
       setTrackingError(trackingFailure instanceof Error ? trackingFailure.message : "Não foi possível gerar o link de rastreio.");
@@ -157,7 +157,70 @@ export function AdminOrders({
     }
   }
 
+  async function sendToCourier(order: AdminOrder, courier: CourierContact) {
+    if (!onTrack) {
+      return;
+    }
+
+    // Aberta ainda dentro do clique: depois de esperar a API o navegador bloquearia a janela.
+    const whatsApp = window.open("", "_blank");
+
+    if (whatsApp) {
+      whatsApp.opener = null;
+    }
+
+    setBusyId(order.id);
+    setTrackingError(null);
+
+    try {
+      const token = await onTrack(order.id);
+      const url = `${window.location.origin}/entrega/${token}`;
+      const target = `https://wa.me/${courier.phone}?text=${encodeURIComponent(`Entrega do pedido ${order.code}. Abra para iniciar: ${url}`)}`;
+      setTracking({ orderId: order.id, url });
+
+      if (whatsApp) {
+        whatsApp.location.href = target;
+      } else {
+        window.location.href = target;
+      }
+    } catch (trackingFailure) {
+      whatsApp?.close();
+      setTrackingError(trackingFailure instanceof Error ? trackingFailure.message : "Não foi possível gerar o link de rastreio.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   const selected = filtered.find((order) => order.id === selectedId) ?? filtered[0] ?? null;
+  const selectedOrderId = selected?.id ?? null;
+  const canTrackSelected = Boolean(onTrack && selected && selected.fulfillmentType === "Delivery" && selected.status !== "Cancelled" && selected.status !== "Delivered");
+
+  useEffect(() => {
+    if (!onLoadCouriers || !selectedOrderId) {
+      return;
+    }
+
+    let alive = true;
+
+    onLoadCouriers()
+      .then((list) => {
+        if (alive) {
+          setCouriers(list);
+          setCouriersError(null);
+        }
+      })
+      .catch(() => {
+        if (alive) {
+          setCouriers(null);
+          setCouriersError("Não foi possível carregar os entregadores. Atualize a página.");
+        }
+      });
+
+    return () => {
+      alive = false;
+    };
+    // Recarrega ao trocar de pedido; a função muda a cada render do painel.
+  }, [selectedOrderId]); // eslint-disable-line react-hooks/exhaustive-deps
   const isBusy = selected !== null && busyId === selected.id;
   const canCancel = selected !== null && selected.status !== "Delivered" && selected.status !== "Cancelled";
 
@@ -238,31 +301,26 @@ export function AdminOrders({
             {selected.notes ? <p className="admin-order-note">Obs.: {selected.notes}</p> : null}
 
             {tracking?.orderId === selected.id ? (
-              <p className="admin-order-note">Link copiado. Envie ao entregador: <a href={tracking.url} rel="noreferrer" target="_blank">{tracking.url}</a></p>
+              <p className="admin-order-note">Link do entregador: <a href={tracking.url} rel="noreferrer" target="_blank">{tracking.url}</a></p>
             ) : null}
-            {tracking?.orderId === selected.id && couriers ? (
+            {canTrackSelected && couriers ? (
               couriers.some((courier) => courier.isActive) ? (
                 <div className="vx-actions">
                   {couriers.filter((courier) => courier.isActive).map((courier) => (
-                    <a
-                      className="secondary-button"
-                      href={`https://wa.me/${courier.phone}?text=${encodeURIComponent(`Entrega do pedido ${selected.code}. Abra para iniciar: ${tracking.url}`)}`}
-                      key={courier.id}
-                      rel="noreferrer"
-                      target="_blank"
-                    >
+                    <button className="secondary-button" disabled={isBusy} key={courier.id} onClick={() => void sendToCourier(selected, courier)} type="button">
                       Enviar para {courier.name}
-                    </a>
+                    </button>
                   ))}
                 </div>
               ) : (
                 <p className="admin-order-note">Cadastre entregadores em Distribuição para enviar o link direto pelo WhatsApp.</p>
               )
             ) : null}
+            {canTrackSelected && couriersError ? <p className="form-error">{couriersError}</p> : null}
             {trackingError ? <p className="form-error">{trackingError}</p> : null}
 
             <div className="vx-actions">
-              {onTrack && selected.fulfillmentType === "Delivery" && selected.status !== "Cancelled" && selected.status !== "Delivered" ? (
+              {canTrackSelected ? (
                 <button className="secondary-button" disabled={isBusy} onClick={() => void shareTracking(selected.id)} type="button">Rastrear entrega</button>
               ) : null}
               {nextStatuses(selected).map((status) => (

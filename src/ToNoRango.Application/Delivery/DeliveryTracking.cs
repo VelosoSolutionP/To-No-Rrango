@@ -48,6 +48,17 @@ public sealed record PublicTrackingDto(
     double? DistanceKm = null,
     int? EtaMinutes = null);
 
+public sealed record LiveDeliveryDto(
+    Guid OrderId,
+    string OrderCode,
+    string CustomerName,
+    string Destination,
+    GeoPoint? Courier,
+    GeoPoint? DestinationPoint,
+    DateTimeOffset? UpdatedAt,
+    double? DistanceKm,
+    int? EtaMinutes);
+
 /// <summary>Rough arrival estimate from the straight-line distance. It does not know streets or traffic.</summary>
 public static class TrackingEstimate
 {
@@ -69,6 +80,31 @@ public static class TrackingEstimate
 
     public static int EtaMinutes(double distanceKm) => Math.Max(1, (int)Math.Ceiling(distanceKm / AverageSpeedKmh * 60));
 
+    public static PublicTrackingDto Snapshot(TrackingSession session, CourierPosition? position)
+    {
+        if (position is null)
+        {
+            return new PublicTrackingDto(true, Destination: session.DestinationPoint);
+        }
+
+        var courier = new GeoPoint(position.Latitude, position.Longitude);
+
+        if (session.DestinationPoint is null)
+        {
+            return new PublicTrackingDto(true, courier, UpdatedAt: position.At);
+        }
+
+        var distance = DistanceKm(courier, session.DestinationPoint);
+
+        // Distância fora do alcance de uma entrega indica endereço localizado errado: melhor não prometer tempo.
+        if (distance > MaxPlausibleKm)
+        {
+            return new PublicTrackingDto(true, courier, UpdatedAt: position.At);
+        }
+
+        return new PublicTrackingDto(true, courier, session.DestinationPoint, position.At, Math.Round(distance, 1), EtaMinutes(distance));
+    }
+
     private static double Radians(double degrees) => degrees * Math.PI / 180;
 }
 
@@ -79,6 +115,8 @@ public sealed class DeliveryTrackingService(
     IGeocoder geocoder,
     TimeProvider clock)
 {
+    private const int MaxLiveDeliveries = 100;
+
     private static readonly PublicTrackingDto Inactive = new(false);
     private static readonly CourierSessionDto Finished = new(false, null, null, null);
 
@@ -173,29 +211,37 @@ public sealed class DeliveryTrackingService(
             return Inactive;
         }
 
-        var position = await store.FindPositionAsync(orderCode);
+        return TrackingEstimate.Snapshot(session, await store.FindPositionAsync(orderCode));
+    }
 
-        if (position is null)
+    public async Task<IReadOnlyList<LiveDeliveryDto>> ListLiveAsync(Guid establishmentId, CancellationToken cancellationToken)
+    {
+        var open = await orders.ListOpenDeliveriesAsync(establishmentId, MaxLiveDeliveries, cancellationToken);
+        var live = new List<LiveDeliveryDto>();
+
+        foreach (var order in open)
         {
-            return new PublicTrackingDto(true, Destination: session.DestinationPoint);
+            var session = await store.FindByOrderAsync(order.Code);
+
+            if (session is null)
+            {
+                continue;
+            }
+
+            var tracking = TrackingEstimate.Snapshot(session, await store.FindPositionAsync(order.Code));
+            live.Add(new LiveDeliveryDto(
+                order.Id,
+                order.Code,
+                order.CustomerName,
+                session.Destination,
+                tracking.Courier,
+                tracking.Destination,
+                tracking.UpdatedAt,
+                tracking.DistanceKm,
+                tracking.EtaMinutes));
         }
 
-        var courier = new GeoPoint(position.Latitude, position.Longitude);
-
-        if (session.DestinationPoint is null)
-        {
-            return new PublicTrackingDto(true, courier, UpdatedAt: position.At);
-        }
-
-        var distance = TrackingEstimate.DistanceKm(courier, session.DestinationPoint);
-
-        // Distância fora do alcance de uma entrega indica endereço localizado errado: melhor não prometer tempo.
-        if (distance > TrackingEstimate.MaxPlausibleKm)
-        {
-            return new PublicTrackingDto(true, courier, UpdatedAt: position.At);
-        }
-
-        return new PublicTrackingDto(true, courier, session.DestinationPoint, position.At, Math.Round(distance, 1), TrackingEstimate.EtaMinutes(distance));
+        return live;
     }
 
     private async Task<bool> CloseIfFinishedAsync(TrackingSession session, CancellationToken cancellationToken)

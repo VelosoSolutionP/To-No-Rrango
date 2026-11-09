@@ -181,8 +181,13 @@ internal static class ModuleEndpoints
     private static void MapCouriers(RouteGroupBuilder group)
     {
         // A atendente envia o link da entrega, então precisa ver a lista, mas não altera o cadastro.
-        group.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager, UserRole.Attendant).MapGet($"{Establishment}/couriers", async (Guid establishmentId, CourierService service, CancellationToken ct) =>
+        var viewers = group.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager, UserRole.Attendant);
+
+        viewers.MapGet($"{Establishment}/couriers", async (Guid establishmentId, CourierService service, CancellationToken ct) =>
             (await service.ListAsync(establishmentId, ct)).ToHttpResult());
+
+        viewers.MapGet($"{Establishment}/live-deliveries", async (Guid establishmentId, DeliveryTrackingService service, CancellationToken ct) =>
+            Results.Ok(await service.ListLiveAsync(establishmentId, ct)));
 
         var managers = group.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager);
 
