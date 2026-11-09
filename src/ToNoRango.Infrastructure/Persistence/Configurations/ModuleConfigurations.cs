@@ -152,6 +152,7 @@ public sealed class PurchaseEntryConfiguration : IEntityTypeConfiguration<Purcha
         builder.Property(entry => entry.Id).ValueGeneratedNever();
         builder.Property(entry => entry.InvoiceNumber).HasMaxLength(30);
         builder.Property(entry => entry.AccessKey).HasMaxLength(44);
+        builder.Property(entry => entry.NfeXml).HasColumnType("text");
         builder.Property(entry => entry.Notes).HasMaxLength(500);
         builder.Property(entry => entry.CreatedBy).HasMaxLength(200);
         builder.HasIndex(entry => new { entry.EstablishmentId, entry.AccessKey }).IsUnique().HasFilter("\"AccessKey\" IS NOT NULL");
@@ -202,6 +203,20 @@ public sealed class DeliveryZoneConfiguration : IEntityTypeConfiguration<Deliver
         builder.Property(zone => zone.DistrictKey).HasMaxLength(80).IsRequired();
         builder.HasIndex(zone => new { zone.EstablishmentId, zone.DistrictKey }).IsUnique();
         builder.HasIndex(zone => zone.TenantId);
+    }
+}
+
+public sealed class CourierConfiguration : IEntityTypeConfiguration<Courier>
+{
+    public void Configure(EntityTypeBuilder<Courier> builder)
+    {
+        builder.ToTable("couriers", "delivery");
+        builder.HasKey(courier => courier.Id);
+        builder.Property(courier => courier.Id).ValueGeneratedNever();
+        builder.Property(courier => courier.Name).HasMaxLength(120).IsRequired();
+        builder.Property(courier => courier.Phone).HasMaxLength(20).IsRequired();
+        builder.HasIndex(courier => new { courier.EstablishmentId, courier.Phone }).IsUnique();
+        builder.HasIndex(courier => courier.TenantId);
     }
 }
 
@@ -299,5 +314,76 @@ public sealed class KnowledgeEntryConfiguration : IEntityTypeConfiguration<Knowl
         builder.Property(entry => entry.Keywords).HasMaxLength(300).IsRequired();
         builder.HasIndex(entry => entry.EstablishmentId);
         builder.HasIndex(entry => entry.TenantId);
+    }
+}
+
+public sealed class FiscalProfileConfiguration : IEntityTypeConfiguration<ToNoRango.Domain.Fiscal.FiscalProfile>
+{
+    public void Configure(EntityTypeBuilder<ToNoRango.Domain.Fiscal.FiscalProfile> builder)
+    {
+        builder.ToTable("profiles", "fiscal");
+        builder.HasKey(profile => profile.Id);
+        builder.Property(profile => profile.Id).ValueGeneratedNever();
+        builder.Property(profile => profile.LegalName).HasMaxLength(60);
+        builder.Property(profile => profile.TradeName).HasMaxLength(60);
+        builder.Property(profile => profile.Cnpj).HasMaxLength(14);
+        builder.Property(profile => profile.StateRegistration).HasMaxLength(14);
+        builder.Property(profile => profile.Street).HasMaxLength(60);
+        builder.Property(profile => profile.Number).HasMaxLength(60);
+        builder.Property(profile => profile.District).HasMaxLength(60);
+        builder.Property(profile => profile.City).HasMaxLength(60);
+        builder.Property(profile => profile.State).HasMaxLength(2);
+        builder.Property(profile => profile.PostalCode).HasMaxLength(8);
+        builder.Property(profile => profile.CityIbgeCode).HasMaxLength(7);
+        builder.Property(profile => profile.AccountantName).HasMaxLength(100);
+        builder.Property(profile => profile.AccountantCpf).HasMaxLength(11);
+        builder.Property(profile => profile.AccountantCrc).HasMaxLength(15);
+        builder.Property(profile => profile.AccountantEmail).HasMaxLength(115);
+        builder.Property(profile => profile.SpedProfile).HasMaxLength(1);
+        builder.Ignore(profile => profile.HasAccounting);
+        builder.Property<uint>("xmin").IsRowVersion();
+        builder.HasIndex(profile => profile.EstablishmentId).IsUnique();
+        builder.HasIndex(profile => profile.TenantId);
+    }
+}
+
+public sealed class ProductFiscalDataConfiguration : IEntityTypeConfiguration<ToNoRango.Domain.Fiscal.ProductFiscalData>
+{
+    public void Configure(EntityTypeBuilder<ToNoRango.Domain.Fiscal.ProductFiscalData> builder)
+    {
+        builder.ToTable("product_data", "fiscal");
+        builder.HasKey(data => data.Id);
+        builder.Property(data => data.Id).ValueGeneratedNever();
+        builder.Property(data => data.Ncm).HasMaxLength(8);
+        builder.Property(data => data.Cfop).HasMaxLength(4);
+        builder.Property(data => data.Cest).HasMaxLength(7);
+        builder.Property(data => data.IcmsCst).HasMaxLength(2);
+        builder.Property(data => data.IcmsRate).HasPrecision(7, 4);
+        builder.Property(data => data.PisCofinsCst).HasMaxLength(2);
+        builder.Property(data => data.PisRate).HasPrecision(7, 4);
+        builder.Property(data => data.CofinsRate).HasPrecision(7, 4);
+        builder.Ignore(data => data.HasPisCofinsValues);
+        builder.HasIndex(data => data.MenuItemId).IsUnique();
+        builder.HasIndex(data => data.TenantId);
+    }
+}
+
+public sealed class FiscalDocumentConfiguration : IEntityTypeConfiguration<ToNoRango.Domain.Fiscal.FiscalDocument>
+{
+    public void Configure(EntityTypeBuilder<ToNoRango.Domain.Fiscal.FiscalDocument> builder)
+    {
+        builder.ToTable("documents", "fiscal");
+        builder.HasKey(document => document.Id);
+        builder.Property(document => document.Id).ValueGeneratedNever();
+        builder.Property(document => document.OrderCode).HasMaxLength(40);
+        builder.Property(document => document.AccessKey).HasMaxLength(44);
+        builder.Property(document => document.Protocol).HasMaxLength(20);
+        builder.Property(document => document.Xml).HasColumnType("text");
+        builder.Property(document => document.Message).HasMaxLength(2000);
+        builder.Ignore(document => document.NumericCode);
+        builder.Property<uint>("xmin").IsRowVersion();
+        builder.HasIndex(document => document.OrderId).IsUnique();
+        builder.HasIndex(document => new { document.EstablishmentId, document.Model, document.Series, document.Number, document.Environment }).IsUnique();
+        builder.HasIndex(document => document.TenantId);
     }
 }

@@ -126,6 +126,29 @@ internal static class PublicEndpoints
         })
         .AllowAnonymous();
 
+        group.MapGet("/orders/{code}/tracking", async (string code, DeliveryTrackingService tracking, CancellationToken cancellationToken) =>
+            Results.Ok(await tracking.GetPublicAsync(code, cancellationToken)))
+        .RequireRateLimiting("public")
+        .AllowAnonymous();
+
+        group.MapGet("/tracking/{token}", async (string token, DeliveryTrackingService tracking, CancellationToken cancellationToken) =>
+            Results.Ok(await tracking.GetCourierSessionAsync(token, cancellationToken)))
+        .RequireRateLimiting("public")
+        .AllowAnonymous();
+
+        group.MapPost("/tracking/{token}/position", async (string token, CourierPositionRequest request, DeliveryTrackingService tracking, CancellationToken cancellationToken) =>
+            (await tracking.ReportPositionAsync(token, request, cancellationToken)).ToHttpResult())
+        .RequireRateLimiting("public")
+        .AllowAnonymous();
+
+        group.MapPost("/tracking/{token}/finish", async (string token, DeliveryTrackingService tracking) =>
+        {
+            await tracking.FinishAsync(token);
+            return Results.NoContent();
+        })
+        .RequireRateLimiting("public")
+        .AllowAnonymous();
+
         group.MapGet("/orders/{code}/payment", async (string code, PaymentService payments, CancellationToken cancellationToken) =>
             (await payments.GetCurrentAsync(code, cancellationToken)).ToHttpResult())
         .AllowAnonymous();

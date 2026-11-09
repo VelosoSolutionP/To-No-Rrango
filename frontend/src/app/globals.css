@@ -4726,3 +4726,74 @@ body {
   border-radius: 0 0 13px 13px;
   background: #16161b;
 }
+
+/* Rastreio da entrega */
+.delivery-map {
+  height: 320px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+
+.delivery-eta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.3rem 1rem;
+  margin: 0.4rem 0 0.9rem;
+}
+
+.delivery-eta strong {
+  color: var(--brand);
+  font-size: 1.15rem;
+}
+
+.delivery-eta span {
+  color: var(--muted);
+}
+
+.delivery-updated {
+  margin: 0.7rem 0 0;
+  font-size: 0.86rem;
+}
+
+.map-pin {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  font-size: 18px;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45);
+}
+
+.map-pin-courier {
+  background: var(--brand);
+}
+
+.map-pin-home {
+  background: var(--surface-3);
+}
+
+.courier-page .primary-button,
+.courier-page .secondary-button {
+  width: 100%;
+  margin-top: 1rem;
+}
+
+.courier-live {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--success);
+  font-weight: 700;
+}
+
+.courier-live i {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  background: var(--success);
+  animation: pulse 1.6s infinite;
+}

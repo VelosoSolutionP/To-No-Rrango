@@ -1135,3 +1135,14 @@
 .vx .module-form {
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
+
+.vx .fiscal-input {
+  width: 100%;
+  min-width: 5.5rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--foreground);
+  font: inherit;
+}

@@ -48,6 +48,10 @@ services:
       Llm__BaseUrl: "http://ollama-proxy:11434/v1"
       Llm__Model: "qwen2.5:3b"
       Zest__BaseUrl: "https://zest.velososolution.com.br"
+      Acbr__Mode: "${ACBR_MODE:-Off}"
+      Acbr__Host: "${ACBR_HOST:-host.docker.internal}"
+      Acbr__Port: "${ACBR_PORT:-3434}"
+      Acbr__Environment: "${ACBR_ENVIRONMENT:-2}"
       Zest__Email: "${ZEST_EMAIL:-}"
       Zest__Password: "${ZEST_PASSWORD:-}"
     extra_hosts:

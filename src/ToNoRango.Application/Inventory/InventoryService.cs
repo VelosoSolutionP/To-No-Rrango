@@ -70,7 +70,8 @@ public sealed record CreatePurchaseRequest(
     DateOnly IssuedOn,
     DateOnly? DueOn,
     string? Notes,
-    IReadOnlyList<PurchaseLineRequest> Lines);
+    IReadOnlyList<PurchaseLineRequest> Lines,
+    string? NfeXml = null);
 
 public sealed record PurchaseLineDto(Guid StockItemId, string Description, decimal Quantity, long UnitCostInCents, long TotalInCents);
 
@@ -324,6 +325,18 @@ public sealed class InventoryService(
                 request.Notes,
                 createdBy,
                 now);
+
+            if (!string.IsNullOrWhiteSpace(request.NfeXml))
+            {
+                var parsedNote = ToNoRango.Application.Fiscal.NfeXmlParser.Parse(request.NfeXml);
+
+                if (parsedNote.AccessKey != request.AccessKey)
+                {
+                    return Result<PurchaseDto>.Failure(AppErrors.Validation("O XML enviado não é o desta compra."));
+                }
+
+                entry.AttachNfeXml(request.NfeXml);
+            }
 
             foreach (var (line, stockItem) in loaded)
             {

@@ -4,6 +4,7 @@ using ToNoRango.Domain.Contracts;
 using ToNoRango.Domain.Delivery;
 using ToNoRango.Domain.Establishments;
 using ToNoRango.Domain.Finance;
+using ToNoRango.Domain.Fiscal;
 using ToNoRango.Domain.Identity;
 using ToNoRango.Domain.Inventory;
 using ToNoRango.Domain.Messaging;
@@ -54,6 +55,9 @@ public sealed class ToNoRangoDbContext : DbContext
 
     public ITenantContext TenantContext { get; }
 
+    public DbSet<FiscalProfile> FiscalProfiles => Set<FiscalProfile>();
+    public DbSet<ProductFiscalData> ProductFiscalData => Set<ProductFiscalData>();
+    public DbSet<FiscalDocument> FiscalDocuments => Set<FiscalDocument>();
     public DbSet<Contract> Contracts => Set<Contract>();
     public DbSet<Establishment> Establishments => Set<Establishment>();
     public DbSet<MenuCategory> MenuCategories => Set<MenuCategory>();
@@ -69,6 +73,9 @@ public sealed class ToNoRangoDbContext : DbContext
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ToNoRangoDbContext).Assembly);
 
+        ApplyTenantFilter<FiscalProfile>(modelBuilder);
+        ApplyTenantFilter<ProductFiscalData>(modelBuilder);
+        ApplyTenantFilter<FiscalDocument>(modelBuilder);
         ApplyTenantFilter<Contract>(modelBuilder);
         ApplyTenantFilter<Establishment>(modelBuilder);
         ApplyTenantFilter<MenuCategory>(modelBuilder);
@@ -91,6 +98,7 @@ public sealed class ToNoRangoDbContext : DbContext
         ApplyTenantFilter<PurchaseEntryLine>(modelBuilder);
         ApplyTenantFilter<FinancialEntry>(modelBuilder);
         ApplyTenantFilter<DeliveryZone>(modelBuilder);
+        ApplyTenantFilter<Courier>(modelBuilder);
         ApplyTenantFilter<WhatsAppSettings>(modelBuilder);
         ApplyTenantFilter<OutboundMessage>(modelBuilder);
         ApplyTenantFilter<Conversation>(modelBuilder);

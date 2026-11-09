@@ -18,7 +18,15 @@ public static class Modules
     public const string Estoque = "estoque";
     public const string Financeiro = "financeiro";
     public const string Fiscal = "fiscal";
+
+    /// <summary>Sold separately, for Lucro Presumido and above: issuing NFC-e through ACBr.</summary>
+    public const string FiscalNfce = "fiscal_nfce";
+
+    public const string FiscalSintegra = "fiscal_sintegra";
+    public const string FiscalSped = "fiscal_sped";
+
     public const string Relatorios = "relatorios";
+    public const string Rastreio = "rastreio";
     public const string Ia = "ia";
 
     /// <summary>Paid add-on: lets ZEST fall back to an LLM when its own rules have no answer.</summary>

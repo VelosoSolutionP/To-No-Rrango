@@ -22,7 +22,7 @@ import type {
 import { AdminEstablishment } from "./AdminEstablishment";
 import { AdminLogin } from "./AdminLogin";
 import { AdminMenu } from "./AdminMenu";
-import { AdminOrders } from "./AdminOrders";
+import { AdminOrders, type CourierContact } from "./AdminOrders";
 import { AdminContext } from "./AdminContext";
 import "./admin.css";
 import { Distribution } from "./modules/Distribution";
@@ -51,7 +51,7 @@ const tabs: Array<{ id: Tab; group: string; label: string; roles: UserRole[]; mo
   { id: "customers", group: "Gestão", label: "Clientes", roles: ["Owner", "Manager", "Attendant"], modules: ["clientes"] },
   { id: "distribution", group: "Gestão", label: "Distribuição", roles: management, modules: ["pedidos"] },
   { id: "finance", group: "Gestão", label: "Financeiro", roles: management, modules: ["financeiro"] },
-  { id: "fiscal", group: "Gestão", label: "Fiscal", roles: management, modules: ["fiscal"] },
+  { id: "fiscal", group: "Gestão", label: "Fiscal", roles: management, modules: ["fiscal", "fiscal_nfce"] },
   { id: "whatsapp", group: "Inteligência", label: "WhatsApp e IA", roles: ["Owner", "Manager", "Attendant"], modules: ["ia", "whatsapp"] },
   { id: "settings", group: "Ajustes", label: "Configurações", roles: management },
 ];
@@ -482,6 +482,8 @@ export function AdminClient() {
                 onMarkPaid={session.role !== "Kitchen" ? markPaid : undefined}
                 onRefresh={refreshOrders}
                 onRefund={canManage && session.modules.includes("pagamentos") ? refundOrder : undefined}
+                onTrack={http && session.role !== "Kitchen" && session.modules.includes("rastreio") ? async (orderId) => (await http.post<{ token: string }>(`/orders/${orderId}/tracking`)).token : undefined}
+                onLoadCouriers={http && session.role !== "Kitchen" && session.modules.includes("rastreio") ? () => http.get<CourierContact[]>(`/establishments/${selectedId}/couriers`) : undefined}
                 onUpdateStatus={updateOrderStatus}
                 orders={orders}
               />
@@ -506,9 +508,9 @@ export function AdminClient() {
 
             {tab === "inventory" && hasEstablishment && http ? <Inventory canImportNfe={session.modules.includes("fiscal")} establishmentId={selectedId} http={http} menu={menu} /> : null}
             {tab === "customers" && hasEstablishment && http ? <Customers establishmentId={selectedId} http={http} /> : null}
-            {tab === "distribution" && hasEstablishment && http ? <Distribution establishmentId={selectedId} http={http} /> : null}
+            {tab === "distribution" && hasEstablishment && http ? <Distribution establishmentId={selectedId} http={http} modules={session.modules} /> : null}
             {tab === "finance" && hasEstablishment && http ? <Finance establishmentId={selectedId} http={http} /> : null}
-            {tab === "fiscal" && hasEstablishment && http ? <Fiscal establishmentId={selectedId} http={http} onOpenInventory={() => goTo("inventory")} /> : null}
+            {tab === "fiscal" && hasEstablishment && http ? <Fiscal establishmentId={selectedId} http={http} modules={session.modules} onOpenInventory={() => goTo("inventory")} /> : null}
 
             {tab === "whatsapp" && hasEstablishment && http ? (
               <Zest

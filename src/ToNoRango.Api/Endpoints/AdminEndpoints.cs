@@ -201,6 +201,13 @@ internal static class AdminEndpoints
         })
         .WithName("AtualizarStatusPedido");
 
+        operations.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager, UserRole.Attendant).RequireModule(Modules.Rastreio).MapPost("/orders/{orderId:guid}/tracking", async (
+            Guid orderId,
+            ToNoRango.Application.Delivery.DeliveryTrackingService service,
+            CancellationToken cancellationToken) =>
+            (await service.StartAsync(orderId, cancellationToken)).ToHttpResult())
+        .WithName("IniciarRastreio");
+
         operations.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager, UserRole.Attendant).MapPost("/orders/{orderId:guid}/paid", async (
             Guid orderId,
             OrderService service,

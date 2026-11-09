@@ -99,12 +99,18 @@ internal static class ModuleEndpoints
 
         MapUsers(admin.MapGroup("/users").RequireRoles(UserRole.Owner));
         MapDelivery(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).RequireModule(Modules.Pedidos));
+        MapCouriers(admin.MapGroup(string.Empty).RequireModule(Modules.Rastreio));
         MapPayments(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).RequireModule(Modules.Pagamentos));
         MapCustomers(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager, UserRole.Attendant).RequireModule(Modules.Clientes));
         MapInventory(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).RequireModule(Modules.Estoque));
         MapFinance(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).RequireModule(Modules.Financeiro));
         MapReports(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).RequireModule(Modules.Relatorios));
         MapFiscal(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).RequireModule(Modules.Fiscal));
+        MapFiscalNfce(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).RequireModule(Modules.FiscalNfce));
+        var fiscalManagers = admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager);
+        MapFiscalFile(fiscalManagers.MapGroup(string.Empty).RequireModule(Modules.FiscalSintegra), "sintegra", FiscalFileKind.Sintegra);
+        MapFiscalFile(fiscalManagers.MapGroup(string.Empty).RequireModule(Modules.FiscalSped), "efd-icms-ipi", FiscalFileKind.EfdIcmsIpi);
+        MapFiscalFile(fiscalManagers.MapGroup(string.Empty).RequireModule(Modules.FiscalSped), "efd-contribuicoes", FiscalFileKind.EfdContribuicoes);
         MapWhatsApp(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager, UserRole.Attendant).RequireModule(Modules.WhatsApp));
         MapZest(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).RequireModule(Modules.Ia));
 
@@ -170,6 +176,21 @@ internal static class ModuleEndpoints
 
         group.MapPut("/delivery-zones/{zoneId:guid}", async (Guid zoneId, DeliveryZoneRequest request, DeliveryService service, CancellationToken ct) =>
             (await service.UpdateAsync(zoneId, request, ct)).ToHttpResult());
+    }
+
+    private static void MapCouriers(RouteGroupBuilder group)
+    {
+        // A atendente envia o link da entrega, então precisa ver a lista, mas não altera o cadastro.
+        group.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager, UserRole.Attendant).MapGet($"{Establishment}/couriers", async (Guid establishmentId, CourierService service, CancellationToken ct) =>
+            (await service.ListAsync(establishmentId, ct)).ToHttpResult());
+
+        var managers = group.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager);
+
+        managers.MapPost($"{Establishment}/couriers", async (Guid establishmentId, CourierRequest request, CourierService service, CancellationToken ct) =>
+            (await service.CreateAsync(establishmentId, request, ct)).ToHttpResult());
+
+        managers.MapPut("/couriers/{courierId:guid}", async (Guid courierId, CourierRequest request, CourierService service, CancellationToken ct) =>
+            (await service.UpdateAsync(courierId, request, ct)).ToHttpResult());
     }
 
     private static void MapPayments(RouteGroupBuilder group)
@@ -263,6 +284,28 @@ internal static class ModuleEndpoints
     {
         group.MapPost($"{Establishment}/nfe/preview", async (Guid establishmentId, NfeXmlRequest request, NfeImportService service, CancellationToken ct) =>
             (await service.PreviewAsync(establishmentId, request, ct)).ToHttpResult());
+    }
+
+    private static void MapFiscalFile(RouteGroupBuilder group, string route, FiscalFileKind kind) =>
+        group.MapPost($"{Establishment}/fiscal/files/{route}", async (Guid establishmentId, FiscalFileRequest request, FiscalService service, CancellationToken ct) =>
+            (await service.GenerateFileAsync(establishmentId, kind, request, ct)).ToHttpResult());
+
+    private static void MapFiscalNfce(RouteGroupBuilder group)
+    {
+        group.MapGet($"{Establishment}/fiscal", async (Guid establishmentId, FiscalService service, CancellationToken ct) =>
+            (await service.GetOverviewAsync(establishmentId, ct)).ToHttpResult());
+
+        group.MapPut($"{Establishment}/fiscal/profile", async (Guid establishmentId, FiscalProfileRequest request, FiscalService service, CancellationToken ct) =>
+            (await service.SaveProfileAsync(establishmentId, request, ct)).ToHttpResult());
+
+        group.MapPut($"{Establishment}/fiscal/products/{{menuItemId:guid}}", async (Guid establishmentId, Guid menuItemId, ProductFiscalRequest request, FiscalService service, CancellationToken ct) =>
+            (await service.SaveProductAsync(establishmentId, menuItemId, request, ct)).ToHttpResult());
+
+        group.MapPost($"{Establishment}/fiscal/orders/{{orderId:guid}}/nfce", async (Guid establishmentId, Guid orderId, FiscalService service, CancellationToken ct) =>
+            (await service.IssueAsync(establishmentId, orderId, ct)).ToHttpResult());
+
+        group.MapGet($"{Establishment}/fiscal/documents/{{documentId:guid}}/xml", async (Guid establishmentId, Guid documentId, FiscalService service, CancellationToken ct) =>
+            (await service.GetXmlAsync(establishmentId, documentId, ct)).ToHttpResult());
     }
 
     private static void MapWhatsApp(RouteGroupBuilder group)

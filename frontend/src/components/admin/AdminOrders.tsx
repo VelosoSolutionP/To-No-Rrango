@@ -4,6 +4,13 @@ import { useMemo, useState } from "react";
 import { formatBRL, formatDateTime } from "@/lib/admin-api";
 import type { AdminOrder, OrderStatus } from "@/lib/types";
 
+export interface CourierContact {
+  id: string;
+  name: string;
+  phone: string;
+  isActive: boolean;
+}
+
 interface AdminOrdersProps {
   orders: AdminOrder[];
   loading: boolean;
@@ -12,6 +19,8 @@ interface AdminOrdersProps {
   onUpdateStatus: (orderId: string, status: OrderStatus, reason: string | null) => Promise<void>;
   onMarkPaid?: (orderId: string) => Promise<void>;
   onRefund?: (orderId: string) => Promise<void>;
+  onTrack?: (orderId: string) => Promise<string>;
+  onLoadCouriers?: () => Promise<CourierContact[]>;
 }
 
 const paymentLabels: Record<AdminOrder["paymentMethod"], string> = {
@@ -79,7 +88,12 @@ export function AdminOrders({
   onUpdateStatus,
   onMarkPaid,
   onRefund,
+  onTrack,
+  onLoadCouriers,
 }: AdminOrdersProps) {
+  const [couriers, setCouriers] = useState<CourierContact[] | null>(null);
+  const [tracking, setTracking] = useState<{ orderId: string; url: string } | null>(null);
+  const [trackingError, setTrackingError] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | OrderStatus>("all");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -116,6 +130,28 @@ export function AdminOrders({
       await action(order.id);
     } catch {
       // O erro é exibido pela prop error.
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function shareTracking(orderId: string) {
+    if (!onTrack) {
+      return;
+    }
+
+    setBusyId(orderId);
+    setTrackingError(null);
+
+    try {
+      const token = await onTrack(orderId);
+      const url = `${window.location.origin}/entrega/${token}`;
+      setTracking({ orderId, url });
+      await navigator.clipboard?.writeText(url).catch(() => undefined);
+      setCouriers(onLoadCouriers ? await onLoadCouriers().catch(() => null) : null);
+    } catch (trackingFailure) {
+      setTracking(null);
+      setTrackingError(trackingFailure instanceof Error ? trackingFailure.message : "Não foi possível gerar o link de rastreio.");
     } finally {
       setBusyId(null);
     }
@@ -201,7 +237,34 @@ export function AdminOrders({
             ) : null}
             {selected.notes ? <p className="admin-order-note">Obs.: {selected.notes}</p> : null}
 
+            {tracking?.orderId === selected.id ? (
+              <p className="admin-order-note">Link copiado. Envie ao entregador: <a href={tracking.url} rel="noreferrer" target="_blank">{tracking.url}</a></p>
+            ) : null}
+            {tracking?.orderId === selected.id && couriers ? (
+              couriers.some((courier) => courier.isActive) ? (
+                <div className="vx-actions">
+                  {couriers.filter((courier) => courier.isActive).map((courier) => (
+                    <a
+                      className="secondary-button"
+                      href={`https://wa.me/${courier.phone}?text=${encodeURIComponent(`Entrega do pedido ${selected.code}. Abra para iniciar: ${tracking.url}`)}`}
+                      key={courier.id}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      Enviar para {courier.name}
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <p className="admin-order-note">Cadastre entregadores em Distribuição para enviar o link direto pelo WhatsApp.</p>
+              )
+            ) : null}
+            {trackingError ? <p className="form-error">{trackingError}</p> : null}
+
             <div className="vx-actions">
+              {onTrack && selected.fulfillmentType === "Delivery" && selected.status !== "Cancelled" && selected.status !== "Delivered" ? (
+                <button className="secondary-button" disabled={isBusy} onClick={() => void shareTracking(selected.id)} type="button">Rastrear entrega</button>
+              ) : null}
               {nextStatuses(selected).map((status) => (
                 <button className="primary-button" disabled={isBusy} key={status} onClick={() => advance(selected, status)} type="button">
                   {isBusy ? "Atualizando..." : `Marcar como ${statusLabels[status].toLowerCase()}`}

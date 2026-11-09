@@ -52,8 +52,8 @@ public static class NfeXmlParser
     private const int MaxLength = 5_000_000;
     private static readonly XNamespace Ns = "http://www.portalfiscal.inf.br/nfe";
 
-    /// <summary>Reads an authorized NF-e. External entities and DTDs are refused because the file comes from outside.</summary>
-    public static ParsedNfe Parse(string xml)
+    /// <summary>Opens the note XML with external entities and DTDs refused, because the file comes from outside.</summary>
+    public static XElement ReadInfo(string xml)
     {
         if (string.IsNullOrWhiteSpace(xml) || xml.Length > MaxLength)
         {
@@ -76,8 +76,14 @@ public static class NfeXmlParser
             throw new ArgumentException("O arquivo não é um XML válido.", exception);
         }
 
-        var info = document.Descendants(Ns + "infNFe").FirstOrDefault()
+        return document.Descendants(Ns + "infNFe").FirstOrDefault()
             ?? throw new ArgumentException("O XML não é uma NF-e.");
+    }
+
+    /// <summary>Reads an authorized NF-e. External entities and DTDs are refused because the file comes from outside.</summary>
+    public static ParsedNfe Parse(string xml)
+    {
+        var info = ReadInfo(xml);
 
         var accessKey = PhoneNumber.Digits(info.Attribute("Id")?.Value);
 

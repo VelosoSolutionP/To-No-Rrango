@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, formatBRL, formatDateTime } from "@/lib/api";
 import type { OrderStatus, OrderTracking } from "@/lib/types";
+import { DeliveryMap } from "./DeliveryMap";
 import { OrderPaymentPanel } from "./OrderPaymentPanel";
 
 interface OrderTrackingClientProps {
@@ -134,6 +135,8 @@ export function OrderTrackingClient({ code }: OrderTrackingClientProps) {
       </section>
 
       <OrderPaymentPanel onPaid={reload} order={order} />
+
+      {order.fulfillmentType === "Delivery" && order.status !== "Cancelled" && order.status !== "Delivered" ? <DeliveryMap code={order.code} /> : null}
 
       {order.status === "Cancelled" ? (
         <section className="tracking-card cancellation-card">

@@ -152,6 +152,7 @@ public sealed class PurchaseEntry : AggregateRoot
     public Guid? SupplierId { get; private set; }
     public string? InvoiceNumber { get; private set; }
     public string? AccessKey { get; private set; }
+    public string? NfeXml { get; private set; }
     public DateOnly IssuedOn { get; private set; }
     public long TotalInCents { get; private set; }
     public string? Notes { get; private set; }
@@ -183,6 +184,8 @@ public sealed class PurchaseEntry : AggregateRoot
         CreatedBy = createdBy;
         CreatedAt = now;
     }
+
+    public void AttachNfeXml(string xml) => NfeXml = xml;
 
     public void AddLine(Guid stockItemId, string description, decimal quantity, long unitCostInCents)
     {

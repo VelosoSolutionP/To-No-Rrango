@@ -30,11 +30,14 @@ public static class DependencyInjection
         services.AddScoped<Abstractions.IModuleAccess>(provider => provider.GetRequiredService<ContractService>());
         services.AddScoped<AuthService>();
         services.AddScoped<DeliveryService>();
+        services.AddScoped<CourierService>();
+        services.AddScoped<DeliveryTrackingService>();
         services.AddScoped<PaymentService>();
         services.AddScoped<PartyService>();
         services.AddScoped<InventoryService>();
         services.AddScoped<FinanceService>();
         services.AddScoped<NfeImportService>();
+        services.AddScoped<FiscalService>();
         services.AddScoped<ZestService>();
         services.AddScoped<ZestSalesService>();
         services.AddScoped<MediaService>();

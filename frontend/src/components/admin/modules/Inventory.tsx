@@ -226,6 +226,7 @@ function Purchase({ http, establishmentId, items, reload, canImportNfe }: Props 
   const [issuedOn, setIssuedOn] = useState(today);
   const [dueOn, setDueOn] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [nfeXml, setNfeXml] = useState<string | null>(null);
   const action = useAction(reload);
 
   async function readNfe(event: ChangeEvent<HTMLInputElement>) {
@@ -238,7 +239,9 @@ function Purchase({ http, establishmentId, items, reload, canImportNfe }: Props 
     }
 
     try {
-      const result = await http.post<NfePreview>(`/establishments/${establishmentId}/nfe/preview`, { xml: await file.text() });
+      const xml = await file.text();
+      setNfeXml(xml);
+      const result = await http.post<NfePreview>(`/establishments/${establishmentId}/nfe/preview`, { xml });
       setPreview(result);
       setSupplierId(result.supplierId ?? "");
       setInvoice(result.number);
@@ -269,6 +272,7 @@ function Purchase({ http, establishmentId, items, reload, canImportNfe }: Props 
           : null,
         invoiceNumber: invoice || null,
         accessKey: preview?.accessKey ?? null,
+        nfeXml: preview ? nfeXml : null,
         issuedOn,
         dueOn: dueOn || null,
         notes: null,

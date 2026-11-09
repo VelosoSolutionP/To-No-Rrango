@@ -48,6 +48,12 @@ public static class DependencyInjection
         services.AddSingleton<ISecretProtector, AesGcmSecretProtector>();
         services.AddSingleton<IAppUrls, AppUrls>();
         services.AddSingleton<IOrderEvents, RedisOrderEvents>();
+        services.AddSingleton<ToNoRango.Application.Delivery.IDeliveryTrackingStore, RedisDeliveryTrackingStore>();
+        services.AddHttpClient<ToNoRango.Application.Delivery.IGeocoder, NominatimGeocoder>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(6);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("ToNoRango/1.0 (+https://to-no-rango.velososolution.com.br)");
+        });
 
         services.AddHttpClient<IPaymentGateway, MercadoPagoGateway>(client =>
         {
@@ -86,6 +92,8 @@ public static class DependencyInjection
 
             client.Timeout = TimeSpan.FromSeconds(15);
         });
+
+        services.AddScoped<ToNoRango.Application.Fiscal.IFiscalGateway, AcbrFiscalGateway>();
 
         services.AddHostedService<OutboxWorker>();
 
