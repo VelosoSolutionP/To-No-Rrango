@@ -800,8 +800,8 @@
   width: clamp(3rem, 7vh, 4.25rem);
   height: clamp(3rem, 7vh, 4.25rem);
   border-radius: 1rem;
-  background: var(--silver);
-  color: #17171c;
+  background: #1c1b22;
+  color: #f4f4f7;
   font-size: clamp(1.15rem, 2.8vh, 1.6rem);
   font-weight: 900;
   letter-spacing: -0.08em;
@@ -933,10 +933,60 @@
   background: linear-gradient(#17151c, #17151c) padding-box, linear-gradient(145deg, rgba(139, 92, 246, 0.75), rgba(255, 106, 19, 0.4)) border-box;
   color: var(--brand);
   text-align: center;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 
 .vx-login-tiles li[data-accent] {
   color: #a78bfa;
+}
+
+/* Contorno neon em camada própria: gradiente não anima, a opacidade sim. */
+.vx-login-tiles li {
+  position: relative;
+}
+
+.vx-login-tiles li::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  padding: 1.5px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, #ff6a13, #8b5cf6);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+
+.vx-login-tiles svg {
+  transition: filter 0.25s ease;
+}
+
+.vx-login-tiles li:hover {
+  box-shadow: 0 0 22px -3px rgba(255, 106, 19, 0.75), 0 0 34px -6px rgba(139, 92, 246, 0.7);
+  transform: translateY(-3px);
+}
+
+.vx-login-tiles li:hover::after {
+  opacity: 1;
+}
+
+.vx-login-tiles li:hover svg {
+  filter: drop-shadow(0 0 7px currentColor);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vx-login-tiles li,
+  .vx-login-tiles li::after,
+  .vx-login-tiles svg {
+    transition: none;
+  }
+
+  .vx-login-tiles li:hover {
+    transform: none;
+  }
 }
 
 .vx-login-tiles span {
