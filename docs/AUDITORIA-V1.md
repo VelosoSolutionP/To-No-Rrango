@@ -93,7 +93,7 @@ Menu do painel: Operação (Visão geral, Pedidos, Cozinha, Entregas, PDV), Gest
 ### 5. Depende de credencial ou serviço externo
 - Mercado Pago: credencial de uma loja e compra real.
 - Evolution: instância real (testado só com simulador).
-- Áudio em produção: subir o whisper-server (modelo base) e apontar `Transcription__Url`; voz precisa de `Voice__PiperPath` e `Voice__Model` onde a API roda (o contêiner atual não tem piper).
+- Áudio em produção: resolvido no Docker. O serviço `whisper` (whisper.cpp, modelo base, compilado sem AVX porque o servidor não tem) sobe com o sistema, e a imagem da API já traz piper com a voz pt_BR e ffmpeg. Testado nos contêineres: transcrição em 18 s para 3,5 s de fala; voz gerada em ogg/opus.
 - Fiscal: certificado A1, CSC, ACBrMonitor; NF-e de saída (modelo 55), cancelamento, inutilização e contingência da NFC-e **não foram feitos**.
 
 ### 6. Testado

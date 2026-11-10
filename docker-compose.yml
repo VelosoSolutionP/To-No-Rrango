@@ -49,6 +49,7 @@ services:
       Acbr__Host: "${ACBR_HOST:-host.docker.internal}"
       Acbr__Port: "${ACBR_PORT:-3434}"
       Acbr__Environment: "${ACBR_ENVIRONMENT:-2}"
+      Transcription__Url: "http://whisper:8178"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -56,6 +57,16 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      whisper:
+        condition: service_started
+
+  # Transcrição dos áudios do WhatsApp (whisper.cpp local, modelo base).
+  whisper:
+    build:
+      context: docker/whisper
+    image: tonorango-whisper
+    restart: unless-stopped
+    command: ["-t", "${WHISPER_THREADS:-8}"]
 
   evolution:
     image: evoapicloud/evolution-api:v2.3.7
