@@ -18,6 +18,8 @@ interface CheckoutModalProps {
   lines: CartLine[];
   onClose: () => void;
   onSuccess: (order: OrderTracking) => void;
+  /** Set when the customer opened the menu from a table QR Code. */
+  tableLabel?: string | null;
 }
 
 const fulfillmentLabels: Record<FulfillmentType, string> = {
@@ -39,9 +41,9 @@ function firstFulfillment(establishment: Establishment): FulfillmentType {
   return "DineIn";
 }
 
-export function CheckoutModal({ establishment, lines, onClose, onSuccess }: CheckoutModalProps) {
+export function CheckoutModal({ establishment, lines, onClose, onSuccess, tableLabel = null }: CheckoutModalProps) {
   const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>(() =>
-    firstFulfillment(establishment),
+    tableLabel ? "DineIn" : firstFulfillment(establishment),
   );
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Pix");
   const [customerName, setCustomerName] = useState("");
@@ -156,6 +158,7 @@ export function CheckoutModal({ establishment, lines, onClose, onSuccess }: Chec
       customerPhone: customerPhone.trim(),
       fulfillmentType,
       paymentMethod,
+      tableLabel: tableLabel ?? undefined,
       notes: notes.trim() || null,
       idempotencyKey: idempotencyKey || null,
       deliveryAddress:
@@ -210,7 +213,10 @@ export function CheckoutModal({ establishment, lines, onClose, onSuccess }: Chec
         </header>
 
         <form className="checkout-form" onSubmit={handleSubmit}>
-          <fieldset className="choice-group">
+          {tableLabel ? (
+            <p className="table-banner">🍽️ Pedido da <strong>mesa {tableLabel}</strong>: vai direto para a cozinha e chega na sua mesa.</p>
+          ) : null}
+          <fieldset className="choice-group" hidden={Boolean(tableLabel)}>
             <legend>Como você quer receber?</legend>
             <div className="choice-grid">
               {fulfillmentOptions.map((option) => (

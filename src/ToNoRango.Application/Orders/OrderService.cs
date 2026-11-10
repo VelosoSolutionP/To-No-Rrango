@@ -57,7 +57,7 @@ public sealed class OrderService(
 
             var openNow = establishment.IsOpenAt(clock.UtcNow);
 
-            if (!openNow && !establishment.AcceptsOrdersWhenClosed && channel != OrderChannel.Pdv)
+            if (!openNow && !establishment.AcceptsOrdersWhenClosed && !IsStaff(channel))
             {
                 return Result<OrderTrackingDto>.Failure(AppErrors.Validation(
                     "O estabelecimento está fechado agora. Horários:\n" + Domain.Establishments.OpeningSchedule.Describe(establishment.OpeningHours)));
@@ -109,6 +109,12 @@ public sealed class OrderService(
             }
 
             var now = clock.UtcNow;
+
+            if (channel == OrderChannel.Web && !string.IsNullOrWhiteSpace(request.TableLabel))
+            {
+                channel = OrderChannel.Table;
+            }
+
             var order = Order.Create(
                 establishment.TenantId,
                 establishment.Id,
@@ -132,10 +138,21 @@ public sealed class OrderService(
                 channel);
 
             order.SetDeliveryReference(address?.Reference);
+
+            // Smart table: the customer scanned the QR Code of a table and orders from there.
+            if (!string.IsNullOrWhiteSpace(request.TableLabel) && channel == OrderChannel.Table)
+            {
+                if (request.FulfillmentType != FulfillmentType.DineIn)
+                {
+                    return Result<OrderTrackingDto>.Failure(AppErrors.Validation("Pedido da mesa é para consumo no local."));
+                }
+
+                order.SetTable(request.TableLabel);
+            }
             var stations = (await menu.ListCategoriesAsync(establishment.Id, includeInactive: true, cancellationToken))
                 .ToDictionary(category => category.Id, category => category.Station);
 
-            if (!openNow && channel != OrderChannel.Pdv && establishment.NextOpeningAfter(now) is { } opening)
+            if (!openNow && !IsStaff(channel) && establishment.NextOpeningAfter(now) is { } opening)
             {
                 order.ScheduleFor(opening, now);
             }
@@ -155,7 +172,7 @@ public sealed class OrderService(
 
             prepare?.Invoke(order);
 
-            if (order.SubtotalInCents < establishment.MinimumOrderInCents && channel != OrderChannel.Pdv)
+            if (order.SubtotalInCents < establishment.MinimumOrderInCents && !IsStaff(channel))
             {
                 return Result<OrderTrackingDto>.Failure(
                     AppErrors.Validation(
@@ -317,6 +334,9 @@ public sealed class OrderService(
 
         return result;
     }
+
+    /// <summary>Orders entered by the staff (counter, waiter) skip customer-facing rules like hours and minimum.</summary>
+    private static bool IsStaff(OrderChannel channel) => channel is OrderChannel.Pdv or OrderChannel.Waiter;
 
     private static bool IsFulfillmentEnabled(Establishment establishment, FulfillmentType fulfillmentType) => fulfillmentType switch
     {

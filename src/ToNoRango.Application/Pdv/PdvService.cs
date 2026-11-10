@@ -31,6 +31,21 @@ public sealed record ReceiveOrderRequest(PaymentMethod PaymentMethod);
 
 public sealed record CancelSaleRequest(string Reason);
 
+/// <summary>A waiter's order for one table: goes straight to the kitchen and is paid when the table closes.</summary>
+public sealed record TableOrderRequest(string? Notes, IReadOnlyList<CreateOrderItemRequest> Items, string? IdempotencyKey = null);
+
+public sealed record CloseTableRequest(PaymentMethod PaymentMethod);
+
+/// <summary>An open table: every unpaid order eaten at the place under the same table label.</summary>
+public sealed record OpenTableDto(
+    string Table,
+    int Orders,
+    long TotalInCents,
+    DateTimeOffset OpenedAt,
+    IReadOnlyList<string> Waiters,
+    bool AllServed,
+    IReadOnlyList<OrderDto> Items);
+
 public sealed record CashMovementDto(
     Guid Id,
     CashMovementType Type,
@@ -315,6 +330,106 @@ public sealed class PdvService(
 
         return result;
     }
+
+    /// <summary>Tables with something to pay, oldest first.</summary>
+    public async Task<Result<IReadOnlyList<OpenTableDto>>> ListTablesAsync(Guid establishmentId, CancellationToken cancellationToken)
+    {
+        var list = await orders.ListAsync(establishmentId, null, 200, cancellationToken);
+
+        return list
+            .Where(order => order.TableLabel is not null && order.Status != OrderStatus.Cancelled && order.PaymentStatus == PaymentStatus.Pending)
+            .GroupBy(order => order.TableLabel!)
+            .Select(group => new OpenTableDto(
+                group.Key,
+                group.Count(),
+                group.Sum(order => order.TotalInCents),
+                group.Min(order => order.CreatedAt),
+                group.Select(order => order.WaiterName).Where(name => name is not null).Distinct().ToList()!,
+                group.All(order => order.Status is OrderStatus.Ready or OrderStatus.Delivered),
+                group.OrderBy(order => order.CreatedAt).Select(OrderDto.From).ToList()))
+            .OrderBy(table => table.OpenedAt)
+            .ToList();
+    }
+
+    /// <summary>The waiter's comanda: confirmed straight away so the kitchen starts, unpaid until the table closes.</summary>
+    public async Task<Result<OrderDto>> TakeTableOrderAsync(Guid establishmentId, string table, TableOrderRequest request, string waiterName, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(table) || table.Trim().Length > 20)
+        {
+            return Result<OrderDto>.Failure(AppErrors.Validation("Informe a mesa."));
+        }
+
+        var establishment = await establishments.GetByIdAsync(establishmentId, cancellationToken);
+
+        if (establishment is null)
+        {
+            return Result<OrderDto>.Failure(CommonErrors.EstablishmentNotFound);
+        }
+
+        var created = await orderService.CreateAsync(
+            establishment.Slug,
+            new CreateOrderRequest($"Mesa {table.Trim()}", "mesa", FulfillmentType.DineIn, PaymentMethod.Cash, request.Notes, request.IdempotencyKey, null, request.Items),
+            cancellationToken,
+            OrderChannel.Waiter,
+            waiterName,
+            order =>
+            {
+                order.SetTable(table);
+                order.SetWaiter(waiterName);
+            },
+            async (order, token) =>
+            {
+                await lifecycle.ChangeStatusAsync(order, OrderStatus.Confirmed, waiterName, "Comanda do garçom.", token);
+                await unitOfWork.SaveChangesAsync(token);
+            });
+
+        if (created.IsFailure)
+        {
+            return Result<OrderDto>.Failure(created.Error);
+        }
+
+        var saved = await orders.GetByCodeAsync(created.Value.Code, cancellationToken);
+        await events.PublishAsync(created.Value.Code);
+        return OrderDto.From(saved!);
+    }
+
+    /// <summary>Closes the bill of a table: every unpaid order is received in the open register with the chosen method.</summary>
+    public Task<Result<CashSessionDto>> CloseTableAsync(Guid establishmentId, string table, CloseTableRequest request, string operatorName, CancellationToken cancellationToken) =>
+        Guarded.RunAsync<CashSessionDto>(() => unitOfWork.ExecuteInTransactionAsync<Result<CashSessionDto>>(async token =>
+        {
+            if (request.PaymentMethod == PaymentMethod.Online)
+            {
+                return Result<CashSessionDto>.Failure(AppErrors.Validation("No balcão, receba em dinheiro, cartão ou Pix."));
+            }
+
+            var session = await FindOpenAsync(establishmentId, token);
+
+            if (session is null)
+            {
+                return Result<CashSessionDto>.Failure(AppErrors.Validation("Abra o caixa antes de fechar a mesa."));
+            }
+
+            var list = await orders.ListAsync(establishmentId, null, 200, token);
+            var open = list
+                .Where(order => order.TableLabel == table.Trim() && order.Status != OrderStatus.Cancelled && order.PaymentStatus == PaymentStatus.Pending)
+                .ToList();
+
+            if (open.Count == 0)
+            {
+                return Result<CashSessionDto>.Failure(AppErrors.Validation("Esta mesa não tem nada a pagar."));
+            }
+
+            foreach (var summary in open)
+            {
+                var order = await orders.GetByIdAsync(summary.Id, token);
+                order!.ChangePaymentMethod(request.PaymentMethod, clock.UtcNow);
+                await lifecycle.MarkPaidAsync(order, token);
+                session.RegisterSale(order, operatorName, clock.UtcNow);
+            }
+
+            await unitOfWork.SaveChangesAsync(token);
+            return CashSessionDto.From(session);
+        }, cancellationToken));
 
     private Task<CashSession?> FindOpenAsync(Guid establishmentId, CancellationToken cancellationToken) =>
         sessions.FirstOrDefaultAsync(session => session.EstablishmentId == establishmentId && session.Status == CashSessionStatus.Open, cancellationToken);

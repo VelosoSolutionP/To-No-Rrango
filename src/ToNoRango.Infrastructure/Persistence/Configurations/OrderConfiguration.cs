@@ -39,6 +39,8 @@ public sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(order => order.CancelledBy).HasMaxLength(120);
         builder.Property(order => order.DiscountReason).HasMaxLength(120);
         builder.Property(order => order.TableLabel).HasMaxLength(20);
+        builder.Property(order => order.WaiterName).HasMaxLength(120);
+        builder.HasIndex(order => new { order.EstablishmentId, order.TableLabel }).HasFilter("\"TableLabel\" IS NOT NULL");
         builder.Property(order => order.DeliveryReference).HasMaxLength(150);
         builder.Property(order => order.CourierName).HasMaxLength(120);
         builder.Property(order => order.CreatedAt).IsRequired();

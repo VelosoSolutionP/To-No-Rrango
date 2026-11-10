@@ -50,7 +50,8 @@ public interface IGeocoder
     Task<GeoPoint?> FindAsync(string street, string? number, string? city, string? state, CancellationToken cancellationToken);
 }
 
-public sealed record TrackingLinkDto(string Token);
+/// <summary>SentToCourier tells the panel the link already went through the store's WhatsApp, so it does not open wa.me.</summary>
+public sealed record TrackingLinkDto(string Token, bool SentToCourier = false);
 
 public sealed record CourierPositionRequest(double Latitude, double Longitude);
 
@@ -159,6 +160,10 @@ public sealed class DeliveryTrackingService(
     IDeliveryTrackingStore store,
     IGeocoder geocoder,
     IRepository<ToNoRango.Domain.Delivery.Courier> couriers,
+    IRepository<ToNoRango.Domain.Messaging.WhatsAppSettings> whatsAppSettings,
+    IRepository<ToNoRango.Domain.Messaging.OutboundMessage> outbox,
+    IWhatsAppSender sender,
+    IAppUrls urls,
     ToNoRango.SharedKernel.Abstractions.IUnitOfWork unitOfWork,
     TimeProvider clock)
 {
@@ -186,24 +191,29 @@ public sealed class DeliveryTrackingService(
                 return Result<TrackingLinkDto>.Failure(AppErrors.Conflict("tracking.not_available", "O rastreio vale só para pedido de entrega em andamento."));
             }
 
-            if (courierId is Guid chosen && order.CourierId != chosen)
+            ToNoRango.Domain.Delivery.Courier? courier = null;
+
+            if (courierId is Guid chosen)
             {
-                var courier = await couriers.FindAsync(chosen, cancellationToken);
+                courier = await couriers.FindAsync(chosen, cancellationToken);
 
                 if (courier is null || courier.EstablishmentId != order.EstablishmentId)
                 {
                     return Result<TrackingLinkDto>.Failure(AppErrors.NotFound("tracking.courier_not_found", "Entregador não encontrado."));
                 }
 
-                order.AssignCourier(courier.Id, courier.Name, clock.GetUtcNow());
-                await unitOfWork.SaveChangesAsync(cancellationToken);
+                if (order.CourierId != chosen)
+                {
+                    order.AssignCourier(courier.Id, courier.Name, clock.GetUtcNow());
+                    await unitOfWork.SaveChangesAsync(cancellationToken);
+                }
             }
 
             var existing = await store.FindByOrderAsync(order.Code);
 
             if (existing is not null)
             {
-                return new TrackingLinkDto(existing.Token);
+                return new TrackingLinkDto(existing.Token, courier is not null && await SendToCourierAsync(order, courier, existing.Token, existing.Destination, cancellationToken));
             }
 
             var establishment = await establishments.GetByIdAsync(order.EstablishmentId, cancellationToken);
@@ -223,8 +233,43 @@ public sealed class DeliveryTrackingService(
                 point);
 
             await store.SaveAsync(session);
-            return new TrackingLinkDto(session.Token);
+            return new TrackingLinkDto(session.Token, courier is not null && await SendToCourierAsync(order, courier, session.Token, destination, cancellationToken));
         });
+
+    /// <summary>
+    /// Sends the delivery to the courier through the store's own WhatsApp: order code, address and
+    /// the link that shares the location. False when the store WhatsApp is not connected.
+    /// </summary>
+    private async Task<bool> SendToCourierAsync(Order order, ToNoRango.Domain.Delivery.Courier courier, string token, string destination, CancellationToken cancellationToken)
+    {
+        if (!sender.IsConfigured)
+        {
+            return false;
+        }
+
+        var settings = await whatsAppSettings.FirstOrDefaultAsync(item => item.EstablishmentId == order.EstablishmentId, cancellationToken);
+
+        if (settings is not { IsReady: true })
+        {
+            return false;
+        }
+
+        var reference = string.IsNullOrWhiteSpace(order.DeliveryReference) ? string.Empty : $"\nReferência: {order.DeliveryReference}";
+        var method = order.PaymentMethod switch
+        {
+            PaymentMethod.Cash => "dinheiro",
+            PaymentMethod.CardOnDelivery => "cartão na maquininha",
+            PaymentMethod.Pix => "Pix",
+            _ => "online",
+        };
+        var amount = (order.TotalInCents / 100m).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture).Replace('.', ',');
+        var charge = order.PaymentStatus == PaymentStatus.Paid ? "Já pago." : $"Receber R$ {amount} em {method}.";
+        var text = $"🛵 *Entrega {order.Code[^8..]}*\n{order.CustomerName} · {order.CustomerPhone}\n{destination}{reference}\n{charge}\n\nAbra para iniciar e compartilhar sua localização:\n{urls.CourierUrl(token)}";
+
+        outbox.Add(new ToNoRango.Domain.Messaging.OutboundMessage(order.TenantId, order.EstablishmentId, courier.Phone, text, clock.GetUtcNow()));
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+        return true;
+    }
 
     public async Task<CourierSessionDto> GetCourierSessionAsync(string token, CancellationToken cancellationToken)
     {

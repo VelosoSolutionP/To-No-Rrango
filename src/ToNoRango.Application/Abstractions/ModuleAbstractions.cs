@@ -57,6 +57,9 @@ public interface IAppUrls
 
     string MenuUrl(string slug);
 
+    /// <summary>The page the courier opens to share the location of one delivery.</summary>
+    string CourierUrl(string token) => $"/entrega/{token}";
+
     /// <summary>Public base address of this API, or null when it is not reachable from the internet.</summary>
     string? PublicApiUrl { get; }
 

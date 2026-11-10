@@ -2,7 +2,7 @@
 
 import { type FormEvent, useState } from "react";
 import { formatBRL, type AdminHttp } from "@/lib/admin-api";
-import { Empty, ErrorMessage, Input, ModuleHeading, text, toCents, toDecimal, useAction, useLoad } from "./shared";
+import { Empty, ErrorMessage, Input, ModuleHeading, SubTabs, text, toCents, toDecimal, useAction, useLoad } from "./shared";
 
 interface Purchase {
   id: string;
@@ -161,6 +161,7 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory }: { ht
   const hasSintegra = hasNfce && modules.includes("fiscal_sintegra");
   const hasSped = hasNfce && modules.includes("fiscal_sped");
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [view, setView] = useState<"issue" | "config" | "products" | "duties" | "entries">(hasNfce ? "issue" : "entries");
   const base = `/establishments/${establishmentId}`;
   const purchases = useLoad(() => http.get<Purchase[]>(`${base}/purchases`).catch(() => []), [establishmentId]);
   const overview = useLoad<FiscalOverview | null>(() => (hasNfce ? http.get<FiscalOverview>(`${base}/fiscal`) : Promise.resolve(null)), [establishmentId, hasNfce]);
@@ -350,8 +351,27 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory }: { ht
     <section className="admin-section">
       <ModuleHeading eyebrow="Fiscal" title="Fiscal" hint={hasNfce ? "NFC-e e NF-e de venda para Lucro Presumido e Lucro Real." : "Notas de entrada importadas por XML."} />
       <ErrorMessage message={action.error ?? overview.error} />
+      {hasNfce && data ? (
+        <div className="kpi-strip">
+          <div className="kpi"><small>Notas emitidas</small><strong>{data.documents.filter((note) => note.status === "Authorized").length}</strong></div>
+          <div className={`kpi ${data.pendingOrders.length ? "is-warn" : ""}`}><small>Pedidos pagos sem nota</small><strong>{data.pendingOrders.length}</strong></div>
+          <div className={`kpi ${data.documents.some((note) => note.status === "Rejected") ? "is-alert" : ""}`}><small>Rejeitadas</small><strong>{data.documents.filter((note) => note.status === "Rejected").length}</strong></div>
+          <div className={`kpi ${dfe.data?.contingencyPending ? "is-alert" : ""}`}><small>Contingência a enviar</small><strong>{dfe.data?.contingencyPending ?? 0}</strong></div>
+          <div className="kpi"><small>Emissor</small><strong className="kpi-text">{direct ? "SEFAZ direto" : data.isMonitorConfigured ? "ACBr" : "Desligado"}</strong></div>
+          <div className="kpi"><small>Ambiente</small><strong className="kpi-text">{(dfe.data?.environment ?? data.environment) === 1 ? "Produção" : "Homologação"}</strong></div>
+        </div>
+      ) : null}
+      <SubTabs
+        onChange={setView}
+        options={[
+          ...(hasNfce ? [{ value: "issue" as const, label: "Emitir" }, { value: "config" as const, label: "Configuração" }, { value: "products" as const, label: "Tributação dos produtos" }] : []),
+          ...(hasNfce ? [{ value: "duties" as const, label: "Obrigações e inutilização" }] : []),
+          ...(hasEntry ? [{ value: "entries" as const, label: "Notas de entrada" }] : []),
+        ]}
+        value={view}
+      />
 
-      {data ? (
+      {view === "config" && data ? (
         <article className="card vx-box">
           <div className="vx-panel-title">
             <h3>Emissor fiscal</h3>
@@ -367,7 +387,7 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory }: { ht
         </article>
       ) : null}
 
-      {data && profile && dfe.data ? (
+      {view === "config" && data && profile && dfe.data ? (
         <article className="card vx-box">
           <div className="vx-panel-title">
             <h3>Certificado e SEFAZ</h3>
@@ -418,7 +438,7 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory }: { ht
         </article>
       ) : null}
 
-      {data ? (
+      {view === "config" && data ? (
         <form className="card module-form" key={profile?.cnpj ?? "novo"} onSubmit={saveProfile}>
           <label className="field">
             <span>Regime tributário *</span>
@@ -454,7 +474,7 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory }: { ht
         </form>
       ) : null}
 
-      {data && data.products.length > 0 ? (
+      {view === "products" && data && data.products.length > 0 ? (
         <article className="card vx-box">
           <div className="vx-panel-title"><h3>Tributação dos produtos</h3></div>
           <p className="muted">Preencha com o seu contador. Produto sem esses dados não entra em nota.</p>
@@ -467,7 +487,13 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory }: { ht
         </article>
       ) : null}
 
-      {data && data.pendingOrders.length > 0 ? (
+      {view === "issue" && data && data.pendingOrders.length === 0 && data.documents.length === 0 ? (
+        <Empty>Nenhum pedido pago esperando nota. Quando houver, ele aparece aqui para emitir NFC-e ou NF-e.</Empty>
+      ) : null}
+      {view === "issue" && !canIssue && data ? (
+        <p className="board-notice is-warn" onClick={() => setView("config")}>Para emitir, envie o certificado A1 e o CSC da loja em Configuração.</p>
+      ) : null}
+      {view === "issue" && data && data.pendingOrders.length > 0 ? (
         <article className="card vx-box">
           <div className="vx-panel-title"><h3>Pedidos pagos sem nota</h3></div>
           <div className="admin-table-wrap">
@@ -495,7 +521,7 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory }: { ht
         </article>
       ) : null}
 
-      {nfeFor ? (
+      {view === "issue" && nfeFor ? (
         <form className="card module-form" onSubmit={issueNfe}>
           <h3 className="field-wide">NF-e do pedido {nfeFor.code} — destinatário</h3>
           <Input label="CPF ou CNPJ *" name="document" required />
@@ -514,7 +540,7 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory }: { ht
         </form>
       ) : null}
 
-      {data && data.documents.length > 0 ? (
+      {view === "issue" && data && data.documents.length > 0 ? (
         <article className="card vx-box">
           <div className="vx-panel-title"><h3>Notas emitidas</h3></div>
           <div className="admin-table-wrap">
@@ -541,7 +567,7 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory }: { ht
         </article>
       ) : null}
 
-      {profile && (hasSintegra || hasSped) ? (
+      {view === "duties" && profile && (hasSintegra || hasSped) ? (
         <form className="card module-form" onSubmit={(event) => event.preventDefault()}>
           <Input label="Mês *" name="period" required type="month" />
           {hasSped ? <Input inputMode="decimal" label="Saldo credor anterior de ICMS (R$)" name="previousCredit" /> : null}
@@ -552,13 +578,13 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory }: { ht
           {hasSped && profile.taxRegime === "LucroPresumido" ? <button className="secondary-button" disabled={action.busy} onClick={(event) => generateFile("efd-contribuicoes", event)} type="button">Gerar SPED Contribuições</button> : null}
         </form>
       ) : null}
-      {warnings.length > 0 ? <ul className="vx-unavailable">{warnings.map((warning) => <li key={warning}><span>{warning}</span></li>)}</ul> : null}
+      {view === "duties" && warnings.length > 0 ? <ul className="vx-unavailable">{warnings.map((warning) => <li key={warning}><span>{warning}</span></li>)}</ul> : null}
 
-      {hasEntry ? <div className="vx-panel-title"><h3>Notas de entrada</h3></div> : null}
-      {hasEntry ? <div><button className="primary-button" onClick={onOpenInventory} type="button">Importar XML de NF-e</button></div> : null}
-      <ErrorMessage message={purchases.error} />
-      {hasEntry && purchases.data && notes.length === 0 ? <Empty>Nenhuma NF-e de entrada importada.</Empty> : null}
-      {hasEntry && notes.length > 0 ? (
+      {view === "entries" && hasEntry ? <div className="vx-panel-title"><h3>Notas de entrada</h3></div> : null}
+      {view === "entries" && hasEntry ? <div><button className="primary-button" onClick={onOpenInventory} type="button">Importar XML de NF-e</button></div> : null}
+      {view === "entries" ? <ErrorMessage message={purchases.error} /> : null}
+      {view === "entries" && hasEntry && purchases.data && notes.length === 0 ? <Empty>Nenhuma NF-e de entrada importada.</Empty> : null}
+      {view === "entries" && hasEntry && notes.length > 0 ? (
         <div className="card admin-table-wrap">
           <table className="admin-table">
             <thead><tr><th>Número</th><th>Emissão</th><th>Chave de acesso</th><th className="num">Total</th></tr></thead>
@@ -571,7 +597,7 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory }: { ht
         </div>
       ) : null}
 
-      {direct && dfe.data ? (
+      {view === "duties" && direct && dfe.data ? (
         <article className="card vx-box">
           <div className="vx-panel-title"><h3>Inutilizar numeração</h3></div>
           <p className="muted">Use quando números foram pulados e nunca serão usados. A SEFAZ registra a faixa como inutilizada.</p>
@@ -600,14 +626,14 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory }: { ht
         </article>
       ) : null}
 
-      <article className="card vx-box">
+      {view === "config" ? <article className="card vx-box">
         <div className="vx-panel-title"><h3>Ainda não disponível</h3></div>
         <ul className="vx-unavailable">
           <li><strong>Transmissão real à SEFAZ</strong><span>Pronta, mas só testada com certificado de teste e validação nos esquemas oficiais. Falta homologar com um certificado A1 real.</span></li>
           <li><strong>IBS e CBS</strong><span>Ainda não enviados na nota; dependem da validação em homologação.</span></li>
           <li><strong>SPED Contribuições do Lucro Real</strong><span>Exige apuração de créditos, ainda não implementada.</span></li>
         </ul>
-      </article>
+      </article> : null}
     </section>
   );
 }

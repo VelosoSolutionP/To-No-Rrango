@@ -130,6 +130,7 @@ export interface CreateOrderRequest {
   idempotencyKey: string | null;
   deliveryAddress: DeliveryAddress | null;
   items: CreateOrderItem[];
+  tableLabel?: string;
 }
 
 export interface OrderItemOption {
@@ -166,7 +167,7 @@ export interface OrderTracking {
   status: OrderStatus;
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
-  channel?: "Web" | "WhatsApp" | "Pdv";
+  channel?: "Web" | "WhatsApp" | "Pdv" | "Waiter" | "Table";
   scheduledFor?: string | null;
   discountInCents?: number;
   tableLabel?: string | null;
@@ -195,6 +196,7 @@ export interface AdminOrder extends OrderTracking {
   updatedAt: string;
   discountReason?: string | null;
   deliveryReference?: string | null;
+  waiterName?: string | null;
 }
 
 export type UserRole = "Owner" | "Manager" | "Attendant" | "Kitchen";

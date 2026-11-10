@@ -10,7 +10,8 @@ public sealed record CreateOrderRequest(
     string? Notes,
     string? IdempotencyKey,
     DeliveryAddressRequest? DeliveryAddress,
-    IReadOnlyList<CreateOrderItemRequest> Items);
+    IReadOnlyList<CreateOrderItemRequest> Items,
+    string? TableLabel = null);
 
 public sealed record DeliveryAddressRequest(
     string Street,
@@ -64,7 +65,8 @@ public sealed record OrderDto(
     string? TableLabel = null,
     string? DeliveryReference = null,
     bool IsRated = false,
-    string? CourierName = null)
+    string? CourierName = null,
+    string? WaiterName = null)
 {
     public static OrderDto From(Order order) => new(
         order.Id,
@@ -106,7 +108,8 @@ public sealed record OrderDto(
         order.TableLabel,
         order.DeliveryReference,
         false,
-        order.CourierName);
+        order.CourierName,
+        order.WaiterName);
 }
 
 public sealed record OrderTrackingDto(

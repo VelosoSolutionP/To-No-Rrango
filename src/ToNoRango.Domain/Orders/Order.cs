@@ -51,6 +51,9 @@ public sealed class Order : AggregateRoot
 
     /// <summary>The table, for orders eaten at the place.</summary>
     public string? TableLabel { get; private set; }
+
+    /// <summary>Who took the order at the table, when a waiter did.</summary>
+    public string? WaiterName { get; private set; }
     public string? DeliveryReference { get; private set; }
     public Guid? CourierId { get; private set; }
     public string? CourierName { get; private set; }
@@ -322,6 +325,9 @@ public sealed class Order : AggregateRoot
         CourierAssignedAt = now;
         UpdatedAt = now;
     }
+
+    public void SetWaiter(string? waiterName) =>
+        WaiterName = string.IsNullOrWhiteSpace(waiterName) ? null : Ensure.MaxLength(waiterName.Trim(), 120, nameof(WaiterName));
 
     public void SetTable(string? tableLabel) =>
         TableLabel = string.IsNullOrWhiteSpace(tableLabel) ? null : Ensure.MaxLength(tableLabel.Trim(), 20, nameof(TableLabel));

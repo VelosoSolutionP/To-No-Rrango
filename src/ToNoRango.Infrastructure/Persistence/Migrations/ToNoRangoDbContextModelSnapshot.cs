@@ -1657,6 +1657,10 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("WaiterName")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
                     b.Property<uint>("xmin")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -1676,6 +1680,9 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("EstablishmentId", "IdempotencyKey")
                         .IsUnique();
+
+                    b.HasIndex("EstablishmentId", "TableLabel")
+                        .HasFilter("\"TableLabel\" IS NOT NULL");
 
                     b.ToTable("orders", "orders");
                 });

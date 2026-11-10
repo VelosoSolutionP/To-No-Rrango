@@ -37,7 +37,13 @@ public enum OrderChannel
 {
     Web = 1,
     WhatsApp = 2,
-    Pdv = 3
+    Pdv = 3,
+
+    /// <summary>Taken by a waiter at the table (comanda).</summary>
+    Waiter = 4,
+
+    /// <summary>Placed by the customer from the table QR Code (smart table).</summary>
+    Table = 5
 }
 
 /// <summary>Where an item is made. Drinks are picked at the bar; food is cooked in the kitchen.</summary>

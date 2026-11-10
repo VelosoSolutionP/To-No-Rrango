@@ -83,6 +83,13 @@ export function MenuClient({ menu }: MenuClientProps) {
   const [filter, setFilter] = useState<MenuFilter>("all");
   const [sort, setSort] = useState<MenuSort>("default");
   const [hoursOpen, setHoursOpen] = useState(false);
+  const [tableLabel, setTableLabel] = useState<string | null>(null);
+
+  // Smart table: the QR Code on the table opens /menu/loja?mesa=7.
+  useEffect(() => {
+    const table = new URLSearchParams(window.location.search).get("mesa")?.trim();
+    setTableLabel(table ? table.slice(0, 20) : null);
+  }, []);
 
   const allCategories = useMemo(
     () => menu.categories.filter((category) => category.items.length > 0 || category.isActive),
@@ -208,6 +215,8 @@ export function MenuClient({ menu }: MenuClientProps) {
           </div>
         </div>
       </header>
+
+      {tableLabel ? <div className="menu-table-banner">🍽️ Você está na <strong>mesa {tableLabel}</strong>. Peça por aqui e receba na mesa.</div> : null}
 
       {closed && establishment.isActive ? (
         <div className="menu-closed-banner">
@@ -384,6 +393,7 @@ export function MenuClient({ menu }: MenuClientProps) {
 
       {checkoutOpen ? (
         <CheckoutModal
+          tableLabel={tableLabel}
           establishment={establishment}
           lines={cart}
           onClose={() => setCheckoutOpen(false)}

@@ -24,9 +24,11 @@ import type {
 import { AdminEstablishment } from "./AdminEstablishment";
 import { AdminLogin } from "./AdminLogin";
 import { AdminMenu } from "./AdminMenu";
-import { AdminOrders, type CourierContact } from "./AdminOrders";
+import { type CourierContact } from "./AdminOrders";
+import { OrdersBoard, type TrackResult } from "./OrdersBoard";
 import { AdminContext } from "./AdminContext";
 import "./admin.css";
+import "./admin-theme.css";
 import { Distribution } from "./modules/Distribution";
 import { Finance } from "./modules/Finance";
 import { Fiscal } from "./modules/Fiscal";
@@ -540,15 +542,13 @@ export function AdminClient() {
             ) : null}
 
             {tab === "orders" && hasEstablishment ? (
-              <AdminOrders
+              <OrdersBoard
                 error={mutationError ?? dataError}
-                loading={dataLoading}
-                onMarkPaid={session.role !== "Kitchen" ? markPaid : undefined}
-                onRefresh={refreshOrders}
-                onRefund={canManage && session.modules.includes("pagamentos") ? refundOrder : undefined}
-                onTrack={http && session.role !== "Kitchen" && session.modules.includes("rastreio") ? async (orderId, courierId) => (await http.post<{ token: string }>(`/orders/${orderId}/courier`, { courierId: courierId ?? null })).token : undefined}
                 onLoadCouriers={http && session.role !== "Kitchen" && session.modules.includes("rastreio") ? () => http.get<CourierContact[]>(`/establishments/${selectedId}/couriers`) : undefined}
+                onMarkPaid={session.role !== "Kitchen" ? markPaid : undefined}
                 onOpenMap={session.role !== "Kitchen" && session.modules.includes("rastreio") ? () => goTo("tracking") : undefined}
+                onRefund={canManage && session.modules.includes("pagamentos") ? refundOrder : undefined}
+                onTrack={http && session.role !== "Kitchen" && session.modules.includes("rastreio") ? (orderId, courierId) => http.post<TrackResult>(`/orders/${orderId}/courier`, { courierId: courierId ?? null }) : undefined}
                 onUpdateStatus={updateOrderStatus}
                 orders={orders}
               />

@@ -27,6 +27,8 @@ public sealed class AppUrls(IConfiguration configuration) : IAppUrls
     public string TrackingUrl(string orderCode) => $"{_web}/pedido/{orderCode}";
 
     public string MenuUrl(string slug) => $"{_web}/menu/{slug}";
+
+    public string CourierUrl(string token) => $"{_web}/entrega/{token}";
 }
 
 public sealed class RedisOrderEvents(IConnectionMultiplexer redis, ILogger<RedisOrderEvents> logger) : IOrderEvents

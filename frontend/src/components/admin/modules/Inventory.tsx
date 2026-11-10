@@ -71,10 +71,41 @@ const movementLabels: Record<Movement["type"], string> = {
   Loss: "Perda",
 };
 
-function Stock({ http, establishmentId, items, reload }: Props & { items: StockItem[]; reload: () => Promise<void> }) {
-  const action = useAction(reload);
+type StockAction = "count" | "entry" | "Adjustment" | "Loss";
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
+const actionLabels: Record<StockAction, string> = {
+  count: "Contagem de inventário",
+  entry: "Entrada avulsa",
+  Adjustment: "Ajuste",
+  Loss: "Perda",
+};
+
+function level(item: StockItem) {
+  if (item.quantityOnHand <= 0) {
+    return 0;
+  }
+  const reference = Math.max(item.minimumQuantity * 2, item.quantityOnHand, 1);
+  return Math.min(100, (item.quantityOnHand / reference) * 100);
+}
+
+function Stock({ http, establishmentId, items, reload, onImport, canImportNfe }: Props & { items: StockItem[]; reload: () => Promise<void>; onImport: () => void }) {
+  const action = useAction(reload);
+  const [filter, setFilter] = useState<"all" | "low" | "negative">("all");
+  const [search, setSearch] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<{ item: StockItem; kind: StockAction } | null>(null);
+
+  const active = items.filter((item) => item.isActive);
+  const low = active.filter((item) => item.isLow && item.quantityOnHand >= 0);
+  const negative = active.filter((item) => item.quantityOnHand < 0);
+  const value = active.reduce((sum, item) => sum + Math.max(0, item.quantityOnHand) * item.averageCostInCents, 0);
+  const query = search.trim().toLowerCase();
+  const shown = active
+    .filter((item) => (filter === "low" ? item.isLow : filter === "negative" ? item.quantityOnHand < 0 : true))
+    .filter((item) => !query || item.name.toLowerCase().includes(query))
+    .sort((a, b) => Number(b.quantityOnHand < 0) - Number(a.quantityOnHand < 0) || Number(b.isLow) - Number(a.isLow) || a.name.localeCompare(b.name));
+
+  async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const element = event.currentTarget;
     const form = new FormData(element);
@@ -88,59 +119,154 @@ function Stock({ http, establishmentId, items, reload }: Props & { items: StockI
 
     if (done) {
       element.reset();
+      setCreating(false);
     }
   }
 
-  function adjust(item: StockItem, type: "Adjustment" | "Loss") {
-    const answer = window.prompt(
-      type === "Loss" ? `Quantidade perdida de ${item.name} (${item.unit}):` : `Ajuste de ${item.name} (${item.unit}). Use negativo para reduzir:`,
-    );
+  async function apply(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editing) {
+      return;
+    }
+    const form = new FormData(event.currentTarget);
+    const amount = toDecimal(form.get("quantity"));
+    const notes = text(form, "notes");
+    const { item, kind } = editing;
+    // A count sets the real quantity: the system records the difference as an adjustment.
+    const quantityChange =
+      kind === "count" ? amount - item.quantityOnHand : kind === "Loss" ? -Math.abs(amount) : kind === "entry" ? Math.abs(amount) : amount;
 
-    if (!answer) {
+    if (quantityChange === 0) {
+      setEditing(null);
       return;
     }
 
-    const amount = toDecimal(answer);
-    void action.run(() =>
+    const done = await action.run(() =>
       http.post(`/stock-items/${item.id}/adjustments`, {
-        type,
-        quantity: type === "Loss" ? -Math.abs(amount) : amount,
-        notes: null,
+        type: kind === "Loss" ? "Loss" : "Adjustment",
+        quantity: quantityChange,
+        notes: notes ?? (kind === "count" ? `Contagem: ${quantity(amount)} ${item.unit}` : kind === "entry" ? "Entrada avulsa" : null),
       }),
     );
+
+    if (done) {
+      setEditing(null);
+    }
   }
 
   return (
     <>
-      <form className="card module-form" onSubmit={submit}>
-        <Input label="Insumo *" name="name" required />
-        <Input label="Unidade *" name="unit" placeholder="un, kg, L" required />
-        <Input inputMode="decimal" label="Estoque mínimo" name="minimum" />
-        <button className="primary-button" disabled={action.busy} type="submit">Adicionar insumo</button>
-      </form>
-      <ErrorText message={action.error} />
-      {items.length === 0 ? <Empty>Cadastre os insumos para controlar o estoque.</Empty> : (
-        <div className="card admin-table-wrap">
-          <table className="admin-table">
-            <thead><tr><th>Insumo</th><th className="num">Saldo</th><th className="num">Mínimo</th><th className="num">Custo médio</th><th>Situação</th><th /></tr></thead>
-            <tbody>
-              {items.map((item) => (
-                <tr key={item.id}>
-                  <td>{item.name}</td>
-                  <td className="num">{quantity(item.quantityOnHand)} {item.unit}</td>
-                  <td className="num">{quantity(item.minimumQuantity)}</td>
-                  <td className="num">{formatBRL(item.averageCostInCents)}</td>
-                  <td>{item.quantityOnHand < 0 ? <span className="table-flag">⚠ Saldo negativo</span> : item.isLow ? <span className="table-flag">⚠ Baixo</span> : "Ok"}</td>
-                  <td className="table-actions">
-                    <button className="link-button" onClick={() => adjust(item, "Adjustment")} type="button">Ajustar</button>
-                    <button className="link-button" onClick={() => adjust(item, "Loss")} type="button">Perda</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div className="kpi-strip">
+        <div className="kpi"><small>Insumos</small><strong>{active.length}</strong></div>
+        <div className={`kpi ${low.length ? "is-warn" : ""}`}><small>No mínimo ou abaixo</small><strong>{low.length}</strong></div>
+        <div className={`kpi ${negative.length ? "is-alert" : ""}`}><small>Saldo negativo</small><strong>{negative.length}</strong></div>
+        <div className="kpi"><small>Valor em estoque (custo médio)</small><strong>{formatBRL(Math.round(value))}</strong></div>
+      </div>
+
+      <div className="board-toolbar">
+        <div className="origin-filter">
+          {(
+            [
+              ["all", "Todos", active.length],
+              ["low", "Baixo", low.length + negative.length],
+              ["negative", "Negativo", negative.length],
+            ] as const
+          ).map(([key, label, count]) => (
+            <button className={`origin-chip ${filter === key ? "is-active" : ""}`} key={key} onClick={() => setFilter(key)} type="button">
+              {label}<b>{count}</b>
+            </button>
+          ))}
         </div>
-      )}
+        <div className="toolbar-actions">
+          <input className="board-search" onChange={(event) => setSearch(event.target.value)} placeholder="Buscar insumo" type="search" value={search} />
+          {canImportNfe ? <button className="secondary-button" onClick={onImport} type="button">Entrada por NF-e (XML)</button> : null}
+          <button className="primary-button" onClick={() => setCreating(true)} type="button">+ Novo insumo</button>
+        </div>
+      </div>
+
+      <ErrorText message={action.error} />
+      {active.length === 0 ? <Empty>Cadastre os insumos para controlar o estoque. A baixa acontece sozinha quando o pedido é confirmado.</Empty> : null}
+
+      <div className="stock-list">
+        {shown.map((item) => {
+          const state = item.quantityOnHand < 0 ? "negative" : item.isLow ? "low" : "ok";
+          return (
+            <article className={`stock-row is-${state}`} key={item.id}>
+              <div className="stock-name">
+                <strong>{item.name}</strong>
+                <small>Mínimo {quantity(item.minimumQuantity)} {item.unit} · {item.averageCostInCents > 0 ? `custo médio ${formatBRL(item.averageCostInCents)}/${item.unit}` : "sem custo (lance uma entrada com valor)"}</small>
+              </div>
+              <div className="stock-level">
+                <div className="stock-bar"><i style={{ width: `${level(item)}%` }} /></div>
+                <span>
+                  <b>{quantity(item.quantityOnHand)}</b> {item.unit}
+                </span>
+              </div>
+              <span className={`stock-state is-${state}`}>{state === "negative" ? "Negativo" : state === "low" ? "Repor" : "Ok"}</span>
+              <div className="stock-actions">
+                <button onClick={() => setEditing({ item, kind: "entry" })} type="button">Entrada</button>
+                <button onClick={() => setEditing({ item, kind: "count" })} type="button">Contar</button>
+                <button onClick={() => setEditing({ item, kind: "Adjustment" })} type="button">Ajustar</button>
+                <button className="danger" onClick={() => setEditing({ item, kind: "Loss" })} type="button">Perda</button>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+
+      {creating ? (
+        <>
+          <button aria-label="Fechar" className="drawer-backdrop" onClick={() => setCreating(false)} type="button" />
+          <aside className="drawer">
+            <header className="drawer-head">
+              <h2>Novo insumo</h2>
+              <button className="drawer-close" onClick={() => setCreating(false)} type="button">×</button>
+            </header>
+            <form className="drawer-form" onSubmit={create}>
+              <Input label="Nome *" name="name" placeholder="Ex.: Pão brioche" required />
+              <Input label="Unidade *" name="unit" placeholder="un, kg, L, g" required />
+              <Input inputMode="decimal" label="Estoque mínimo (avisa quando chegar)" name="minimum" />
+              <p className="muted">Depois ligue o insumo aos produtos na Ficha técnica: cada venda confirmada baixa o estoque.</p>
+              <button className="primary-button" disabled={action.busy} type="submit">Cadastrar</button>
+            </form>
+          </aside>
+        </>
+      ) : null}
+
+      {editing ? (
+        <>
+          <button aria-label="Fechar" className="drawer-backdrop" onClick={() => setEditing(null)} type="button" />
+          <aside className="drawer">
+            <header className="drawer-head">
+              <div>
+                <small className="muted">{actionLabels[editing.kind]}</small>
+                <h2>{editing.item.name}</h2>
+                <small className="muted">Saldo atual: {quantity(editing.item.quantityOnHand)} {editing.item.unit}</small>
+              </div>
+              <button className="drawer-close" onClick={() => setEditing(null)} type="button">×</button>
+            </header>
+            <form className="drawer-form" key={`${editing.item.id}-${editing.kind}`} onSubmit={apply}>
+              <Input
+                autoFocus
+                inputMode="decimal"
+                label={
+                  editing.kind === "count"
+                    ? `Quantidade contada (${editing.item.unit}) *`
+                    : editing.kind === "Adjustment"
+                      ? `Ajuste em ${editing.item.unit} (negativo para reduzir) *`
+                      : `Quantidade (${editing.item.unit}) *`
+                }
+                name="quantity"
+                required
+              />
+              <Input label="Observação" name="notes" placeholder={editing.kind === "Loss" ? "Ex.: venceu, caiu no chão" : ""} />
+              {editing.kind === "count" ? <p className="muted">O sistema registra a diferença entre o contado e o saldo como ajuste, com data e quem contou.</p> : null}
+              {editing.kind === "entry" ? <p className="muted">Para entrada com nota fiscal e custo, use a aba Entrada ou a NF-e (XML).</p> : null}
+              <button className={`primary-button ${editing.kind === "Loss" ? "danger-button" : ""}`} disabled={action.busy} type="submit">Registrar</button>
+            </form>
+          </aside>
+        </>
+      ) : null}
     </>
   );
 }
@@ -384,7 +510,7 @@ export function Inventory(props: Props) {
 
   return (
     <section className="admin-section">
-      <ModuleHeading eyebrow="Gestão" title="Estoque" hint={low > 0 ? `⚠ ${low} insumo(s) no limite mínimo.` : "A baixa acontece quando o pedido é confirmado e volta se ele for cancelado."} />
+      <ModuleHeading eyebrow="Gestão" title="Estoque" hint={low > 0 ? `${low} insumo(s) no limite mínimo.` : "A baixa acontece quando o pedido é confirmado e volta se ele for cancelado."} />
       <SubTabs
         onChange={setView}
         options={[
@@ -397,7 +523,7 @@ export function Inventory(props: Props) {
         value={view}
       />
       <ErrorText message={stock.error} />
-      {view === "stock" ? <Stock {...props} items={items} reload={stock.reload} /> : null}
+      {view === "stock" ? <Stock {...props} items={items} onImport={() => setView("purchase")} reload={stock.reload} /> : null}
       {view === "recipes" ? <Recipes {...props} items={items.filter((item) => item.isActive)} /> : null}
       {view === "purchase" ? <Purchase {...props} items={items.filter((item) => item.isActive)} reload={stock.reload} /> : null}
       {view === "movements" ? <Movements {...props} items={items} /> : null}

@@ -57,6 +57,15 @@ internal static class OperationEndpoints
         cashiers.MapPost($"{Establishment}/pdv/orders/{{orderId:guid}}/receive", async (Guid establishmentId, Guid orderId, ReceiveOrderRequest request, HttpContext http, PdvService service, CancellationToken ct) =>
             (await service.ReceiveAsync(establishmentId, orderId, request, http.Actor(), ct)).ToHttpResult());
 
+        cashiers.MapGet($"{Establishment}/tables", async (Guid establishmentId, PdvService service, CancellationToken ct) =>
+            (await service.ListTablesAsync(establishmentId, ct)).ToHttpResult());
+
+        cashiers.MapPost($"{Establishment}/tables/{{table}}/orders", async (Guid establishmentId, string table, TableOrderRequest request, HttpContext http, PdvService service, CancellationToken ct) =>
+            (await service.TakeTableOrderAsync(establishmentId, table, request, ActorName(http), ct)).ToHttpResult());
+
+        cashiers.MapPost($"{Establishment}/tables/{{table}}/close", async (Guid establishmentId, string table, CloseTableRequest request, HttpContext http, PdvService service, CancellationToken ct) =>
+            (await service.CloseTableAsync(establishmentId, table, request, http.Actor(), ct)).ToHttpResult());
+
         // Undoing a sale moves money out of the register, so it needs a manager.
         operations.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager)
             .MapPost($"{Establishment}/pdv/sales/{{orderId:guid}}/cancel", async (Guid establishmentId, Guid orderId, CancelSaleRequest request, HttpContext http, PdvService service, CancellationToken ct) =>
@@ -77,6 +86,10 @@ internal static class OperationEndpoints
 
         return app;
     }
+
+    /// <summary>The person's name for the kitchen and the bill; falls back to the e-mail.</summary>
+    private static string ActorName(HttpContext http) =>
+        http.User.FindFirstValue("name") ?? http.User.FindFirstValue(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Name) ?? http.Actor();
 
     private static bool CanDiscount(HttpContext http) =>
         http.IsPlatform() || http.User.FindFirstValue("role") is nameof(UserRole.Owner) or nameof(UserRole.Manager);
