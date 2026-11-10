@@ -230,6 +230,12 @@ internal static class ModuleEndpoints
         group.MapPut("/customers/{customerId:guid}", async (Guid customerId, CustomerRequest request, PartyService service, CancellationToken ct) =>
             (await service.UpdateCustomerAsync(customerId, request, ct)).ToHttpResult());
 
+        group.MapDelete("/customers/{customerId:guid}", async (Guid customerId, PartyService service, CancellationToken ct) =>
+            (await service.DeleteCustomerAsync(customerId, ct)).ToHttpResult());
+        group.MapPatch("/customers/{customerId:guid}/active", async (Guid customerId, ToNoRango.Application.Catalog.SetMenuActiveRequest request, PartyService service, CancellationToken ct) =>
+            (await service.SetCustomerActiveAsync(customerId, request.IsActive, ct)).ToHttpResult());
+        group.MapDelete("/suppliers/{supplierId:guid}", async (Guid supplierId, PartyService service, CancellationToken ct) =>
+            (await service.DeleteSupplierAsync(supplierId, ct)).ToHttpResult());
         group.MapGet($"{Establishment}/suppliers", async (Guid establishmentId, PartyService service, CancellationToken ct) =>
             (await service.ListSuppliersAsync(establishmentId, ct)).ToHttpResult());
 
@@ -281,9 +287,10 @@ internal static class ModuleEndpoints
         group.MapPost($"{Establishment}/financial-entries", async (Guid establishmentId, FinancialEntryRequest request, FinanceService service, CancellationToken ct) =>
             (await service.CreateAsync(establishmentId, request, ct)).ToHttpResult());
 
-        group.MapPost("/financial-entries/{entryId:guid}/settle", async (Guid entryId, FinanceService service, CancellationToken ct) =>
-            (await service.SettleAsync(entryId, ct)).ToHttpResult());
-
+        group.MapPost("/financial-entries/{entryId:guid}/reopen", async (Guid entryId, FinanceService service, CancellationToken ct) =>
+            (await service.ReopenAsync(entryId, ct)).ToHttpResult());
+        group.MapPost("/financial-entries/{entryId:guid}/settle", async (Guid entryId, SettleEntryRequest? request, FinanceService service, CancellationToken ct) =>
+            (await (request is null ? service.SettleAsync(entryId, ct) : service.SettleAsync(entryId, request, ct))).ToHttpResult());
         group.MapPost("/financial-entries/{entryId:guid}/cancel", async (Guid entryId, FinanceService service, CancellationToken ct) =>
             (await service.CancelAsync(entryId, ct)).ToHttpResult());
     }

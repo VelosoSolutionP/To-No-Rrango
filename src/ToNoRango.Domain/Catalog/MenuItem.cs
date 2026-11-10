@@ -17,6 +17,11 @@ public sealed class MenuItem : AggregateRoot
 
     /// <summary>The "de" price of a promotion. Only kept when it is higher than the current price.</summary>
     public long? CompareAtPriceInCents { get; private set; }
+
+    /// <summary>Internal code (SKU) and barcode (EAN/GTIN) used to find the product at the PDV and on notes.</summary>
+    public string? Sku { get; private set; }
+    public string? Barcode { get; private set; }
+    public string Unit { get; private set; } = "UN";
     public bool IsActive { get; private set; } = true;
     public bool IsAvailable { get; private set; } = true;
     public int SortOrder { get; private set; }
@@ -76,6 +81,21 @@ public sealed class MenuItem : AggregateRoot
     public void SetCompareAtPrice(long? compareAtPriceInCents, DateTimeOffset now)
     {
         CompareAtPriceInCents = compareAtPriceInCents is long value && value > PriceInCents ? value : null;
+        UpdatedAt = now;
+    }
+
+    public void SetCodes(string? sku, string? barcode, string? unit, DateTimeOffset now)
+    {
+        Sku = NormalizeOptional(sku, 30, nameof(Sku));
+        var digits = string.IsNullOrWhiteSpace(barcode) ? null : new string(barcode.Where(char.IsAsciiDigit).ToArray());
+
+        if (digits is not null && digits.Length is not (8 or 12 or 13 or 14))
+        {
+            throw new ArgumentException("O código de barras (EAN/GTIN) tem 8, 12, 13 ou 14 dígitos.", nameof(barcode));
+        }
+
+        Barcode = digits;
+        Unit = string.IsNullOrWhiteSpace(unit) ? "UN" : Ensure.MaxLength(unit.Trim().ToUpperInvariant(), 6, nameof(Unit));
         UpdatedAt = now;
     }
 

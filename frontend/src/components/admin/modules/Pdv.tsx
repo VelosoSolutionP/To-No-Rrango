@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { formatBRL, formatDateTime, type AdminHttp } from "@/lib/admin-api";
 import type { AdminOrder, MenuItem, PaymentMethod, PublicMenu } from "@/lib/types";
 import { ErrorMessage, text, toCents, useAction, useLoad } from "./shared";
@@ -60,6 +60,13 @@ interface Line {
 
 type Mode = "counter" | "tables" | "delivery" | "receive";
 
+interface CustomerLite {
+  id: string;
+  name: string;
+  phone: string;
+  isActive?: boolean;
+}
+
 const methodLabels: Record<PaymentMethod, string> = { Cash: "Dinheiro", CardOnDelivery: "Cartão", Pix: "Pix", Online: "Online" };
 const methodIcons: Record<string, string> = { Cash: "💵", CardOnDelivery: "💳", Pix: "⚡" };
 const movementLabels: Record<CashMovement["type"], string> = { Supply: "Suprimento", Withdrawal: "Sangria", Sale: "Venda", SaleReversal: "Estorno" };
@@ -108,6 +115,8 @@ export function Pdv({
   const [drawer, setDrawer] = useState<"cash" | "history" | null>(null);
   const [table, setTable] = useState<string | null>(null);
   const [comanda, setComanda] = useState<string | null>(null);
+  const [receipt, setReceipt] = useState<AdminOrder | null>(null);
+  const customers = useLoad(() => http.get<CustomerLite[]>(`${base}/customers`).catch(() => []), [base]);
   const session = overview.data?.current ?? null;
 
   useEffect(() => {
@@ -186,6 +195,7 @@ export function Pdv({
           busy={action.busy}
           canManage={canManage}
           comanda={mode === "tables" ? comanda : null}
+          customers={customers.data ?? []}
           delivery={mode === "delivery"}
           menu={menu}
           onBack={() => setComanda(null)}
@@ -198,10 +208,17 @@ export function Pdv({
               }
               return done;
             }
-            return action.run(() => http.post(`${base}/pdv/sales`, payload));
+            let sold: AdminOrder | null = null;
+            const done = await action.run(async () => {
+              sold = (await http.post<{ order: AdminOrder }>(`${base}/pdv/sales`, payload)).order;
+            });
+            if (done && sold) setReceipt(sold);
+            return done;
           }}
         />
       )}
+
+      {receipt ? <Receipt onClose={() => setReceipt(null)} order={receipt} storeName={menu?.establishment.name ?? ""} /> : null}
 
       {drawer === "cash" && session ? (
         <Drawer onClose={() => setDrawer(null)} title="Caixa">
@@ -280,6 +297,7 @@ function OpenCash({ busy, onOpen }: { busy: boolean; onOpen: (cents: number) => 
 /* ------------------------------------------------------------------------------------------------ */
 
 function SaleView({
+  customers,
   menu,
   busy,
   canManage,
@@ -295,6 +313,7 @@ function SaleView({
   comanda: string | null;
   onSell: (payload: unknown) => Promise<boolean>;
   onBack: () => void;
+  customers: CustomerLite[];
 }) {
   const [category, setCategory] = useState<string>("all");
   const [search, setSearch] = useState("");
@@ -320,7 +339,7 @@ function SaleView({
       .filter(({ product, categoryId }) =>
         category === "all" ? true : category === "promo" ? (product.compareAtPriceInCents ?? 0) > product.priceInCents : categoryId === category,
       )
-      .filter(({ product }) => !query || plain(`${product.name} ${product.description ?? ""}`).includes(query));
+      .filter(({ product }) => !query || plain(`${product.name} ${product.description ?? ""} ${product.sku ?? ""} ${product.barcode ?? ""}`).includes(query));
   }, [categories, category, search]);
 
   const subtotal = lines.reduce((total, line) => total + line.unitInCents * line.quantity, 0);
@@ -344,6 +363,43 @@ function SaleView({
 
   function change_(key: string, delta: number) {
     setLines((current) => current.flatMap((line) => (line.key !== key ? [line] : line.quantity + delta > 0 ? [{ ...line, quantity: Math.min(99, line.quantity + delta) }] : [])));
+  }
+
+  const searchRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [customerPhone, setCustomerPhone] = useState("");
+
+  // Shortcuts at the counter: F2 search, F4 next payment method, F9 finish, Esc clear search.
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === "F2") {
+        event.preventDefault();
+        searchRef.current?.focus();
+      } else if (event.key === "F4" && !isComanda) {
+        event.preventDefault();
+        setMethod((current) => counterMethods[(counterMethods.indexOf(current) + 1) % counterMethods.length]);
+      } else if (event.key === "F9") {
+        event.preventDefault();
+        formRef.current?.requestSubmit();
+      } else if (event.key === "Escape" && document.activeElement === searchRef.current) {
+        setSearch("");
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isComanda]);
+
+  /** The barcode reader types the code and presses Enter: an exact code adds the product at once. */
+  function onSearchEnter() {
+    const code = search.trim();
+    const all = categories.flatMap((item) => item.items).filter((product) => product.isActive && product.isAvailable);
+    const exact = all.find((product) => product.barcode === code.replace(/\D/g, "") || (product.sku && product.sku.toLowerCase() === code.toLowerCase()));
+    const target = exact ?? (products.length === 1 ? products[0].product : null);
+    if (target) {
+      if (target.optionGroups.length > 0) setPicking(target);
+      else add(target);
+      setSearch("");
+    }
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -385,7 +441,9 @@ function SaleView({
       setDiscount("");
       setNotes("");
       setDineIn("");
+      setCustomerPhone("");
       setIdempotencyKey(crypto.randomUUID());
+      searchRef.current?.focus();
       element.reset();
     }
   }
@@ -411,7 +469,24 @@ function SaleView({
       </aside>
 
       <div className="pos-catalog">
-        <input className="pos-search" onChange={(event) => setSearch(event.target.value)} placeholder="Buscar produto (nome ou descrição)" type="search" value={search} />
+        <div className="pos-searchbar">
+          <input
+            autoFocus
+            className="pos-search"
+            onChange={(event) => setSearch(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                onSearchEnter();
+              }
+            }}
+            placeholder="Nome, código ou leia o código de barras  (F2)"
+            ref={searchRef}
+            type="search"
+            value={search}
+          />
+          <span className="pos-keys"><kbd>F4</kbd> pagamento <kbd>F9</kbd> finalizar</span>
+        </div>
         <div className="pos-grid">
           {products.map(({ product, categoryId }) => {
             const promo = (product.compareAtPriceInCents ?? 0) > product.priceInCents;
@@ -440,7 +515,7 @@ function SaleView({
         </div>
       </div>
 
-      <form className="pos-ticket" onSubmit={submit}>
+      <form className="pos-ticket" onSubmit={submit} ref={formRef}>
         <header>
           {isComanda ? (
             <>
@@ -475,14 +550,32 @@ function SaleView({
         <div className="pos-ticket-body">
           {!isComanda && !delivery && details ? (
             <div className="pos-row">
-              <input name="customerName" placeholder="Cliente (opcional)" />
+              <input
+                list="pos-customers"
+                name="customerName"
+                onChange={(event) => {
+                  const found = customers.find((customer) => customer.name === event.target.value);
+                  if (found) setCustomerPhone(found.phone);
+                }}
+                placeholder="Cliente (opcional)"
+              />
+              <input name="customerPhone" type="hidden" value={customerPhone} />
               <input inputMode="text" maxLength={20} onChange={(event) => setDineIn(event.target.value)} placeholder="Mesa (opcional)" value={dineIn} />
             </div>
           ) : null}
           {delivery ? (
             <div className="pos-address">
-              <input name="customerName" placeholder="Cliente *" required />
-              <input inputMode="tel" name="customerPhone" placeholder="Telefone *" required />
+              <input
+                list="pos-customers"
+                name="customerName"
+                onChange={(event) => {
+                  const found = customers.find((customer) => customer.name === event.target.value);
+                  if (found) setCustomerPhone(found.phone);
+                }}
+                placeholder="Cliente *"
+                required
+              />
+              <input inputMode="tel" name="customerPhone" onChange={(event) => setCustomerPhone(event.target.value)} placeholder="Telefone *" required value={customerPhone} />
               <input className="wide" name="street" placeholder="Rua *" required />
               <input name="number" placeholder="Nº *" required />
               <input name="district" placeholder="Bairro *" required />
@@ -560,6 +653,11 @@ function SaleView({
       </form>
 
       {picking ? <OptionPicker item={picking} onCancel={() => setPicking(null)} onPick={(ids) => add(picking, ids)} /> : null}
+      <datalist id="pos-customers">
+        {customers.filter((customer) => customer.isActive !== false).slice(0, 300).map((customer) => (
+          <option key={customer.id} value={customer.name}>{customer.phone}</option>
+        ))}
+      </datalist>
     </div>
   );
 }
@@ -919,5 +1017,46 @@ function History({ sessions }: { sessions: CashSession[] }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+/* ------------------------------------------------------------------------------------------------ */
+
+/** Sale receipt (not a fiscal note): shown after the sale, printable on any printer. */
+function Receipt({ order, storeName, onClose }: { order: AdminOrder; storeName: string; onClose: () => void }) {
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => event.key === "Escape" && onClose();
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  return (
+    <div className="modal-backdrop receipt-backdrop" role="presentation">
+      <section className="modal receipt-modal" role="dialog">
+        <div className="receipt" id="receipt">
+          <strong className="receipt-store">{storeName}</strong>
+          <small>Comprovante de venda · sem valor fiscal</small>
+          <small>#{order.code} · {formatDateTime(order.createdAt)}</small>
+          {order.tableLabel ? <small>Mesa {order.tableLabel}</small> : null}
+          <hr />
+          {order.items.map((item) => (
+            <div className="receipt-line" key={item.id}>
+              <span>{item.quantity}× {item.name}</span>
+              <span>{formatBRL(item.totalInCents)}</span>
+            </div>
+          ))}
+          <hr />
+          {order.discountInCents ? <div className="receipt-line"><span>Desconto</span><span>− {formatBRL(order.discountInCents)}</span></div> : null}
+          {order.deliveryFeeInCents ? <div className="receipt-line"><span>Entrega</span><span>{formatBRL(order.deliveryFeeInCents)}</span></div> : null}
+          <div className="receipt-line receipt-total"><span>Total</span><span>{formatBRL(order.totalInCents)}</span></div>
+          <small>Pagamento: {methodLabels[order.paymentMethod]}</small>
+          <small>Obrigado pela preferência!</small>
+        </div>
+        <div className="receipt-actions">
+          <button className="secondary-button" onClick={() => window.print()} type="button">Imprimir comprovante</button>
+          <button className="primary-button" onClick={onClose} type="button">Nova venda (Esc)</button>
+        </div>
+      </section>
+    </div>
   );
 }

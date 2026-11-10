@@ -7,7 +7,9 @@ using ToNoRango.SharedKernel.Results;
 
 namespace ToNoRango.Application.Finance;
 
-public sealed record FinancialEntryRequest(FinancialType Type, string Category, string Description, long AmountInCents, DateOnly DueOn);
+public sealed record FinancialEntryRequest(FinancialType Type, string Category, string Description, long AmountInCents, DateOnly DueOn, string? Counterparty = null, string? DocumentNumber = null);
+
+public sealed record SettleEntryRequest(string? Method, DateOnly? On);
 
 public sealed record FinancialEntryDto(
     Guid Id,
@@ -18,7 +20,12 @@ public sealed record FinancialEntryDto(
     string Description,
     long AmountInCents,
     DateOnly DueOn,
-    DateTimeOffset? SettledAt)
+    DateTimeOffset? SettledAt,
+    string? Counterparty = null,
+    string? DocumentNumber = null,
+    string? SettlementMethod = null,
+    DateOnly? SettledOn = null,
+    DateTimeOffset? CreatedAt = null)
 {
     public static FinancialEntryDto From(FinancialEntry entry) => new(
         entry.Id,
@@ -29,7 +36,12 @@ public sealed record FinancialEntryDto(
         entry.Description,
         entry.AmountInCents,
         entry.DueOn,
-        entry.SettledAt);
+        entry.SettledAt,
+        entry.Counterparty,
+        entry.DocumentNumber,
+        entry.SettlementMethod,
+        entry.SettledOn,
+        entry.CreatedAt);
 }
 
 public sealed record DashboardDto(
@@ -57,7 +69,7 @@ public sealed class FinanceService(
             entry => entry.DueOn,
             cancellationToken,
             descending: true,
-            take: 300);
+            take: 2000);
 
         return list.Select(FinancialEntryDto.From).ToList();
     }
@@ -83,6 +95,7 @@ public sealed class FinanceService(
                 request.AmountInCents,
                 request.DueOn,
                 clock.UtcNow);
+            entry.Describe(request.Counterparty, request.DocumentNumber);
 
             entries.Add(entry);
             await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -92,6 +105,12 @@ public sealed class FinanceService(
 
     public Task<Result<FinancialEntryDto>> SettleAsync(Guid entryId, CancellationToken cancellationToken) =>
         ChangeAsync(entryId, entry => entry.Settle(clock.UtcNow), cancellationToken);
+
+    public Task<Result<FinancialEntryDto>> SettleAsync(Guid entryId, SettleEntryRequest request, CancellationToken cancellationToken) =>
+        ChangeAsync(entryId, entry => entry.Settle(clock.UtcNow, request.Method, request.On), cancellationToken);
+
+    public Task<Result<FinancialEntryDto>> ReopenAsync(Guid entryId, CancellationToken cancellationToken) =>
+        ChangeAsync(entryId, entry => entry.Reopen(), cancellationToken);
 
     public Task<Result<FinancialEntryDto>> CancelAsync(Guid entryId, CancellationToken cancellationToken) =>
         ChangeAsync(entryId, entry =>

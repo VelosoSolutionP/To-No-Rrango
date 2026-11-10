@@ -20,6 +20,9 @@ public sealed class MenuItemConfiguration : IEntityTypeConfiguration<MenuItem>
         builder.Property(item => item.PriceInCents).IsRequired();
         builder.Property(item => item.SortOrder).IsRequired();
         builder.Ignore(item => item.IsOnPromotion);
+        builder.Property(item => item.Sku).HasMaxLength(30);
+        builder.Property(item => item.Barcode).HasMaxLength(14);
+        builder.Property(item => item.Unit).HasMaxLength(6).HasDefaultValue("UN");
         builder.Property(item => item.CreatedAt).IsRequired();
         builder.Property(item => item.UpdatedAt).IsRequired();
 

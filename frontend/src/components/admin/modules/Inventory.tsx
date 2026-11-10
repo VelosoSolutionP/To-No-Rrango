@@ -3,7 +3,6 @@
 import { type ChangeEvent, type FormEvent, useEffect, useState } from "react";
 import { formatBRL, formatDateTime, type AdminHttp } from "@/lib/admin-api";
 import type { PublicMenu } from "@/lib/types";
-import { Suppliers } from "./Parties";
 import { Empty, ErrorMessage as ErrorText, Input, ModuleHeading, SubTabs, messageOf, quantity, text, toCents, toDecimal, useAction, useLoad } from "./shared";
 
 interface StockItem {
@@ -180,7 +179,7 @@ function Stock({ http, establishmentId, items, reload, onImport, canImportNfe }:
         <div className="toolbar-actions">
           <input className="board-search" onChange={(event) => setSearch(event.target.value)} placeholder="Buscar insumo" type="search" value={search} />
           {canImportNfe ? <button className="secondary-button" onClick={onImport} type="button">Entrada por NF-e (XML)</button> : null}
-          <button className="primary-button" onClick={() => setCreating(true)} type="button">+ Novo insumo</button>
+          <button className="secondary-button" onClick={() => setCreating(true)} type="button">+ Insumo rápido</button>
         </div>
       </div>
 
@@ -268,77 +267,6 @@ function Stock({ http, establishmentId, items, reload, onImport, canImportNfe }:
         </>
       ) : null}
     </>
-  );
-}
-
-function Recipes({ http, menu, items }: Props & { items: StockItem[] }) {
-  const menuItems = menu?.categories.flatMap((category) => category.items) ?? [];
-  const [menuItemId, setMenuItemId] = useState("");
-  const [lines, setLines] = useState<Array<{ stockItemId: string; quantity: string }>>([]);
-  const [saved, setSaved] = useState(false);
-  const action = useAction();
-
-  useEffect(() => {
-    setSaved(false);
-
-    if (!menuItemId) {
-      setLines([]);
-      return;
-    }
-
-    http
-      .get<Array<{ stockItemId: string; quantity: number }>>(`/items/${menuItemId}/recipe`)
-      .then((recipe) => setLines(recipe.map((line) => ({ stockItemId: line.stockItemId, quantity: String(Number(line.quantity)) }))))
-      .catch(() => setLines([]));
-  }, [http, menuItemId]);
-
-  async function save() {
-    setSaved(false);
-    const done = await action.run(() =>
-      http.put(`/items/${menuItemId}/recipe`, lines.map((line) => ({ stockItemId: line.stockItemId, quantity: toDecimal(line.quantity) }))),
-    );
-    setSaved(done);
-  }
-
-  return (
-    <div className="card module-stack">
-      <label className="field">
-        <span>Item do cardápio</span>
-        <select onChange={(event) => setMenuItemId(event.target.value)} value={menuItemId}>
-          <option value="">Selecione</option>
-          {menuItems.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-        </select>
-      </label>
-      {menuItemId ? (
-        <>
-          <p className="muted">Quanto de cada insumo sai do estoque quando uma unidade é confirmada.</p>
-          {lines.map((line, index) => (
-            <div className="module-line" key={index}>
-              <select
-                onChange={(event) => setLines((current) => current.map((row, i) => (i === index ? { ...row, stockItemId: event.target.value } : row)))}
-                value={line.stockItemId}
-              >
-                <option value="">Insumo</option>
-                {items.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.unit})</option>)}
-              </select>
-              <input
-                aria-label="Quantidade"
-                inputMode="decimal"
-                onChange={(event) => setLines((current) => current.map((row, i) => (i === index ? { ...row, quantity: event.target.value } : row)))}
-                value={line.quantity}
-              />
-              <button className="link-button" onClick={() => setLines((current) => current.filter((_, i) => i !== index))} type="button">Remover</button>
-            </div>
-          ))}
-          <div className="module-actions">
-            <button className="secondary-button secondary-button-small" onClick={() => setLines((current) => [...current, { stockItemId: "", quantity: "" }])} type="button">Adicionar insumo</button>
-            <button className="primary-button" disabled={action.busy || lines.some((line) => !line.stockItemId || toDecimal(line.quantity) <= 0)} onClick={save} type="button">Salvar ficha técnica</button>
-            {saved ? <span className="muted">Ficha salva.</span> : null}
-          </div>
-          <ErrorText message={action.error} />
-        </>
-      ) : null}
-    </div>
   );
 }
 
@@ -502,32 +430,27 @@ function Movements({ http, establishmentId, items }: Props & { items: StockItem[
 }
 
 export function Inventory(props: Props) {
-  type View = "stock" | "recipes" | "purchase" | "movements" | "suppliers";
+  type View = "stock" | "purchase" | "movements";
   const [view, setView] = useState<View>("stock");
   const stock = useLoad(() => props.http.get<StockItem[]>(`/establishments/${props.establishmentId}/stock-items`), [props.establishmentId]);
   const items = stock.data ?? [];
-  const low = items.filter((item) => item.isLow).length;
-
+  
   return (
     <section className="admin-section">
-      <ModuleHeading eyebrow="Gestão" title="Estoque" hint={low > 0 ? `${low} insumo(s) no limite mínimo.` : "A baixa acontece quando o pedido é confirmado e volta se ele for cancelado."} />
+      <ModuleHeading eyebrow="Relatório" title="Estoque" hint="Posição, entradas e movimentações. Produtos, ficha técnica e fornecedores ficam nos cadastros." />
       <SubTabs
         onChange={setView}
         options={[
-          { value: "stock", label: "Insumos" },
-          { value: "recipes", label: "Ficha técnica" },
-          { value: "purchase", label: "Entrada" },
+          { value: "stock", label: "Posição e contagem" },
+          { value: "purchase", label: "Entrada de mercadoria" },
           { value: "movements", label: "Movimentações" },
-          { value: "suppliers", label: "Fornecedores" },
         ]}
         value={view}
       />
       <ErrorText message={stock.error} />
       {view === "stock" ? <Stock {...props} items={items} onImport={() => setView("purchase")} reload={stock.reload} /> : null}
-      {view === "recipes" ? <Recipes {...props} items={items.filter((item) => item.isActive)} /> : null}
       {view === "purchase" ? <Purchase {...props} items={items.filter((item) => item.isActive)} reload={stock.reload} /> : null}
       {view === "movements" ? <Movements {...props} items={items} /> : null}
-      {view === "suppliers" ? <Suppliers establishmentId={props.establishmentId} http={props.http} /> : null}
     </section>
   );
 }

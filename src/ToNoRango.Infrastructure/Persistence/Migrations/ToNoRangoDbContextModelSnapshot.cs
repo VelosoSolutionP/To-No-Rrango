@@ -121,6 +121,10 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Barcode")
+                        .HasMaxLength(14)
+                        .HasColumnType("character varying(14)");
+
                     b.Property<Guid>("CategoryId")
                         .HasColumnType("uuid");
 
@@ -155,11 +159,22 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                     b.Property<long>("PriceInCents")
                         .HasColumnType("bigint");
 
+                    b.Property<string>("Sku")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(6)
+                        .HasColumnType("character varying(6)")
+                        .HasDefaultValue("UN");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -557,6 +572,10 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                         .HasMaxLength(60)
                         .HasColumnType("character varying(60)");
 
+                    b.Property<string>("Counterparty")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -564,6 +583,10 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<string>("DocumentNumber")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
 
                     b.Property<DateOnly>("DueOn")
                         .HasColumnType("date");
@@ -573,6 +596,13 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTimeOffset?>("SettledAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly?>("SettledOn")
+                        .HasColumnType("date");
+
+                    b.Property<string>("SettlementMethod")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
 
                     b.Property<int>("Source")
                         .HasColumnType("integer");
@@ -1838,6 +1868,9 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid>("EstablishmentId")
                         .HasColumnType("uuid");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
 
                     b.Property<DateTimeOffset?>("LastOrderAt")
                         .HasColumnType("timestamp with time zone");

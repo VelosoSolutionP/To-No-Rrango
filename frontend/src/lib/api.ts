@@ -13,7 +13,9 @@ export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost
 
 /** Reads the human sentence of a ProblemDetails response, including validation problems. */
 export function problemDetail(problem: { detail?: string; errors?: Record<string, string[]> } | null): string | undefined {
-  return problem?.detail ?? (problem?.errors ? Object.values(problem.errors)[0]?.[0] : undefined);
+  const message = problem?.detail ?? (problem?.errors ? Object.values(problem.errors)[0]?.[0] : undefined);
+  // Domain messages may carry the .NET parameter name; the person only needs the sentence.
+  return message?.replace(/\s*\(Parameter '[^']*'\)/g, "").trim();
 }
 
 export class ApiError extends Error {

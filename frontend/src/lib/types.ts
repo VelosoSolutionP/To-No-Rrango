@@ -86,6 +86,9 @@ export interface MenuItem {
   comboParts?: MenuComboPart[] | null;
   comboSavingsInCents?: number | null;
   compareAtPriceInCents?: number | null;
+  sku?: string | null;
+  barcode?: string | null;
+  unit?: string;
 }
 
 export interface MenuCategory {

@@ -84,7 +84,10 @@ public sealed record MenuItemDto(
     IReadOnlyList<MenuOptionGroupDto> OptionGroups,
     IReadOnlyList<MenuComboPartDto>? ComboParts = null,
     long? ComboSavingsInCents = null,
-    long? CompareAtPriceInCents = null)
+    long? CompareAtPriceInCents = null,
+    string? Sku = null,
+    string? Barcode = null,
+    string Unit = "UN")
 {
     public static MenuItemDto From(MenuItem item) => new(
         item.Id,
@@ -101,7 +104,10 @@ public sealed record MenuItemDto(
             .ThenBy(group => group.Name)
             .Select(MenuOptionGroupDto.From)
             .ToList(),
-        CompareAtPriceInCents: item.IsOnPromotion ? item.CompareAtPriceInCents : null);
+        CompareAtPriceInCents: item.IsOnPromotion ? item.CompareAtPriceInCents : null,
+        Sku: item.Sku,
+        Barcode: item.Barcode,
+        Unit: item.Unit);
 
     /// <summary>Builds the combo view, so the menu can show what the combo bundles and how much it saves.</summary>
     public static MenuItemDto From(MenuItem item, IReadOnlyList<MenuCombo> combos, IReadOnlyList<MenuItem> allItems)
@@ -142,7 +148,10 @@ public sealed record MenuItemDto(
                 .ToList(),
             parts,
             separate > item.PriceInCents ? separate - item.PriceInCents : null,
-            item.IsOnPromotion ? item.CompareAtPriceInCents : null);
+            item.IsOnPromotion ? item.CompareAtPriceInCents : null,
+            item.Sku,
+            item.Barcode,
+            item.Unit);
     }
 }
 
@@ -204,7 +213,10 @@ public sealed record CreateMenuItemRequest(
     bool IsAvailable,
     IReadOnlyList<MenuOptionGroupRequest>? OptionGroups,
     IReadOnlyList<MenuComboLineRequest>? ComboLines = null,
-    long? CompareAtPriceInCents = null);
+    long? CompareAtPriceInCents = null,
+    string? Sku = null,
+    string? Barcode = null,
+    string? Unit = null);
 
 public sealed record UpdateMenuItemRequest(
     Guid CategoryId,
@@ -216,7 +228,10 @@ public sealed record UpdateMenuItemRequest(
     bool IsAvailable,
     IReadOnlyList<MenuOptionGroupRequest>? OptionGroups,
     IReadOnlyList<MenuComboLineRequest>? ComboLines = null,
-    long? CompareAtPriceInCents = null);
+    long? CompareAtPriceInCents = null,
+    string? Sku = null,
+    string? Barcode = null,
+    string? Unit = null);
 
 public sealed record MenuComboLineRequest(Guid MenuItemId, int Quantity);
 

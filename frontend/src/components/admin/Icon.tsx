@@ -14,11 +14,28 @@ const paths: Record<string, string> = {
   zest: "M13 2 4 14h7l-1 8 9-12h-7l1-8Z",
   settings: "M4 7h10m4 0h2M4 17h2m4 0h10M14 4v6m-4 4v6",
   establishment: "M4 10v10h16V10M3 10l2-6h14l2 6M3 10a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0M10 20v-5h4v5",
+  edit: "M4 20h4L19 9l-4-4L4 16v4Zm10-14 4 4",
+  trash: "M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3",
+  eye: "M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Zm10 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z",
+  power: "M12 3v9m6.4-5.4a8 8 0 1 1-12.8 0",
+  plus: "M12 5v14M5 12h14",
+  search: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Zm10 3-5-5",
+  check: "M5 12l5 5 9-10",
+  undo: "M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3",
+  whatsappSend: "M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z",
+  lock: "M6 11h12v10H6V11Zm2 0V8a4 4 0 0 1 8 0v3",
+  download: "M12 3v12m-5-5 5 5 5-5M4 21h16",
+  box: "M12 3 4 7v10l8 4 8-4V7l-8-4Z",
+  pos: "M4 4h16v10H4V4Zm4 16h8m-4-6v6M8 8h3m3 0h2",
+  truck: "M3 6h11v11H3V6Zm11 4h4l3 3v4h-7v-7ZM7.5 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm10 0a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z",
+  tag: "M3 12V4h8l10 10-8 8L3 12Zm5-4h.01",
+  pause: "M8 5v14m8-14v14",
+  play: "M7 5l12 7-12 7V5Z",
 };
 
-export function Icon({ name }: { name: string }) {
+export function Icon({ name, size = 20 }: { name: string; size?: number }) {
   return (
-    <svg aria-hidden="true" fill="none" height="20" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" viewBox="0 0 24 24" width="20">
+    <svg aria-hidden="true" fill="none" height={size} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" viewBox="0 0 24 24" width={size}>
       <path d={paths[name] ?? paths.overview} />
     </svg>
   );

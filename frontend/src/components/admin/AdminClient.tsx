@@ -31,39 +31,37 @@ import "./admin.css";
 import "./admin-theme.css";
 import { Distribution } from "./modules/Distribution";
 import { Finance } from "./modules/Finance";
-import { Fiscal } from "./modules/Fiscal";
 import { Inventory } from "./modules/Inventory";
 import { Kitchen } from "./modules/Kitchen";
-import { LiveDeliveries } from "./modules/LiveDeliveries";
 import { Overview } from "./modules/Overview";
 import { Pdv } from "./modules/Pdv";
-import { Ratings } from "./modules/Ratings";
-import { Reports } from "./modules/Reports";
 import { ZestIa } from "./modules/ZestIa";
-import { SubTabs } from "./modules/shared";
-import { Customers } from "./modules/Parties";
+import { Customers, Suppliers } from "./modules/Parties";
+import { Products } from "./modules/Products";
+import { Icon } from "./Icon";
 import { Settings } from "./modules/Settings";
 
-type Tab = "overview" | "orders" | "kitchen" | "tracking" | "pdv" | "menu" | "inventory" | "customers" | "distribution" | "finance" | "fiscal" | "reports" | "zest" | "settings";
+type Tab = "overview" | "orders" | "kitchen" | "pdv" | "distribution" | "products" | "menu" | "customers" | "suppliers" | "inventory" | "finance" | "fiscal" | "reports" | "zest" | "settings";
 
 const roleName: Record<UserRole, string> = { Owner: "Dono", Manager: "Gerente", Attendant: "Atendente", Kitchen: "Cozinha" };
 
 const management: UserRole[] = ["Owner", "Manager"];
 const everyone: UserRole[] = ["Owner", "Manager", "Attendant", "Kitchen"];
 
-const tabs: Array<{ id: Tab; group: string; label: string; roles: UserRole[]; modules?: string[] }> = [
+const tabs: Array<{ id: Tab; group: string; label: string; roles: UserRole[]; modules?: string[]; locked?: boolean }> = [
   { id: "overview", group: "Operação", label: "Visão geral", roles: ["Owner", "Manager", "Attendant"] },
   { id: "orders", group: "Operação", label: "Pedidos", roles: everyone, modules: ["pedidos"] },
   { id: "kitchen", group: "Operação", label: "Cozinha", roles: everyone, modules: ["pedidos"] },
-  { id: "tracking", group: "Operação", label: "Entregas", roles: ["Owner", "Manager", "Attendant"], modules: ["rastreio"] },
   { id: "pdv", group: "Operação", label: "PDV", roles: ["Owner", "Manager", "Attendant"], modules: ["pedidos"] },
-  { id: "menu", group: "Gestão", label: "Cardápio", roles: management, modules: ["cardapio"] },
+  { id: "distribution", group: "Operação", label: "Distribuição", roles: ["Owner", "Manager", "Attendant"], modules: ["pedidos"] },
+  { id: "products", group: "Cadastros", label: "Produtos", roles: management, modules: ["cardapio"] },
+  { id: "menu", group: "Cadastros", label: "Cardápio", roles: management, modules: ["cardapio"] },
+  { id: "customers", group: "Cadastros", label: "Clientes", roles: ["Owner", "Manager", "Attendant"], modules: ["clientes"] },
+  { id: "suppliers", group: "Cadastros", label: "Fornecedores", roles: management, modules: ["estoque"] },
   { id: "inventory", group: "Gestão", label: "Estoque", roles: management, modules: ["estoque"] },
-  { id: "customers", group: "Gestão", label: "Clientes", roles: ["Owner", "Manager", "Attendant"], modules: ["clientes"] },
-  { id: "distribution", group: "Gestão", label: "Distribuição", roles: management, modules: ["pedidos"] },
   { id: "finance", group: "Gestão", label: "Financeiro", roles: management, modules: ["financeiro"] },
-  { id: "fiscal", group: "Gestão", label: "Fiscal", roles: management, modules: ["fiscal", "fiscal_nfce"] },
-  { id: "reports", group: "Gestão", label: "Relatórios", roles: management, modules: ["pedidos"] },
+  { id: "fiscal", group: "Gestão", label: "Fiscal", roles: management, modules: ["fiscal", "fiscal_nfce"], locked: true },
+  { id: "reports", group: "Gestão", label: "Relatórios", roles: management, modules: ["pedidos"], locked: true },
   { id: "zest", group: "Inteligência", label: "ZEST IA", roles: management, modules: ["ia"] },
   { id: "settings", group: "Ajustes", label: "Configurações", roles: management },
 ];
@@ -92,7 +90,6 @@ export function AdminClient() {
   const [mutationBusy, setMutationBusy] = useState(false);
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [navOpen, setNavOpen] = useState(false);
-  const [reportView, setReportView] = useState<"sales" | "ratings">("ratings");
 
   const selectedEstablishment = useMemo(
     () => establishments.find((establishment) => establishment.id === selectedId) ?? null,
@@ -247,7 +244,7 @@ export function AdminClient() {
   }, [selectedId, session]);
 
   useEffect(() => {
-    if (!session || !selectedId || (tab !== "orders" && tab !== "kitchen" && tab !== "overview" && tab !== "pdv")) {
+    if (!session || !selectedId || (tab !== "orders" && tab !== "kitchen" && tab !== "overview" && tab !== "pdv" && tab !== "distribution")) {
       return;
     }
 
@@ -507,6 +504,7 @@ export function AdminClient() {
                 >
                   <span>{item.label}</span>
                   {item.id === "orders" && pendingOrders > 0 ? <b>{pendingOrders}</b> : null}
+                  {item.locked ? <i className="vx-lock" title="Em levantamento de requisitos"><Icon name="lock" size={14} /></i> : null}
                 </button>
               </Fragment>
             ))}
@@ -546,7 +544,7 @@ export function AdminClient() {
                 error={mutationError ?? dataError}
                 onLoadCouriers={http && session.role !== "Kitchen" && session.modules.includes("rastreio") ? () => http.get<CourierContact[]>(`/establishments/${selectedId}/couriers`) : undefined}
                 onMarkPaid={session.role !== "Kitchen" ? markPaid : undefined}
-                onOpenMap={session.role !== "Kitchen" && session.modules.includes("rastreio") ? () => goTo("tracking") : undefined}
+                onOpenMap={session.role !== "Kitchen" && session.modules.includes("rastreio") ? () => goTo("distribution") : undefined}
                 onRefund={canManage && session.modules.includes("pagamentos") ? refundOrder : undefined}
                 onTrack={http && session.role !== "Kitchen" && session.modules.includes("rastreio") ? (orderId, courierId) => http.post<TrackResult>(`/orders/${orderId}/courier`, { courierId: courierId ?? null }) : undefined}
                 onUpdateStatus={updateOrderStatus}
@@ -554,23 +552,19 @@ export function AdminClient() {
               />
             ) : null}
 
-            {tab === "tracking" && hasEstablishment && http ? <LiveDeliveries establishmentId={selectedId} http={http} /> : null}
             {tab === "kitchen" && hasEstablishment ? <Kitchen error={mutationError ?? dataError} onAdvance={updateOrderStatus} onAdvanceItem={http ? advanceItem : undefined} orders={orders} /> : null}
             {tab === "pdv" && hasEstablishment && http ? <Pdv canManage={canManage} establishmentId={selectedId} http={http} menu={menu} onChanged={refreshOrders} orders={orders} /> : null}
-            {tab === "reports" && hasEstablishment && http ? (
-              <>
-                {session.modules.includes("relatorios") ? (
-                  <SubTabs
-                    onChange={setReportView}
-                    options={[
-                      { value: "ratings", label: "Avaliações" },
-                      { value: "sales", label: "Vendas" },
-                    ]}
-                    value={reportView}
-                  />
-                ) : null}
-                {reportView === "sales" && session.modules.includes("relatorios") ? <Reports establishmentId={selectedId} http={http} /> : <Ratings establishmentId={selectedId} http={http} />}
-              </>
+            {(tab === "reports" || tab === "fiscal") && hasEstablishment ? (
+              <section className="locked-module">
+                <span className="locked-icon"><Icon name="lock" size={34} /></span>
+                <p className="eyebrow">{tab === "fiscal" ? "Fiscal" : "Relatórios"}</p>
+                <h2>Em levantamento de requisitos</h2>
+                <p className="muted">
+                  {tab === "fiscal"
+                    ? "A emissão de NFC-e e NF-e, SINTEGRA e SPED estão sendo redefinidas. A tributação de cada produto continua no cadastro de Produtos."
+                    : "Os relatórios estão sendo redefinidos. Enquanto isso, os números do dia estão na Visão geral, no Financeiro e no Estoque."}
+                </p>
+              </section>
             ) : null}
             {tab === "zest" && hasEstablishment && http ? <ZestIa establishmentId={selectedId} http={http} /> : null}
 
@@ -590,10 +584,20 @@ export function AdminClient() {
             ) : null}
 
             {tab === "inventory" && hasEstablishment && http ? <Inventory canImportNfe={session.modules.includes("fiscal")} establishmentId={selectedId} http={http} menu={menu} /> : null}
+            {tab === "products" && hasEstablishment && http ? <Products establishmentId={selectedId} http={http} menu={menu} modules={session.modules} onMenuChanged={refreshMenu} /> : null}
+            {tab === "suppliers" && hasEstablishment && http ? <Suppliers establishmentId={selectedId} http={http} /> : null}
             {tab === "customers" && hasEstablishment && http ? <Customers establishmentId={selectedId} http={http} /> : null}
-            {tab === "distribution" && hasEstablishment && http ? <Distribution establishmentId={selectedId} http={http} modules={session.modules} /> : null}
+            {tab === "distribution" && hasEstablishment && http ? (
+              <Distribution
+                establishmentId={selectedId}
+                http={http}
+                modules={session.modules}
+                onChanged={refreshOrders}
+                onTrack={session.modules.includes("rastreio") ? (orderId, courierId) => http.post<TrackResult>(`/orders/${orderId}/courier`, { courierId }) : undefined}
+                orders={orders}
+              />
+            ) : null}
             {tab === "finance" && hasEstablishment && http ? <Finance establishmentId={selectedId} http={http} /> : null}
-            {tab === "fiscal" && hasEstablishment && http ? <Fiscal establishmentId={selectedId} http={http} modules={session.modules} onOpenInventory={() => goTo("inventory")} /> : null}
 
             {tab === "settings" ? (
               <Settings

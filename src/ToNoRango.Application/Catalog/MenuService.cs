@@ -191,6 +191,7 @@ public sealed class MenuService(
 
             item.ReplaceOptionGroups(MapGroups(request.OptionGroups), now);
             item.SetCompareAtPrice(request.CompareAtPriceInCents, now);
+            item.SetCodes(request.Sku, request.Barcode, request.Unit, now);
             await SaveComboAsync(establishment, item, request.ComboLines, now, cancellationToken);
 
             await menu.AddItemAsync(item, cancellationToken);
@@ -236,6 +237,7 @@ public sealed class MenuService(
                 request.SortOrder,
                 now);
             item.SetCompareAtPrice(request.CompareAtPriceInCents, now);
+            item.SetCodes(request.Sku, request.Barcode, request.Unit, now);
 
             if (request.OptionGroups is not null)
             {

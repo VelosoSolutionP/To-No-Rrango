@@ -18,7 +18,9 @@ public sealed record CustomerDto(
     string? Notes,
     int OrdersCount,
     long TotalOrderedInCents,
-    DateTimeOffset? LastOrderAt)
+    DateTimeOffset? LastOrderAt,
+    bool IsActive = true,
+    DateTimeOffset? CreatedAt = null)
 {
     public static CustomerDto From(Customer customer) => new(
         customer.Id,
@@ -29,7 +31,9 @@ public sealed record CustomerDto(
         customer.Notes,
         customer.OrdersCount,
         customer.TotalOrderedInCents,
-        customer.LastOrderAt);
+        customer.LastOrderAt,
+        customer.IsActive,
+        customer.CreatedAt);
 }
 
 public sealed record SupplierRequest(
@@ -121,6 +125,61 @@ public sealed class PartyService(
             await unitOfWork.SaveChangesAsync(cancellationToken);
 
             return CustomerDto.From(customer);
+        });
+
+    /// <summary>A customer without orders is removed; one with history is only deactivated, so reports keep their names.</summary>
+    public Task<Result<bool>> DeleteCustomerAsync(Guid customerId, CancellationToken cancellationToken) =>
+        Guarded.RunAsync<bool>(async () =>
+        {
+            var customer = await customers.FindAsync(customerId, cancellationToken);
+
+            if (customer is null)
+            {
+                return Result<bool>.Failure(AppErrors.NotFound("customer.not_found", "Cliente não encontrado."));
+            }
+
+            if (customer.OrdersCount == 0)
+            {
+                customers.Remove(customer);
+            }
+            else
+            {
+                customer.SetActive(false, clock.UtcNow);
+            }
+
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return customer.OrdersCount == 0;
+        });
+
+    public Task<Result<CustomerDto>> SetCustomerActiveAsync(Guid customerId, bool isActive, CancellationToken cancellationToken) =>
+        Guarded.RunAsync<CustomerDto>(async () =>
+        {
+            var customer = await customers.FindAsync(customerId, cancellationToken);
+
+            if (customer is null)
+            {
+                return Result<CustomerDto>.Failure(AppErrors.NotFound("customer.not_found", "Cliente não encontrado."));
+            }
+
+            customer.SetActive(isActive, clock.UtcNow);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return CustomerDto.From(customer);
+        });
+
+    /// <summary>Suppliers stay in purchase history: deleting deactivates.</summary>
+    public Task<Result<SupplierDto>> DeleteSupplierAsync(Guid supplierId, CancellationToken cancellationToken) =>
+        Guarded.RunAsync<SupplierDto>(async () =>
+        {
+            var supplier = await suppliers.FindAsync(supplierId, cancellationToken);
+
+            if (supplier is null)
+            {
+                return Result<SupplierDto>.Failure(AppErrors.NotFound("supplier.not_found", "Fornecedor não encontrado."));
+            }
+
+            supplier.Update(supplier.Name, supplier.TradeName, supplier.Document, supplier.Phone, supplier.Email, supplier.Address, false, clock.UtcNow);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return SupplierDto.From(supplier);
         });
 
     public async Task<Result<IReadOnlyList<SupplierDto>>> ListSuppliersAsync(Guid establishmentId, CancellationToken cancellationToken)

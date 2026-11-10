@@ -186,6 +186,9 @@ public sealed class FinancialEntryConfiguration : IEntityTypeConfiguration<Finan
         builder.Property(entry => entry.Source).HasConversion<int>();
         builder.Property(entry => entry.Category).HasMaxLength(60).IsRequired();
         builder.Property(entry => entry.Description).HasMaxLength(200).IsRequired();
+        builder.Property(entry => entry.Counterparty).HasMaxLength(120);
+        builder.Property(entry => entry.DocumentNumber).HasMaxLength(40);
+        builder.Property(entry => entry.SettlementMethod).HasMaxLength(40);
         builder.HasIndex(entry => new { entry.Source, entry.SourceId }).IsUnique().HasFilter("\"SourceId\" IS NOT NULL");
         builder.HasIndex(entry => new { entry.EstablishmentId, entry.DueOn });
         builder.HasIndex(entry => entry.TenantId);

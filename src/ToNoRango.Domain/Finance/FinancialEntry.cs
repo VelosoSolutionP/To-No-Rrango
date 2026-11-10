@@ -36,6 +36,12 @@ public sealed class FinancialEntry : AggregateRoot
     public long AmountInCents { get; private set; }
     public DateOnly DueOn { get; private set; }
     public DateTimeOffset? SettledAt { get; private set; }
+
+    /// <summary>Who pays or receives (customer, supplier) and the document number, as in an ERP title.</summary>
+    public string? Counterparty { get; private set; }
+    public string? DocumentNumber { get; private set; }
+    public string? SettlementMethod { get; private set; }
+    public DateOnly? SettledOn { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
 
     private FinancialEntry() { }
@@ -71,7 +77,9 @@ public sealed class FinancialEntry : AggregateRoot
         CreatedAt = now;
     }
 
-    public void Settle(DateTimeOffset now)
+    public void Settle(DateTimeOffset now) => Settle(now, null, null);
+
+    public void Settle(DateTimeOffset now, string? method, DateOnly? on)
     {
         if (Status != FinancialStatus.Open)
         {
@@ -80,6 +88,28 @@ public sealed class FinancialEntry : AggregateRoot
 
         Status = FinancialStatus.Settled;
         SettledAt = now;
+        SettlementMethod = string.IsNullOrWhiteSpace(method) ? null : Ensure.MaxLength(method.Trim(), 40, nameof(SettlementMethod));
+        SettledOn = on ?? DateOnly.FromDateTime(now.UtcDateTime);
+    }
+
+    public void Describe(string? counterparty, string? documentNumber)
+    {
+        Counterparty = string.IsNullOrWhiteSpace(counterparty) ? null : Ensure.MaxLength(counterparty.Trim(), 120, nameof(Counterparty));
+        DocumentNumber = string.IsNullOrWhiteSpace(documentNumber) ? null : Ensure.MaxLength(documentNumber.Trim(), 40, nameof(DocumentNumber));
+    }
+
+    /// <summary>Reopens a settled title (estorno da baixa).</summary>
+    public void Reopen()
+    {
+        if (Status != FinancialStatus.Settled || Source != FinancialSource.Manual)
+        {
+            throw new InvalidOperationException("Só a baixa de um título manual pode ser estornada aqui.");
+        }
+
+        Status = FinancialStatus.Open;
+        SettledAt = null;
+        SettledOn = null;
+        SettlementMethod = null;
     }
 
     public void Cancel()

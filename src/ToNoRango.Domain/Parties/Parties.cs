@@ -17,6 +17,7 @@ public sealed class Customer : AggregateRoot
     public int OrdersCount { get; private set; }
     public long TotalOrderedInCents { get; private set; }
     public DateTimeOffset? LastOrderAt { get; private set; }
+    public bool IsActive { get; private set; } = true;
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -39,6 +40,12 @@ public sealed class Customer : AggregateRoot
         Document = PartyRules.NormalizeDocument(document);
         Email = PartyRules.Optional(email, 200, nameof(Email));
         Notes = PartyRules.Optional(notes, 500, nameof(Notes));
+        UpdatedAt = now;
+    }
+
+    public void SetActive(bool isActive, DateTimeOffset now)
+    {
+        IsActive = isActive;
         UpdatedAt = now;
     }
 }
