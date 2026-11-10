@@ -611,6 +611,20 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                         .HasMaxLength(44)
                         .HasColumnType("character varying(44)");
 
+                    b.Property<string>("CancelProtocol")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("CancelReason")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<DateTimeOffset?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("ContingencyAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -642,6 +656,14 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<string>("RecipientDocument")
+                        .HasMaxLength(14)
+                        .HasColumnType("character varying(14)");
+
+                    b.Property<string>("RecipientName")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
                     b.Property<int>("Series")
                         .HasColumnType("integer");
 
@@ -669,15 +691,73 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("OrderId")
-                        .IsUnique();
-
                     b.HasIndex("TenantId");
+
+                    b.HasIndex("OrderId", "Model")
+                        .IsUnique();
 
                     b.HasIndex("EstablishmentId", "Model", "Series", "Number", "Environment")
                         .IsUnique();
 
                     b.ToTable("documents", "fiscal");
+                });
+
+            modelBuilder.Entity("ToNoRango.Domain.Fiscal.FiscalNumberGap", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Environment")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("EstablishmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("FromNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Message")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("Model")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Protocol")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<int>("Series")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ToNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Xml")
+                        .HasMaxLength(512)
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("EstablishmentId", "Model", "Series");
+
+                    b.ToTable("number_gaps", "fiscal");
                 });
 
             modelBuilder.Entity("ToNoRango.Domain.Fiscal.FiscalProfile", b =>
@@ -701,6 +781,13 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<DateTimeOffset?>("CertificateExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CertificateSubject")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
                     b.Property<string>("City")
                         .IsRequired()
                         .HasMaxLength(60)
@@ -716,10 +803,31 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                         .HasMaxLength(14)
                         .HasColumnType("character varying(14)");
 
+                    b.Property<string>("CscId")
+                        .HasMaxLength(6)
+                        .HasColumnType("character varying(6)");
+
                     b.Property<string>("District")
                         .IsRequired()
                         .HasMaxLength(60)
                         .HasColumnType("character varying(60)");
+
+                    b.Property<string>("EncryptedCertificate")
+                        .HasMaxLength(512)
+                        .HasColumnType("text");
+
+                    b.Property<string>("EncryptedCertificatePassword")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("EncryptedCscToken")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("Environment")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(2);
 
                     b.Property<Guid>("EstablishmentId")
                         .HasColumnType("uuid");
@@ -731,6 +839,16 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("NextNumber")
                         .HasColumnType("integer");
+
+                    b.Property<int>("NfeNextNumber")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
+                    b.Property<int>("NfeSeries")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
 
                     b.Property<string>("Number")
                         .IsRequired()

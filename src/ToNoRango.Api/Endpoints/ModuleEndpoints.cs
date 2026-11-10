@@ -299,6 +299,26 @@ internal static class ModuleEndpoints
 
     private static void MapFiscalNfce(RouteGroupBuilder group)
     {
+        // Direct emission at the SEFAZ with the store's A1 certificate (no ACBr).
+        group.MapGet($"{Establishment}/fiscal/dfe", async (Guid establishmentId, DfeService service, CancellationToken ct) =>
+            (await service.GetSettingsAsync(establishmentId, ct)).ToHttpResult());
+        group.MapPut($"{Establishment}/fiscal/dfe", async (Guid establishmentId, DfeSettingsRequest request, DfeService service, CancellationToken ct) =>
+            (await service.SaveSettingsAsync(establishmentId, request, ct)).ToHttpResult());
+        group.MapPost($"{Establishment}/fiscal/certificate", async (Guid establishmentId, UploadCertificateRequest request, DfeService service, CancellationToken ct) =>
+            (await service.UploadCertificateAsync(establishmentId, request, ct)).ToHttpResult());
+        group.MapDelete($"{Establishment}/fiscal/certificate", async (Guid establishmentId, DfeService service, CancellationToken ct) =>
+            (await service.RemoveCertificateAsync(establishmentId, ct)).ToHttpResult());
+        group.MapGet($"{Establishment}/fiscal/status", async (Guid establishmentId, int? model, DfeService service, CancellationToken ct) =>
+            (await service.StatusAsync(establishmentId, model ?? 65, ct)).ToHttpResult());
+        group.MapPost($"{Establishment}/fiscal/orders/{{orderId:guid}}/nfe", async (Guid establishmentId, Guid orderId, NfeRecipientRequest request, DfeService service, CancellationToken ct) =>
+            (await service.IssueAsync(establishmentId, orderId, ToNoRango.Domain.Fiscal.FiscalDocument.NfeModel, request, ct)).ToHttpResult());
+        group.MapPost($"{Establishment}/fiscal/documents/{{documentId:guid}}/cancel", async (Guid establishmentId, Guid documentId, CancelNoteRequest request, DfeService service, CancellationToken ct) =>
+            (await service.CancelAsync(establishmentId, documentId, request, ct)).ToHttpResult());
+        group.MapPost($"{Establishment}/fiscal/contingency/send", async (Guid establishmentId, DfeService service, CancellationToken ct) =>
+            (await service.SendContingencyAsync(establishmentId, ct)).ToHttpResult());
+        group.MapPost($"{Establishment}/fiscal/number-gaps", async (Guid establishmentId, NumberGapRequest request, DfeService service, CancellationToken ct) =>
+            (await service.GiveUpNumbersAsync(establishmentId, request, ct)).ToHttpResult());
+
         group.MapGet($"{Establishment}/fiscal", async (Guid establishmentId, FiscalService service, CancellationToken ct) =>
             (await service.GetOverviewAsync(establishmentId, ct)).ToHttpResult());
 

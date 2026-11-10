@@ -19,11 +19,17 @@
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <PackageReference Include="StackExchange.Redis" />
+    <PackageReference Include="Hercules.NET.NFe.NFCe" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\ToNoRango.Application\ToNoRango.Application.csproj" />
     <ProjectReference Include="..\ToNoRango.SharedKernel\ToNoRango.SharedKernel.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Esquemas oficiais da SEFAZ (NF-e 4.00): toda nota é validada contra eles antes de sair. -->
+    <None Include="Fiscal\Schemas\*.xsd" CopyToOutputDirectory="PreserveNewest" LinkBase="Fiscal\Schemas" />
   </ItemGroup>
 
 </Project>

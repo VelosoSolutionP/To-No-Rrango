@@ -38,6 +38,7 @@ public static class DependencyInjection
         services.AddScoped<InventoryService>();
         services.AddScoped<FinanceService>();
         services.AddScoped<ToNoRango.Application.Pdv.PdvService>();
+        services.AddScoped<ToNoRango.Application.Fiscal.DfeService>();
         services.AddScoped<ToNoRango.Application.Feedback.RatingService>();
         services.AddScoped<NfeImportService>();
         services.AddScoped<FiscalService>();

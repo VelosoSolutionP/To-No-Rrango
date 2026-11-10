@@ -74,6 +74,7 @@ public static class DependencyInjection
 
         services.AddHttpClient<ISpeechToText, WhisperSpeechToText>(client => client.Timeout = TimeSpan.FromSeconds(45));
         services.AddSingleton<ITextToSpeech, PiperTextToSpeech>();
+        services.AddSingleton<ToNoRango.Application.Fiscal.IDfeEmitter, Fiscal.ZeusDfeEmitter>();
         services.AddHttpClient<IWhatsAppSender, EvolutionWhatsAppSender>(client =>
         {
             if (!string.IsNullOrWhiteSpace(evolutionBaseUrl))

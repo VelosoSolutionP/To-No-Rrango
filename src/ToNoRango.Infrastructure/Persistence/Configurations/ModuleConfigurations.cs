@@ -343,6 +343,15 @@ public sealed class FiscalProfileConfiguration : IEntityTypeConfiguration<ToNoRa
         builder.Property(profile => profile.AccountantCrc).HasMaxLength(15);
         builder.Property(profile => profile.AccountantEmail).HasMaxLength(115);
         builder.Property(profile => profile.SpedProfile).HasMaxLength(1);
+        builder.Property(profile => profile.EncryptedCertificate).HasColumnType("text");
+        builder.Property(profile => profile.EncryptedCertificatePassword).HasMaxLength(500);
+        builder.Property(profile => profile.CertificateSubject).HasMaxLength(300);
+        builder.Property(profile => profile.CscId).HasMaxLength(6);
+        builder.Property(profile => profile.EncryptedCscToken).HasMaxLength(500);
+        builder.Property(profile => profile.Environment).HasDefaultValue(2);
+        builder.Property(profile => profile.NfeSeries).HasDefaultValue(1);
+        builder.Property(profile => profile.NfeNextNumber).HasDefaultValue(1);
+        builder.Ignore(profile => profile.HasCertificate);
         builder.Ignore(profile => profile.HasAccounting);
         builder.Property<uint>("xmin").IsRowVersion();
         builder.HasIndex(profile => profile.EstablishmentId).IsUnique();
@@ -383,9 +392,14 @@ public sealed class FiscalDocumentConfiguration : IEntityTypeConfiguration<ToNoR
         builder.Property(document => document.Protocol).HasMaxLength(20);
         builder.Property(document => document.Xml).HasColumnType("text");
         builder.Property(document => document.Message).HasMaxLength(2000);
+        builder.Property(document => document.RecipientDocument).HasMaxLength(14);
+        builder.Property(document => document.RecipientName).HasMaxLength(60);
+        builder.Property(document => document.CancelProtocol).HasMaxLength(20);
+        builder.Property(document => document.CancelReason).HasMaxLength(255);
         builder.Ignore(document => document.NumericCode);
         builder.Property<uint>("xmin").IsRowVersion();
-        builder.HasIndex(document => document.OrderId).IsUnique();
+        // One note of each model per order: an NFC-e and, if asked, an NF-e.
+        builder.HasIndex(document => new { document.OrderId, document.Model }).IsUnique();
         builder.HasIndex(document => new { document.EstablishmentId, document.Model, document.Series, document.Number, document.Environment }).IsUnique();
         builder.HasIndex(document => document.TenantId);
     }

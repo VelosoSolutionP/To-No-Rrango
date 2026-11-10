@@ -16,7 +16,11 @@ public enum FiscalDocumentStatus
     /// <summary>Numbered and possibly sent; the SEFAZ answer is not known yet.</summary>
     Processing = 1,
     Authorized = 2,
-    Rejected = 3
+    Rejected = 3,
+    Cancelled = 4,
+
+    /// <summary>NFC-e issued offline while the SEFAZ was out of reach; it must be sent within 24 hours.</summary>
+    Contingency = 5
 }
 
 /// <summary>Issuer data of one establishment. The A1 certificate and the CSC stay in ACBrMonitor.</summary>
@@ -43,6 +47,23 @@ public sealed class FiscalProfile : AggregateRoot
     public string? AccountantCrc { get; private set; }
     public string? AccountantEmail { get; private set; }
     public string? SpedProfile { get; private set; }
+
+    /// <summary>A1 certificate (PFX), encrypted. With it the system talks to the SEFAZ itself, without ACBr.</summary>
+    public string? EncryptedCertificate { get; private set; }
+    public string? EncryptedCertificatePassword { get; private set; }
+    public string? CertificateSubject { get; private set; }
+    public DateTimeOffset? CertificateExpiresAt { get; private set; }
+
+    /// <summary>NFC-e security code (CSC) given by the SEFAZ: id and the encrypted token.</summary>
+    public string? CscId { get; private set; }
+    public string? EncryptedCscToken { get; private set; }
+
+    /// <summary>1 = production, 2 = homologation. Starts in homologation.</summary>
+    public int Environment { get; private set; } = 2;
+    public int NfeSeries { get; private set; } = 1;
+    public int NfeNextNumber { get; private set; } = 1;
+
+    public bool HasCertificate => EncryptedCertificate is not null && EncryptedCertificatePassword is not null;
 
     private FiscalProfile() { }
 
@@ -161,6 +182,59 @@ public sealed class FiscalProfile : AggregateRoot
 
     public int TakeNumber() => NextNumber++;
 
+    public int TakeNfeNumber() => NfeNextNumber++;
+
+    public void SetCertificate(string encryptedPfx, string encryptedPassword, string subject, DateTimeOffset expiresAt)
+    {
+        EncryptedCertificate = Ensure.NotNullOrWhiteSpace(encryptedPfx, nameof(encryptedPfx));
+        EncryptedCertificatePassword = Ensure.NotNullOrWhiteSpace(encryptedPassword, nameof(encryptedPassword));
+        CertificateSubject = Ensure.MaxLength(subject, 300, nameof(subject));
+        CertificateExpiresAt = expiresAt;
+    }
+
+    public void RemoveCertificate()
+    {
+        EncryptedCertificate = null;
+        EncryptedCertificatePassword = null;
+        CertificateSubject = null;
+        CertificateExpiresAt = null;
+    }
+
+    public void SetCsc(string? cscId, string? encryptedToken)
+    {
+        var id = string.IsNullOrWhiteSpace(cscId) ? null : Digits(cscId);
+
+        if (id is not null && (id.Length is < 1 or > 6))
+        {
+            throw new ArgumentException("O identificador do CSC tem até 6 dígitos.", nameof(cscId));
+        }
+
+        CscId = id;
+        EncryptedCscToken = id is null ? null : encryptedToken ?? EncryptedCscToken;
+    }
+
+    public void SetEnvironment(int environment, int nfeSeries, int nfeNextNumber)
+    {
+        if (environment is not (1 or 2))
+        {
+            throw new ArgumentException("Ambiente fiscal: 1 = produção, 2 = homologação.", nameof(environment));
+        }
+
+        if (nfeSeries is < 1 or > 889)
+        {
+            throw new ArgumentException("A série da NF-e vai de 1 a 889.", nameof(nfeSeries));
+        }
+
+        if (nfeNextNumber is < 1 or > 999_999_999)
+        {
+            throw new ArgumentException("Próximo número da NF-e inválido.", nameof(nfeNextNumber));
+        }
+
+        Environment = environment;
+        NfeSeries = nfeSeries;
+        NfeNextNumber = nfeNextNumber;
+    }
+
     private static string? Clean(string? value, int max) =>
         string.IsNullOrWhiteSpace(value) ? null : Ensure.MaxLength(value.Trim(), max, nameof(value));
 
@@ -261,6 +335,7 @@ public sealed class ProductFiscalData : AggregateRoot
 public sealed class FiscalDocument : AggregateRoot
 {
     public const int NfceModel = 65;
+    public const int NfeModel = 55;
 
     public Guid TenantId { get; private set; }
     public Guid EstablishmentId { get; private set; }
@@ -278,6 +353,14 @@ public sealed class FiscalDocument : AggregateRoot
     public long TotalInCents { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
+    public string? RecipientDocument { get; private set; }
+    public string? RecipientName { get; private set; }
+    public string? CancelProtocol { get; private set; }
+    public string? CancelReason { get; private set; }
+    public DateTimeOffset? CancelledAt { get; private set; }
+
+    /// <summary>When the note was signed offline (NFC-e contingency); the SEFAZ counts the 24 hours from here.</summary>
+    public DateTimeOffset? ContingencyAt { get; private set; }
 
     private FiscalDocument() { }
 
@@ -290,8 +373,19 @@ public sealed class FiscalDocument : AggregateRoot
         int number,
         int environment,
         long totalInCents,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        int model = NfceModel,
+        string? recipientDocument = null,
+        string? recipientName = null)
     {
+        if (model is not (NfceModel or NfeModel))
+        {
+            throw new ArgumentException("Modelo fiscal inválido.", nameof(model));
+        }
+
+        Model = model;
+        RecipientDocument = recipientDocument;
+        RecipientName = recipientName;
         Id = GuidV7.New();
         TenantId = Ensure.NotEmpty(tenantId, nameof(TenantId));
         EstablishmentId = Ensure.NotEmpty(establishmentId, nameof(EstablishmentId));
@@ -340,10 +434,107 @@ public sealed class FiscalDocument : AggregateRoot
         UpdatedAt = now;
     }
 
+    /// <summary>Signed offline (NFC-e contingency). The key and XML are final; only the SEFAZ protocol is missing.</summary>
+    public void MarkContingency(string accessKey, string xml, string message, DateTimeOffset now)
+    {
+        Status = FiscalDocumentStatus.Contingency;
+        AccessKey = accessKey;
+        Xml = xml;
+        Message = message;
+        ContingencyAt ??= now;
+        UpdatedAt = now;
+    }
+
+    public void Cancel(string protocol, string reason, string? eventXml, DateTimeOffset now)
+    {
+        if (Status != FiscalDocumentStatus.Authorized)
+        {
+            throw new InvalidOperationException("Só uma nota autorizada pode ser cancelada.");
+        }
+
+        Status = FiscalDocumentStatus.Cancelled;
+        CancelProtocol = protocol;
+        CancelReason = reason;
+        CancelledAt = now;
+        Message = "Cancelada.";
+        Xml = eventXml is null ? Xml : $"{Xml}\n<!-- evento de cancelamento -->\n{eventXml}";
+        UpdatedAt = now;
+    }
+
     public void MarkUnanswered(string message, DateTimeOffset now)
     {
         Status = FiscalDocumentStatus.Processing;
         Message = message;
         UpdatedAt = now;
+    }
+}
+
+public enum NumberGapStatus
+{
+    Pending = 1,
+    Done = 2,
+    Rejected = 3
+}
+
+/// <summary>
+/// A range of numbers given up at the SEFAZ (inutilização): numbers skipped by a failure that
+/// will never be used, so the sequence has no unexplained holes.
+/// </summary>
+public sealed class FiscalNumberGap : AggregateRoot
+{
+    public Guid TenantId { get; private set; }
+    public Guid EstablishmentId { get; private set; }
+    public int Model { get; private set; }
+    public int Series { get; private set; }
+    public int FromNumber { get; private set; }
+    public int ToNumber { get; private set; }
+    public int Environment { get; private set; }
+    public string Reason { get; private set; } = string.Empty;
+    public NumberGapStatus Status { get; private set; }
+    public string? Protocol { get; private set; }
+    public string? Message { get; private set; }
+    public string? Xml { get; private set; }
+    public DateTimeOffset CreatedAt { get; private set; }
+
+    private FiscalNumberGap() { }
+
+    public FiscalNumberGap(Guid tenantId, Guid establishmentId, int model, int series, int fromNumber, int toNumber, int environment, string reason, DateTimeOffset now)
+    {
+        if (model is not (FiscalDocument.NfceModel or FiscalDocument.NfeModel))
+        {
+            throw new ArgumentException("Modelo fiscal inválido.", nameof(model));
+        }
+
+        if (fromNumber < 1 || toNumber < fromNumber || toNumber > 999_999_999)
+        {
+            throw new ArgumentException("Faixa de numeração inválida.", nameof(fromNumber));
+        }
+
+        var why = Ensure.NotNullOrWhiteSpace(reason, nameof(reason)).Trim();
+
+        if (why.Length is < 15 or > 255)
+        {
+            throw new ArgumentException("A justificativa precisa ter de 15 a 255 caracteres.", nameof(reason));
+        }
+
+        Id = GuidV7.New();
+        TenantId = Ensure.NotEmpty(tenantId, nameof(TenantId));
+        EstablishmentId = Ensure.NotEmpty(establishmentId, nameof(EstablishmentId));
+        Model = model;
+        Series = series;
+        FromNumber = fromNumber;
+        ToNumber = toNumber;
+        Environment = environment;
+        Reason = why;
+        Status = NumberGapStatus.Pending;
+        CreatedAt = now;
+    }
+
+    public void Finish(bool accepted, string? protocol, string message, string? xml)
+    {
+        Status = accepted ? NumberGapStatus.Done : NumberGapStatus.Rejected;
+        Protocol = protocol;
+        Message = message;
+        Xml = xml;
     }
 }

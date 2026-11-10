@@ -74,7 +74,11 @@ public sealed record FiscalDocumentDto(
     string? Message,
     long TotalInCents,
     bool HasXml,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int Model = FiscalDocument.NfceModel,
+    string? RecipientName = null,
+    string? CancelReason = null,
+    DateTimeOffset? ContingencyAt = null);
 
 public sealed record FiscalOverviewDto(
     bool IsMonitorConfigured,
@@ -107,6 +111,7 @@ public sealed class FiscalService(
     IRepository<FiscalDocument> documents,
     IRepository<ToNoRango.Domain.Inventory.PurchaseEntry> purchases,
     IFiscalGateway gateway,
+    DfeService dfe,
     IUnitOfWork unitOfWork,
     TimeProvider clock)
 {
@@ -205,14 +210,24 @@ public sealed class FiscalService(
             return ToProduct(item, tax);
         });
 
-    public Task<Result<FiscalDocumentDto>> IssueAsync(Guid establishmentId, Guid orderId, CancellationToken cancellationToken) =>
+    public async Task<Result<FiscalDocumentDto>> IssueAsync(Guid establishmentId, Guid orderId, CancellationToken cancellationToken)
+    {
+        // A store with its own A1 certificate talks to the SEFAZ directly; ACBr stays for whoever already uses it.
+        var own = await profiles.FirstOrDefaultAsync(item => item.EstablishmentId == establishmentId, cancellationToken);
+
+        return own is { HasCertificate: true }
+            ? await dfe.IssueAsync(establishmentId, orderId, FiscalDocument.NfceModel, null, cancellationToken)
+            : await IssueWithAcbrAsync(establishmentId, orderId, cancellationToken);
+    }
+
+    private Task<Result<FiscalDocumentDto>> IssueWithAcbrAsync(Guid establishmentId, Guid orderId, CancellationToken cancellationToken) =>
         Guarded.RunAsync<FiscalDocumentDto>(async () =>
         {
             if (!gateway.IsConfigured)
             {
                 return Result<FiscalDocumentDto>.Failure(AppErrors.Conflict(
                     "fiscal.monitor_off",
-                    "O emissor fiscal (ACBrMonitor) ainda não está ligado. Nenhuma nota foi gerada."));
+                    "Nenhum emissor fiscal configurado: envie o certificado A1 da loja (ou ligue o ACBrMonitor). Nenhuma nota foi gerada."));
             }
 
             var establishment = await establishments.GetByIdAsync(establishmentId, cancellationToken);
@@ -439,7 +454,7 @@ public sealed class FiscalService(
         profile.AccountantEmail,
         profile.SpedProfile);
 
-    private static FiscalDocumentDto ToDto(FiscalDocument document) => new(
+    internal static FiscalDocumentDto ToDto(FiscalDocument document) => new(
         document.Id,
         document.OrderId,
         document.OrderCode,
@@ -452,5 +467,9 @@ public sealed class FiscalService(
         document.Message,
         document.TotalInCents,
         !string.IsNullOrEmpty(document.Xml),
-        document.UpdatedAt);
+        document.UpdatedAt,
+        document.Model,
+        document.RecipientName,
+        document.CancelReason,
+        document.ContingencyAt);
 }

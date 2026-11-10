@@ -22,6 +22,11 @@
     <PackageVersion Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="$(AspNetVersion)" />
   </ItemGroup>
 
+  <ItemGroup Label="Fiscal">
+    <!-- NF-e e NFC-e direto na SEFAZ, sem programa externo. LGPL-2.1: usado como pacote, sem alterar o código dele. -->
+    <PackageVersion Include="Hercules.NET.NFe.NFCe" Version="2026.11.9.1840" />
+  </ItemGroup>
+
   <ItemGroup Label="Persistence">
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="$(AspNetVersion)" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="$(AspNetVersion)" />

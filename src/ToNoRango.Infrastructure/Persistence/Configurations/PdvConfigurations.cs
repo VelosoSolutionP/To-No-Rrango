@@ -77,3 +77,20 @@ public sealed class KnowledgeGapConfiguration : IEntityTypeConfiguration<ToNoRan
         builder.HasIndex(gap => gap.TenantId);
     }
 }
+
+public sealed class FiscalNumberGapConfiguration : IEntityTypeConfiguration<ToNoRango.Domain.Fiscal.FiscalNumberGap>
+{
+    public void Configure(EntityTypeBuilder<ToNoRango.Domain.Fiscal.FiscalNumberGap> builder)
+    {
+        builder.ToTable("number_gaps", "fiscal");
+        builder.HasKey(gap => gap.Id);
+        builder.Property(gap => gap.Id).ValueGeneratedNever();
+        builder.Property(gap => gap.Status).HasConversion<int>();
+        builder.Property(gap => gap.Reason).HasMaxLength(255).IsRequired();
+        builder.Property(gap => gap.Protocol).HasMaxLength(20);
+        builder.Property(gap => gap.Message).HasMaxLength(500);
+        builder.Property(gap => gap.Xml).HasColumnType("text");
+        builder.HasIndex(gap => new { gap.EstablishmentId, gap.Model, gap.Series });
+        builder.HasIndex(gap => gap.TenantId);
+    }
+}

@@ -94,7 +94,7 @@ Menu do painel: Operação (Visão geral, Pedidos, Cozinha, Entregas, PDV), Gest
 - Mercado Pago: credencial de uma loja e compra real.
 - Evolution: instância real (testado só com simulador).
 - Áudio em produção: resolvido no Docker. O serviço `whisper` (whisper.cpp, modelo base, compilado sem AVX porque o servidor não tem) sobe com o sistema, e a imagem da API já traz piper com a voz pt_BR e ffmpeg. Testado nos contêineres: transcrição em 18 s para 3,5 s de fala; voz gerada em ogg/opus.
-- Fiscal: certificado A1, CSC, ACBrMonitor; NF-e de saída (modelo 55), cancelamento, inutilização e contingência da NFC-e **não foram feitos**.
+- Fiscal: emissão direta na SEFAZ (sem ACBr) com a biblioteca gratuita Hercules.NET.NFe.NFCe (LGPL-2.1): NFC-e, NF-e de saída (55), cancelamento, inutilização, contingência offline da NFC-e com envio posterior, teste de comunicação. Certificado A1 e CSC por loja, guardados cifrados. Testado sem a SEFAZ: notas assinadas com certificado de teste, validadas nos esquemas oficiais (XSD 4.00) e assinatura conferida; API testada em cópia do banco (11/11). **Falta transmitir de verdade** com certificado A1 e CSC reais em homologação. O ACBr continua funcionando para loja sem certificado enviado.
 
 ### 6. Testado
 222 testes automatizados; E2E da API (52 de 53 checagens; a que falhou era do próprio teste), E2E no navegador (17 de 18; a falha era de tempo do teste e foi confirmada à mão), E2E de áudio (7 de 7). Tudo numa cópia descartável do banco.

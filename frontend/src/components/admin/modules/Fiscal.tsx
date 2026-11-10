@@ -62,11 +62,40 @@ interface FiscalDocument {
   series: number;
   number: number;
   environment: number;
-  status: "Processing" | "Authorized" | "Rejected";
+  status: "Processing" | "Authorized" | "Rejected" | "Cancelled" | "Contingency";
   accessKey: string | null;
   message: string | null;
   totalInCents: number;
   hasXml: boolean;
+  model?: number;
+  recipientName?: string | null;
+  cancelReason?: string | null;
+}
+
+interface NumberGap {
+  id: string;
+  model: number;
+  series: number;
+  fromNumber: number;
+  toNumber: number;
+  environment: number;
+  reason: string;
+  status: "Pending" | "Done" | "Rejected";
+  protocol: string | null;
+  message: string | null;
+}
+
+interface DfeSettings {
+  hasCertificate: boolean;
+  certificateSubject: string | null;
+  certificateExpiresAt: string | null;
+  environment: number;
+  cscId: string | null;
+  hasCscToken: boolean;
+  nfeSeries: number;
+  nfeNextNumber: number;
+  contingencyPending: number;
+  gaps: NumberGap[];
 }
 
 interface FiscalOverview {
@@ -82,7 +111,18 @@ const statusLabels: Record<FiscalDocument["status"], string> = {
   Processing: "Sem resposta",
   Authorized: "Autorizada",
   Rejected: "Rejeitada",
+  Cancelled: "Cancelada",
+  Contingency: "Contingência (enviar em 24 h)",
 };
+
+function readFileBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+    reader.onerror = () => reject(new Error("Não consegui ler o arquivo."));
+    reader.readAsDataURL(file);
+  });
+}
 
 function ProductRow({ product, onSave, busy }: { product: FiscalProduct; onSave: (product: FiscalProduct) => void; busy: boolean }) {
   const [draft, setDraft] = useState(product);
@@ -128,7 +168,108 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory }: { ht
   const notes = purchases.data?.filter((purchase) => purchase.accessKey) ?? [];
   const data = overview.data;
   const profile = data?.profile ?? null;
-  const canIssue = Boolean(data?.isMonitorConfigured && profile);
+  const dfe = useLoad<DfeSettings | null>(() => (hasNfce ? http.get<DfeSettings>(`${base}/fiscal/dfe`) : Promise.resolve(null)), [establishmentId, hasNfce]);
+  const dfeAction = useAction(async () => {
+    await dfe.reload();
+    await overview.reload();
+  });
+  const direct = dfe.data?.hasCertificate ?? false;
+  const canIssue = Boolean((data?.isMonitorConfigured || direct) && profile);
+  const [nfeFor, setNfeFor] = useState<PendingOrder | null>(null);
+  const [sefaz, setSefaz] = useState<string | null>(null);
+
+  async function uploadCertificate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const element = event.currentTarget;
+    const form = new FormData(element);
+    const file = form.get("pfx");
+
+    if (!(file instanceof File) || file.size === 0) {
+      return;
+    }
+
+    const pfxBase64 = await readFileBase64(file);
+    const done = await dfeAction.run(() => http.post(`${base}/fiscal/certificate`, { pfxBase64, password: String(form.get("password") ?? "") }));
+
+    if (done) {
+      element.reset();
+    }
+  }
+
+  function saveDfe(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    void dfeAction.run(() =>
+      http.put(`${base}/fiscal/dfe`, {
+        environment: Number(form.get("environment")),
+        cscId: text(form, "cscId"),
+        cscToken: text(form, "cscToken"),
+        nfeSeries: Number(form.get("nfeSeries")) || 1,
+        nfeNextNumber: Number(form.get("nfeNextNumber")) || 1,
+      }),
+    );
+  }
+
+  function issueNfe(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!nfeFor) {
+      return;
+    }
+    const form = new FormData(event.currentTarget);
+    void dfeAction
+      .run(() =>
+        http.post(`${base}/fiscal/orders/${nfeFor.orderId}/nfe`, {
+          document: text(form, "document"),
+          name: text(form, "name"),
+          stateRegistration: text(form, "stateRegistration"),
+          street: text(form, "street"),
+          number: text(form, "number"),
+          district: text(form, "district"),
+          cityIbgeCode: text(form, "cityIbgeCode"),
+          city: text(form, "city"),
+          state: text(form, "state"),
+          postalCode: text(form, "postalCode"),
+          email: text(form, "email"),
+        }),
+      )
+      .then((done) => done && setNfeFor(null));
+  }
+
+  function cancelNote(note: FiscalDocument) {
+    const reason = window.prompt("Justificativa do cancelamento (de 15 a 255 caracteres):");
+    if (reason && reason.trim().length >= 15) {
+      void dfeAction.run(() => http.post(`${base}/fiscal/documents/${note.id}/cancel`, { reason: reason.trim() }));
+    } else if (reason) {
+      window.alert("A justificativa precisa ter pelo menos 15 caracteres.");
+    }
+  }
+
+  function giveUpNumbers(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const element = event.currentTarget;
+    const form = new FormData(element);
+    void dfeAction
+      .run(() =>
+        http.post(`${base}/fiscal/number-gaps`, {
+          model: Number(form.get("model")),
+          series: Number(form.get("series")),
+          fromNumber: Number(form.get("fromNumber")),
+          toNumber: Number(form.get("toNumber")),
+          reason: text(form, "reason"),
+        }),
+      )
+      .then((done) => done && element.reset());
+  }
+
+  async function checkSefaz() {
+    setSefaz("Consultando…");
+    try {
+      const answer = await http.get<{ accepted: boolean; message: string }>(`${base}/fiscal/status?model=65`);
+      setSefaz(`${answer.accepted ? "SEFAZ no ar" : "SEFAZ com problema"}: ${answer.message}`);
+    } catch (failure) {
+      setSefaz(failure instanceof Error ? failure.message : "Não foi possível consultar.");
+    }
+  }
 
   function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -207,7 +348,7 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory }: { ht
 
   return (
     <section className="admin-section">
-      <ModuleHeading eyebrow="Fiscal" title="Fiscal" hint={hasNfce ? "NFC-e de venda para Lucro Presumido e Lucro Real." : "Notas de entrada importadas por XML."} />
+      <ModuleHeading eyebrow="Fiscal" title="Fiscal" hint={hasNfce ? "NFC-e e NF-e de venda para Lucro Presumido e Lucro Real." : "Notas de entrada importadas por XML."} />
       <ErrorMessage message={action.error ?? overview.error} />
 
       {data ? (
@@ -217,10 +358,63 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory }: { ht
             <span className="vx-pill"><i />{data.isMonitorConfigured ? (data.environment === 2 ? "Homologação, sem valor fiscal" : "Produção") : "Desligado"}</span>
           </div>
           <p className="muted">
-            {data.isMonitorConfigured
-              ? "Conectado às configurações do ACBrMonitor, onde ficam o certificado A1 e o CSC."
-              : "A emissão fica disponível quando o ACBrMonitor, com o certificado A1 e o CSC da loja, estiver ligado. Enquanto isso, você já pode preencher os dados abaixo."}
+            {direct
+              ? "Emissão direta na SEFAZ com o certificado A1 da loja (sem programa instalado)."
+              : data.isMonitorConfigured
+                ? "Conectado às configurações do ACBrMonitor, onde ficam o certificado A1 e o CSC."
+                : "Envie o certificado A1 da loja abaixo para emitir direto na SEFAZ. Enquanto isso, você já pode preencher os dados do emitente."}
           </p>
+        </article>
+      ) : null}
+
+      {data && profile && dfe.data ? (
+        <article className="card vx-box">
+          <div className="vx-panel-title">
+            <h3>Certificado e SEFAZ</h3>
+            <span className="vx-pill"><i />{dfe.data.environment === 1 ? "Produção" : "Homologação, sem valor fiscal"}</span>
+          </div>
+          <ErrorMessage message={dfeAction.error ?? dfe.error} />
+          {dfe.data.hasCertificate ? (
+            <p>
+              Certificado: <strong>{dfe.data.certificateSubject}</strong>
+              <br />
+              Vence em {dfe.data.certificateExpiresAt ? new Date(dfe.data.certificateExpiresAt).toLocaleDateString("pt-BR") : "—"}{" "}
+              <button className="link-button" disabled={dfeAction.busy} onClick={() => window.confirm("Remover o certificado desta loja?") && void dfeAction.run(() => http.del(`${base}/fiscal/certificate`))} type="button">Remover</button>
+            </p>
+          ) : (
+            <p className="muted">Nenhum certificado enviado. Ele fica guardado criptografado e só é aberto na hora de assinar.</p>
+          )}
+          <form className="module-form" onSubmit={(event) => void uploadCertificate(event)}>
+            <label className="field"><span>Certificado A1 (.pfx)</span><input accept=".pfx,.p12" name="pfx" required type="file" /></label>
+            <Input autoComplete="off" label="Senha do certificado" name="password" required type="password" />
+            <button className="secondary-button" disabled={dfeAction.busy} type="submit">{dfe.data.hasCertificate ? "Trocar certificado" : "Enviar certificado"}</button>
+          </form>
+          <form className="module-form" key={`${dfe.data.environment}-${dfe.data.cscId}-${dfe.data.nfeNextNumber}`} onSubmit={saveDfe}>
+            <label className="field">
+              <span>Ambiente</span>
+              <select defaultValue={dfe.data.environment} name="environment">
+                <option value={2}>Homologação (teste, sem valor fiscal)</option>
+                <option value={1}>Produção</option>
+              </select>
+            </label>
+            <Input defaultValue={dfe.data.cscId ?? ""} label="ID do CSC (NFC-e)" name="cscId" />
+            <Input autoComplete="off" label={dfe.data.hasCscToken ? "CSC (deixe vazio para manter)" : "CSC (código da SEFAZ)"} name="cscToken" type="password" />
+            <Input defaultValue={dfe.data.nfeSeries} label="Série da NF-e" min={1} name="nfeSeries" type="number" />
+            <Input defaultValue={dfe.data.nfeNextNumber} label="Próximo número da NF-e" min={1} name="nfeNextNumber" type="number" />
+            <button className="secondary-button" disabled={dfeAction.busy} type="submit">Salvar</button>
+          </form>
+          {dfe.data.hasCertificate ? (
+            <div className="zest-gap-actions">
+              <button className="link-button" onClick={() => void checkSefaz()} type="button">Testar comunicação com a SEFAZ</button>
+              {sefaz ? <span className="muted">{sefaz}</span> : null}
+            </div>
+          ) : null}
+          {dfe.data.contingencyPending > 0 ? (
+            <p className="form-error">
+              {dfe.data.contingencyPending} NFC-e em contingência aguardando envio (prazo de 24 horas).{" "}
+              <button className="secondary-button" disabled={dfeAction.busy} onClick={() => void dfeAction.run(() => http.post(`${base}/fiscal/contingency/send`))} type="button">Enviar agora</button>
+            </p>
+          ) : null}
         </article>
       ) : null}
 
@@ -289,6 +483,9 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory }: { ht
                       {canIssue ? (
                         <button className="link-button" disabled={action.busy} onClick={() => void action.run(() => http.post(`${base}/fiscal/orders/${order.orderId}/nfce`))} type="button">Emitir NFC-e</button>
                       ) : null}
+                      {direct ? (
+                        <button className="link-button" disabled={dfeAction.busy} onClick={() => setNfeFor(order)} type="button">Emitir NF-e</button>
+                      ) : null}
                     </td>
                   </tr>
                 ))}
@@ -298,21 +495,44 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory }: { ht
         </article>
       ) : null}
 
+      {nfeFor ? (
+        <form className="card module-form" onSubmit={issueNfe}>
+          <h3 className="field-wide">NF-e do pedido {nfeFor.code} — destinatário</h3>
+          <Input label="CPF ou CNPJ *" name="document" required />
+          <Input defaultValue={nfeFor.customerName} label="Nome / razão social *" maxLength={60} name="name" required wide />
+          <Input label="Inscrição estadual (se contribuinte)" name="stateRegistration" />
+          <Input label="Rua *" maxLength={60} name="street" required wide />
+          <Input label="Número *" name="number" required />
+          <Input label="Bairro *" name="district" required />
+          <Input defaultValue={profile?.city} label="Cidade *" name="city" required />
+          <Input defaultValue={profile?.state} label="UF *" maxLength={2} name="state" required />
+          <Input defaultValue={profile?.cityIbgeCode} label="Código IBGE do município *" name="cityIbgeCode" required />
+          <Input label="CEP *" name="postalCode" required />
+          <Input label="E-mail" name="email" type="email" />
+          <button className="secondary-button" onClick={() => setNfeFor(null)} type="button">Cancelar</button>
+          <button className="primary-button" disabled={dfeAction.busy} type="submit">Emitir NF-e</button>
+        </form>
+      ) : null}
+
       {data && data.documents.length > 0 ? (
         <article className="card vx-box">
           <div className="vx-panel-title"><h3>Notas emitidas</h3></div>
           <div className="admin-table-wrap">
             <table className="admin-table">
-              <thead><tr><th>Número</th><th>Pedido</th><th>Situação</th><th>Retorno</th><th className="num">Total</th><th /></tr></thead>
+              <thead><tr><th>Modelo</th><th>Número</th><th>Pedido</th><th>Situação</th><th>Retorno</th><th className="num">Total</th><th /></tr></thead>
               <tbody>
                 {data.documents.map((note) => (
                   <tr key={note.id}>
+                    <td>{note.model === 55 ? "NF-e" : "NFC-e"}</td>
                     <td>{note.series}/{note.number}</td>
                     <td>{note.orderCode}</td>
                     <td>{statusLabels[note.status]}{note.environment === 2 ? " (homologação)" : ""}</td>
                     <td>{note.message ?? "—"}</td>
                     <td className="num">{formatBRL(note.totalInCents)}</td>
-                    <td className="table-actions">{note.hasXml ? <button className="link-button" disabled={action.busy} onClick={() => downloadXml(note)} type="button">Baixar XML</button> : null}</td>
+                    <td className="table-actions">
+                      {note.hasXml ? <button className="link-button" disabled={action.busy} onClick={() => downloadXml(note)} type="button">Baixar XML</button> : null}
+                      {direct && note.status === "Authorized" ? <button className="link-button" disabled={dfeAction.busy} onClick={() => cancelNote(note)} type="button">Cancelar</button> : null}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -351,10 +571,39 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory }: { ht
         </div>
       ) : null}
 
+      {direct && dfe.data ? (
+        <article className="card vx-box">
+          <div className="vx-panel-title"><h3>Inutilizar numeração</h3></div>
+          <p className="muted">Use quando números foram pulados e nunca serão usados. A SEFAZ registra a faixa como inutilizada.</p>
+          <form className="module-form" onSubmit={giveUpNumbers}>
+            <label className="field"><span>Modelo</span><select name="model"><option value={65}>NFC-e (65)</option><option value={55}>NF-e (55)</option></select></label>
+            <Input defaultValue={1} label="Série" min={1} name="series" required type="number" />
+            <Input label="Do número" min={1} name="fromNumber" required type="number" />
+            <Input label="Até o número" min={1} name="toNumber" required type="number" />
+            <Input label="Justificativa (mín. 15 caracteres)" maxLength={255} minLength={15} name="reason" required wide />
+            <button className="secondary-button" disabled={dfeAction.busy} type="submit">Inutilizar</button>
+          </form>
+          {dfe.data.gaps.length > 0 ? (
+            <table className="admin-table">
+              <tbody>
+                {dfe.data.gaps.map((gap) => (
+                  <tr key={gap.id}>
+                    <td>{gap.model === 55 ? "NF-e" : "NFC-e"} série {gap.series}</td>
+                    <td>{gap.fromNumber} a {gap.toNumber}</td>
+                    <td>{gap.status === "Done" ? `Inutilizada (${gap.protocol})` : gap.status === "Rejected" ? "Recusada" : "Pendente"}</td>
+                    <td>{gap.message}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : null}
+        </article>
+      ) : null}
+
       <article className="card vx-box">
         <div className="vx-panel-title"><h3>Ainda não disponível</h3></div>
         <ul className="vx-unavailable">
-          <li><strong>Cancelamento de NFC-e e NF-e modelo 55</strong><span>Entram depois da homologação da NFC-e.</span></li>
+          <li><strong>Transmissão real à SEFAZ</strong><span>Pronta, mas só testada com certificado de teste e validação nos esquemas oficiais. Falta homologar com um certificado A1 real.</span></li>
           <li><strong>IBS e CBS</strong><span>Ainda não enviados na nota; dependem da validação em homologação.</span></li>
           <li><strong>SPED Contribuições do Lucro Real</strong><span>Exige apuração de créditos, ainda não implementada.</span></li>
         </ul>
