@@ -56,6 +56,8 @@ builder.Services.AddRateLimiter(options =>
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     options.AddPolicy("login", context => FixedWindowByIp(context, 10));
     options.AddPolicy("public", context => FixedWindowByIp(context, 60));
+    // ZEST relays every customer from one address, so it gets a larger window.
+    options.AddPolicy("zest", context => FixedWindowByIp(context, 1200));
 });
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>

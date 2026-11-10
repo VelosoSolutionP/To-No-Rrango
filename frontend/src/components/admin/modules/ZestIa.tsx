@@ -13,6 +13,15 @@ interface Gap {
   lastAskedAt: string;
 }
 
+interface Connection {
+  isConnected: boolean;
+  keyHint: string | null;
+  createdAt: string | null;
+  lastUsedAt: string | null;
+  messagesRelayed: number;
+  endpoint: string | null;
+}
+
 interface Knowledge {
   id: string;
   topic: string;
@@ -33,6 +42,20 @@ export function ZestIa({ http, establishmentId }: { http: AdminHttp; establishme
     await knowledge.reload();
   });
   const [answering, setAnswering] = useState<Gap | null>(null);
+  const connection = useLoad(() => http.get<Connection>(`/establishments/${establishmentId}/zest/connector`), [establishmentId]);
+  const [newKey, setNewKey] = useState<string | null>(null);
+  const connectorAction = useAction(connection.reload);
+
+  async function createKey() {
+    if (connection.data?.isConnected && !window.confirm("Gerar uma chave nova desliga a anterior na hora. Continuar?")) {
+      return;
+    }
+
+    await connectorAction.run(async () => {
+      const created = await http.post<{ key: string }>(`/establishments/${establishmentId}/zest/connector/key`);
+      setNewKey(created.key);
+    });
+  }
 
   async function teach(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -65,7 +88,53 @@ export function ZestIa({ http, establishmentId }: { http: AdminHttp; establishme
         title="ZEST IA"
         hint="Perguntas dos clientes que ficaram sem resposta. Responda uma vez e o atendimento passa a usar a sua resposta."
       />
-      <ErrorMessage message={gaps.error ?? knowledge.error ?? action.error} />
+      <ErrorMessage message={gaps.error ?? knowledge.error ?? action.error ?? connection.error ?? connectorAction.error} />
+
+      <article className="card zest-teach">
+        <h3>Conexão com o ZEST</h3>
+        <p className="muted">
+          A IA roda no ZEST. Ele manda aqui a mensagem do cliente (texto ou áudio) e recebe as respostas para entregar: cardápio, pedido, pagamento e
+          acompanhamento saem dos dados desta loja.
+        </p>
+        {connection.data?.isConnected ? (
+          <p>
+            Conectado · chave terminada em <strong>{connection.data.keyHint}</strong> · {connection.data.messagesRelayed} mensagem(ns)
+            {connection.data.lastUsedAt ? ` · última em ${formatDateTime(connection.data.lastUsedAt)}` : " · ainda não usada"}
+          </p>
+        ) : (
+          <p className="muted">Ainda não conectado.</p>
+        )}
+        {newKey ? (
+          <div className="zest-key">
+            <strong>Copie agora: esta chave não aparece de novo.</strong>
+            <code>{newKey}</code>
+            <button className="secondary-button" onClick={() => void navigator.clipboard?.writeText(newKey)} type="button">Copiar chave</button>
+          </div>
+        ) : null}
+        {connection.data?.endpoint ? (
+          <pre className="zest-snippet">{`POST ${connection.data.endpoint}
+X-Zest-Key: <chave>
+Content-Type: application/json
+
+{ "phone": "5511999998888", "name": "Cliente",
+  "text": "quero pedir",            // ou
+  "audioBase64": "<ogg em base64>", "audioMime": "audio/ogg",
+  "messageId": "id-da-mensagem" }
+
+→ { "replies": [ { "text": "...", "imageBase64": null, "audioBase64": null } ],
+    "handoff": false }`}</pre>
+        ) : null}
+        <div className="zest-gap-actions">
+          {connection.data?.isConnected ? (
+            <button className="link-button" disabled={connectorAction.busy} onClick={() => window.confirm("Desconectar o ZEST desta loja?") && void connectorAction.run(() => http.del(`/establishments/${establishmentId}/zest/connector`))} type="button">
+              Desconectar
+            </button>
+          ) : null}
+          <button className="primary-button" disabled={connectorAction.busy} onClick={() => void createKey()} type="button">
+            {connection.data?.isConnected ? "Gerar chave nova" : "Gerar chave de conexão"}
+          </button>
+        </div>
+      </article>
 
       <h3>Perguntas sem resposta</h3>
       {gaps.data?.length === 0 ? <Empty>Nenhuma pergunta pendente.</Empty> : null}

@@ -123,6 +123,13 @@ internal static class ModuleEndpoints
     {
         var webhooks = app.MapGroup("/api/webhooks").WithTags("Webhooks").AllowAnonymous();
 
+        // ZEST relays customer messages here and delivers the replies; the store key goes in X-Zest-Key.
+        app.MapPost("/api/zest/{establishmentId:guid}/messages", async (Guid establishmentId, ConnectorMessageRequest request, HttpContext http, ZestConnectorService service, CancellationToken ct) =>
+            (await service.RelayAsync(establishmentId, http.Request.Headers["X-Zest-Key"].ToString(), request, ct)).ToHttpResult())
+            .WithTags("ZEST")
+            .AllowAnonymous()
+            .RequireRateLimiting("zest");
+
         webhooks.MapPost("/mercadopago/{establishmentId:guid}", async (Guid establishmentId, HttpContext http, PaymentService service, CancellationToken ct) =>
         {
             var type = http.Request.Query["type"].ToString();
@@ -389,6 +396,13 @@ internal static class ModuleEndpoints
 
         group.MapGet($"{Establishment}/zest/stats", async (Guid establishmentId, ZestSalesService service, CancellationToken ct) =>
             (await service.GetStatsAsync(establishmentId, ct)).ToHttpResult());
+
+        group.MapGet($"{Establishment}/zest/connector", async (Guid establishmentId, ZestConnectorService service, CancellationToken ct) =>
+            (await service.GetAsync(establishmentId, ct)).ToHttpResult());
+        group.MapPost($"{Establishment}/zest/connector/key", async (Guid establishmentId, ZestConnectorService service, CancellationToken ct) =>
+            (await service.CreateKeyAsync(establishmentId, ct)).ToHttpResult());
+        group.MapDelete($"{Establishment}/zest/connector", async (Guid establishmentId, ZestConnectorService service, CancellationToken ct) =>
+            (await service.DisconnectAsync(establishmentId, ct)).ToHttpResult());
 
         group.MapGet($"{Establishment}/zest/gaps", async (Guid establishmentId, ZestService service, CancellationToken ct) =>
             (await service.ListGapsAsync(establishmentId, ct)).ToHttpResult());

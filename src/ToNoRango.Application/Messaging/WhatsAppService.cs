@@ -49,6 +49,14 @@ public sealed record StaffMessageRequest(string Text);
 
 public sealed record SetBotRequest(bool Paused);
 
+/// <summary>A customer message relayed by ZEST. Audio goes as base64 (ogg/opus from WhatsApp, or any format ffmpeg reads).</summary>
+public sealed record ConnectorMessageRequest(string Phone, string? Name, string? Text, string? AudioBase64, string? AudioMime, string? MessageId);
+
+/// <summary>One reply to deliver: text, an image (Pix QR Code) or a voice note (ogg/opus).</summary>
+public sealed record ConnectorReply(string? Text, string? ImageBase64, string? AudioBase64);
+
+public sealed record ConnectorReplyDto(IReadOnlyList<ConnectorReply> Replies, bool Handoff, bool Duplicate = false);
+
 public sealed record InboundWhatsApp(string ExternalId, string Phone, string? PushName, string? Text, bool IsAudio, string? AudioBase64 = null, string? AudioMime = null);
 
 public static class EvolutionWebhookParser
@@ -467,13 +475,71 @@ public sealed class WhatsAppService(
                 return Result<bool>.Failure(CommonErrors.EstablishmentNotFound);
             }
 
+            var autoReply = settings.AutoReply && sender.IsConfigured && settings.IsReady;
+            await ProcessInboundAsync(establishment, settings, inbound, autoReply, cancellationToken);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+
+            return true;
+        });
+
+    /// <summary>
+    /// ZEST relays a customer message (text or audio) and gets the replies back instead of them
+    /// being sent through Evolution. The conversation, sale and history are the same as WhatsApp.
+    /// </summary>
+    public Task<Result<ConnectorReplyDto>> RelayFromZestAsync(Establishment establishment, ConnectorMessageRequest request, CancellationToken cancellationToken) =>
+        Guarded.RunAsync<ConnectorReplyDto>(async () =>
+        {
+            var phone = PhoneNumber.Digits(request.Phone);
+
+            if (phone.Length < 10)
+            {
+                return Result<ConnectorReplyDto>.Failure(AppErrors.Validation("Telefone do cliente inválido."));
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Text) && string.IsNullOrWhiteSpace(request.AudioBase64))
+            {
+                return Result<ConnectorReplyDto>.Failure(AppErrors.Validation("Envie texto ou áudio."));
+            }
+
+            var externalId = string.IsNullOrWhiteSpace(request.MessageId) ? $"zest-{Guid.NewGuid():N}" : $"zest-{request.MessageId.Trim()}";
+            externalId = externalId.Length > 120 ? externalId[..120] : externalId;
+
+            if (await messages.AnyAsync(message => message.EstablishmentId == establishment.Id && message.ExternalId == externalId, cancellationToken))
+            {
+                return new ConnectorReplyDto([], false, Duplicate: true);
+            }
+
+            var settings = await settingsRepository.FirstOrDefaultAsync(item => item.EstablishmentId == establishment.Id, cancellationToken);
+            var inbound = new InboundWhatsApp(
+                externalId,
+                phone,
+                request.Name,
+                request.Text,
+                !string.IsNullOrWhiteSpace(request.AudioBase64),
+                request.AudioBase64,
+                request.AudioMime);
+
+            _collected = [];
+            var handoff = await ProcessInboundAsync(establishment, settings, inbound, true, cancellationToken);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+
+            var replies = _collected;
+            _collected = null;
+            return new ConnectorReplyDto(replies, handoff);
+        });
+
+    /// <summary>Stores the customer message, transcribes audio and answers with the sale or the store's knowledge. Returns true when the bot handed over to a person.</summary>
+    private async Task<bool> ProcessInboundAsync(Establishment establishment, WhatsAppSettings? settings, InboundWhatsApp inbound, bool autoReply, CancellationToken cancellationToken)
+    {
+        var establishmentId = establishment.Id;
+        var tenantId = establishment.TenantId;
             var now = clock.UtcNow;
             var key = PhoneNumber.Key(inbound.Phone);
             var conversation = await conversations.FirstOrDefaultAsync(item => item.EstablishmentId == establishmentId && item.PhoneKey == key, cancellationToken);
 
             if (conversation is null)
             {
-                conversation = new Conversation(settings.TenantId, establishmentId, inbound.Phone, inbound.PushName, now);
+                conversation = new Conversation(tenantId, establishmentId, inbound.Phone, inbound.PushName, now);
                 conversations.Add(conversation);
             }
 
@@ -483,14 +549,12 @@ public sealed class WhatsAppService(
                 : string.IsNullOrWhiteSpace(inbound.Text) ? "[áudio]" : inbound.Text.Trim();
             text = text.Length > 4000 ? text[..4000] : text;
 
-            messages.Add(new ConversationMessage(settings.TenantId, establishmentId, conversation.Id, MessageDirection.Inbound, MessageAuthor.Customer, text, inbound.ExternalId, now));
+            messages.Add(new ConversationMessage(tenantId, establishmentId, conversation.Id, MessageDirection.Inbound, MessageAuthor.Customer, text, inbound.ExternalId, now));
             conversation.Touch(text, now);
 
-            if (settings.AutoReply
-                && sender.IsConfigured
-                && settings.IsReady
+            if (autoReply
                 && !conversation.IsBotPaused(now)
-                && await modules.IsAllowedAsync(settings.TenantId, Modules.Ia, cancellationToken))
+                && await modules.IsAllowedAsync(tenantId, Modules.Ia, cancellationToken))
             {
                 if (inbound.IsAudio && heard is null)
                 {
@@ -510,10 +574,8 @@ public sealed class WhatsAppService(
                 }
             }
 
-            await unitOfWork.SaveChangesAsync(cancellationToken);
-
-            return true;
-        });
+        return conversation.IsBotPaused(now);
+    }
 
     /// <summary>A sale takes priority; only a message outside a sale is answered as a question.</summary>
     private async Task ReplyWithZestAsync(
@@ -584,6 +646,7 @@ public sealed class WhatsAppService(
         }
     }
 
+    private List<ConnectorReply>? _collected;
     private bool _replyVoice;
     private string? _replyPrefix;
     private readonly List<string> _toSpeak = [];
@@ -601,7 +664,11 @@ public sealed class WhatsAppService(
 
         var audio = await voice.SpeakAsync(spoken, cancellationToken);
 
-        if (audio is not null)
+        if (audio is not null && _collected is not null)
+        {
+            _collected.Add(new ConnectorReply(null, null, audio));
+        }
+        else if (audio is not null)
         {
             outbox.Add(new OutboundMessage(conversation.TenantId, conversation.EstablishmentId, conversation.Phone, string.Empty, now.AddMilliseconds(5), audioBase64: audio, audioMimeType: "audio/ogg; codecs=opus"));
         }
@@ -617,7 +684,15 @@ public sealed class WhatsAppService(
 
         var message = new ConversationMessage(conversation.TenantId, conversation.EstablishmentId, conversation.Id, MessageDirection.Outbound, author, text, null, now);
         messages.Add(message);
-        outbox.Add(new OutboundMessage(conversation.TenantId, conversation.EstablishmentId, conversation.Phone, text, now, imageBase64));
+
+        if (_collected is not null)
+        {
+            _collected.Add(new ConnectorReply(text, imageBase64, null));
+        }
+        else
+        {
+            outbox.Add(new OutboundMessage(conversation.TenantId, conversation.EstablishmentId, conversation.Phone, text, now, imageBase64));
+        }
         conversation.Touch(text, now);
 
         // Whoever spoke gets an answer they can listen to; the text stays for links, codes and totals.
@@ -630,7 +705,7 @@ public sealed class WhatsAppService(
     }
 
     /// <summary>Gets the words of a voice note. Null when there is no transcription server or nothing was understood.</summary>
-    private async Task<string?> TranscribeAsync(WhatsAppSettings settings, InboundWhatsApp inbound, CancellationToken cancellationToken)
+    private async Task<string?> TranscribeAsync(WhatsAppSettings? settings, InboundWhatsApp inbound, CancellationToken cancellationToken)
     {
         if (!listener.IsConfigured)
         {
@@ -640,7 +715,7 @@ public sealed class WhatsAppService(
         var base64 = inbound.AudioBase64;
         var mime = inbound.AudioMime ?? "audio/ogg";
 
-        if (base64 is null && settings.IsReady && sender.IsConfigured)
+        if (base64 is null && settings is { IsReady: true } && sender.IsConfigured)
         {
             try
             {

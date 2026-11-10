@@ -94,3 +94,17 @@ public sealed class FiscalNumberGapConfiguration : IEntityTypeConfiguration<ToNo
         builder.HasIndex(gap => gap.TenantId);
     }
 }
+
+public sealed class ZestConnectionConfiguration : IEntityTypeConfiguration<ToNoRango.Domain.Zest.ZestConnection>
+{
+    public void Configure(EntityTypeBuilder<ToNoRango.Domain.Zest.ZestConnection> builder)
+    {
+        builder.ToTable("connections", "zest");
+        builder.HasKey(connection => connection.Id);
+        builder.Property(connection => connection.Id).ValueGeneratedNever();
+        builder.Property(connection => connection.KeyHash).HasMaxLength(64).IsRequired();
+        builder.Property(connection => connection.KeyHint).HasMaxLength(12).IsRequired();
+        builder.HasIndex(connection => connection.EstablishmentId).IsUnique();
+        builder.HasIndex(connection => connection.TenantId);
+    }
+}

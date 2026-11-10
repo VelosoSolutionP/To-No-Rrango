@@ -2235,6 +2235,46 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                     b.ToTable("knowledge_gaps", "zest");
                 });
 
+            modelBuilder.Entity("ToNoRango.Domain.Zest.ZestConnection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EstablishmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("KeyHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("KeyHint")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)");
+
+                    b.Property<DateTimeOffset?>("LastUsedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("MessagesRelayed")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EstablishmentId")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("connections", "zest");
+                });
+
             modelBuilder.Entity("ToNoRango.Domain.Catalog.MenuComboLine", b =>
                 {
                     b.HasOne("ToNoRango.Domain.Catalog.MenuCombo", null)

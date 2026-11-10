@@ -87,6 +87,8 @@ Cardápio, carrinho, checkout, Mercado Pago (Pix, cartão, link), webhook, venda
 | Áudio: transcrição com whisper local e resposta em voz com piper (pt_BR) | `Speech.cs`, `WhatsAppService` | E2E com simulador da Evolution: nota de voz → texto → venda → texto e nota de voz enviados |
 | Perguntas sem resposta (lacunas) e tela para responder | `KnowledgeGap`, aba ZEST IA | E2E |
 
+| Conector ZEST: chave por loja (guardada só como hash), rota `POST /api/zest/{loja}/messages` com `X-Zest-Key`, texto ou áudio, respostas em texto, imagem (Pix) e voz, histórico no painel, mensagem repetida ignorada | `ZestConnectorService`, aba ZEST IA | E2E em cópia do banco: venda completa por texto até o pedido, áudio com resposta em voz, atendente (18/18) |
+
 ### 4. Refatorado
 Menu do painel: Operação (Visão geral, Pedidos, Cozinha, Entregas, PDV), Gestão (Cardápio, Estoque, Clientes, Distribuição, Financeiro, Fiscal, Relatórios), Inteligência (ZEST IA), Ajustes (Configurações).
 

@@ -292,6 +292,15 @@ public class ZestSalesFlowV1Tests
     }
 
     [Fact]
+    public async Task ListaDeItens_EntendeQuantidadeAntesDoNome()
+    {
+        var turn = await Talk(Catalog(), "quero pedir", "1", "quero 2 x burger");
+
+        Assert.Equal(SalesStep.CartReview, turn.State.Step);
+        Assert.Equal(2, turn.State.Cart.Single().Quantity);
+    }
+
+    [Fact]
     public async Task Busca_SemResultadoAvisaEMostraCategorias()
     {
         var turn = await Talk(Catalog(), "buscar pizza");

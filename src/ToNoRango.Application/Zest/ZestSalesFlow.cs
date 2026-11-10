@@ -388,7 +388,8 @@ public static class ZestSalesFlow
             return Retry(state, catalog, "Não encontrei esse item.");
         }
 
-        state.PendingQuantity = quantity;
+        // "quero 1 combo" names the quantity before the item, as at the start of the sale.
+        state.PendingQuantity = quantity ?? (text.All(char.IsAsciiDigit) ? null : ParseQuantityBefore(text));
         state.SearchIds = [];
         return BeginItem(state, item, catalog, null);
     }

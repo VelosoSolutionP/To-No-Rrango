@@ -1749,3 +1749,8 @@
 .hours-row .admin-check { min-width: 120px; }
 .hours-row input[type="time"] { min-height: 40px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2); color: var(--foreground); }
 .hours-row.is-closed { opacity: 0.6; }
+
+/* ---- Conector ZEST ---- */
+.vx .zest-key { display: grid; gap: 0.4rem; padding: 0.8rem; border-radius: 10px; border: 1px solid var(--warning); background: color-mix(in srgb, var(--warning) 10%, var(--surface)); }
+.vx .zest-key code { font-family: var(--mono); font-size: 0.95rem; word-break: break-all; }
+.vx .zest-snippet { margin: 0; padding: 0.8rem; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); font: 12px/1.5 var(--mono); white-space: pre-wrap; overflow-x: auto; }

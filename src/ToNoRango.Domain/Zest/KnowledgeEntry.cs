@@ -75,3 +75,42 @@ public sealed class KnowledgeGap : AggregateRoot
 
     public void Resolve(DateTimeOffset now) => ResolvedAt = now;
 }
+
+/// <summary>
+/// The key ZEST uses to relay customer messages to this store. Only the SHA-256 of the key is
+/// kept; the key itself is shown once, when it is created.
+/// </summary>
+public sealed class ZestConnection : AggregateRoot
+{
+    public Guid TenantId { get; private set; }
+    public Guid EstablishmentId { get; private set; }
+    public string KeyHash { get; private set; } = string.Empty;
+    public string KeyHint { get; private set; } = string.Empty;
+    public DateTimeOffset CreatedAt { get; private set; }
+    public DateTimeOffset? LastUsedAt { get; private set; }
+    public int MessagesRelayed { get; private set; }
+
+    private ZestConnection() { }
+
+    public ZestConnection(Guid tenantId, Guid establishmentId, string keyHash, string keyHint, DateTimeOffset now)
+    {
+        Id = GuidV7.New();
+        TenantId = Ensure.NotEmpty(tenantId, nameof(TenantId));
+        EstablishmentId = Ensure.NotEmpty(establishmentId, nameof(EstablishmentId));
+        Rotate(keyHash, keyHint, now);
+    }
+
+    public void Rotate(string keyHash, string keyHint, DateTimeOffset now)
+    {
+        KeyHash = Ensure.NotNullOrWhiteSpace(keyHash, nameof(keyHash));
+        KeyHint = Ensure.MaxLength(keyHint, 12, nameof(keyHint));
+        CreatedAt = now;
+        LastUsedAt = null;
+    }
+
+    public void Used(DateTimeOffset now)
+    {
+        LastUsedAt = now;
+        MessagesRelayed++;
+    }
+}
