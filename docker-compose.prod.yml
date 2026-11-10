@@ -3,6 +3,8 @@ services:
   api:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
+      # Aplica as migrações do banco ao subir; sem isso o código novo roda com o banco antigo.
+      Database__MigrateOnStartup: "true"
       Admin__ApiKey: "${TNR_ADMIN_KEY:?defina TNR_ADMIN_KEY no .env}"
       App__PublicWebUrl: "https://to-no-rango.velososolution.com.br"
       App__PublicApiUrl: "https://to-no-rango.velososolution.com.br"

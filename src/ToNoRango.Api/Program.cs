@@ -109,7 +109,8 @@ if (app.Configuration.GetValue("Network:TrustForwardedHeaders", false))
     app.UseForwardedHeaders();
 }
 
-if (app.Environment.IsDevelopment())
+// Production turns this on in docker-compose.prod.yml, so a deploy never runs new code on an old schema.
+if (app.Environment.IsDevelopment() || app.Configuration.GetValue("Database:MigrateOnStartup", false))
 {
     using var scope = app.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<ToNoRangoDbContext>();
