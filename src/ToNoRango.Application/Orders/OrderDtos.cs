@@ -19,7 +19,8 @@ public sealed record DeliveryAddressRequest(
     string District,
     string City,
     string State,
-    string PostalCode);
+    string PostalCode,
+    string? Reference = null);
 
 public sealed record CreateOrderItemRequest(
     Guid MenuItemId,
@@ -56,7 +57,14 @@ public sealed record OrderDto(
     DateTimeOffset? CancelledAt,
     string? CancelReason,
     IReadOnlyList<OrderItemDto> Items,
-    IReadOnlyList<OrderStatusHistoryDto> StatusHistory)
+    IReadOnlyList<OrderStatusHistoryDto> StatusHistory,
+    DateTimeOffset? ScheduledFor = null,
+    long DiscountInCents = 0,
+    string? DiscountReason = null,
+    string? TableLabel = null,
+    string? DeliveryReference = null,
+    bool IsRated = false,
+    string? CourierName = null)
 {
     public static OrderDto From(Order order) => new(
         order.Id,
@@ -91,7 +99,14 @@ public sealed record OrderDto(
         order.CancelledAt,
         order.CancelReason,
         order.Items.Select(OrderItemDto.From).ToList(),
-        order.StatusHistory.OrderBy(history => history.ChangedAt).Select(OrderStatusHistoryDto.From).ToList());
+        order.StatusHistory.OrderBy(history => history.ChangedAt).Select(OrderStatusHistoryDto.From).ToList(),
+        order.ScheduledFor,
+        order.DiscountInCents,
+        order.DiscountReason,
+        order.TableLabel,
+        order.DeliveryReference,
+        false,
+        order.CourierName);
 }
 
 public sealed record OrderTrackingDto(
@@ -112,7 +127,12 @@ public sealed record OrderTrackingDto(
     DateTimeOffset? CancelledAt,
     string? CancelReason,
     IReadOnlyList<OrderItemDto> Items,
-    IReadOnlyList<OrderStatusHistoryDto> StatusHistory)
+    IReadOnlyList<OrderStatusHistoryDto> StatusHistory,
+    OrderChannel Channel = OrderChannel.Web,
+    DateTimeOffset? ScheduledFor = null,
+    long DiscountInCents = 0,
+    string? TableLabel = null,
+    string? CourierName = null)
 {
     public static OrderTrackingDto From(Order order) => new(
         order.Code,
@@ -132,7 +152,12 @@ public sealed record OrderTrackingDto(
         order.CancelledAt,
         order.CancelReason,
         order.Items.Select(OrderItemDto.From).ToList(),
-        order.StatusHistory.OrderBy(history => history.ChangedAt).Select(OrderStatusHistoryDto.From).ToList());
+        order.StatusHistory.OrderBy(history => history.ChangedAt).Select(OrderStatusHistoryDto.From).ToList(),
+        order.Channel,
+        order.ScheduledFor,
+        order.DiscountInCents,
+        order.TableLabel,
+        order.CourierName);
 
     private static string MaskPhone(string phone)
     {
@@ -161,7 +186,10 @@ public sealed record OrderItemDto(
     int Quantity,
     string? Notes,
     long TotalInCents,
-    IReadOnlyList<OrderItemOptionDto> Options)
+    IReadOnlyList<OrderItemOptionDto> Options,
+    PrepStation Station = PrepStation.Kitchen,
+    ItemPrepStatus PrepStatus = ItemPrepStatus.Received,
+    DateTimeOffset? PrepUpdatedAt = null)
 {
     public static OrderItemDto From(OrderItem item) => new(
         item.Id,
@@ -171,8 +199,13 @@ public sealed record OrderItemDto(
         item.Quantity,
         item.Notes,
         item.TotalInCents,
-        item.Options.Select(OrderItemOptionDto.From).ToList());
+        item.Options.Select(OrderItemOptionDto.From).ToList(),
+        item.Station,
+        item.PrepStatus,
+        item.PrepUpdatedAt);
 }
+
+public sealed record AdvanceItemRequest(ItemPrepStatus Status);
 
 public sealed record OrderItemOptionDto(string GroupName, string Name, long PriceInCents)
 {

@@ -164,6 +164,12 @@ public interface IWhatsAppSender
 
     Task<(bool Connected, string? Number)> GetStateAsync(string instanceName, CancellationToken cancellationToken);
 
+    /// <summary>Downloads the media of a received message, as base64 with its mime type.</summary>
+    Task<(string Base64, string Mime)?> GetMediaAsync(string instanceName, string apiKey, string messageId, CancellationToken cancellationToken);
+
+    /// <summary>Sends a voice note (ogg/opus in base64).</summary>
+    Task SendAudioAsync(string instanceName, string apiKey, string phone, string audioBase64, CancellationToken cancellationToken);
+
     Task LogoutAsync(string instanceName, CancellationToken cancellationToken);
 }
 
@@ -206,4 +212,22 @@ public sealed record DashboardData(
 public interface IReportQueries
 {
     Task<DashboardData> GetDashboardAsync(Guid establishmentId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken);
+}
+
+/// <summary>Speech to text. Runs on a local whisper server: it only listens, it never decides anything.</summary>
+public interface ISpeechToText
+{
+    bool IsConfigured { get; }
+
+    /// <summary>The words heard, or null when nothing could be understood or the server is out.</summary>
+    Task<string?> TranscribeAsync(byte[] audio, string mime, CancellationToken cancellationToken);
+}
+
+/// <summary>Text to speech in Brazilian Portuguese, for answering a voice note with a voice note.</summary>
+public interface ITextToSpeech
+{
+    bool IsConfigured { get; }
+
+    /// <summary>A voice note in ogg/opus as base64, or null when it could not be made.</summary>
+    Task<string?> SpeakAsync(string text, CancellationToken cancellationToken);
 }

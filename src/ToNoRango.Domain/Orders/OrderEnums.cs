@@ -36,5 +36,27 @@ public enum PaymentStatus
 public enum OrderChannel
 {
     Web = 1,
-    WhatsApp = 2
+    WhatsApp = 2,
+    Pdv = 3
+}
+
+/// <summary>Where an item is made. Drinks are picked at the bar; food is cooked in the kitchen.</summary>
+public enum PrepStation
+{
+    Kitchen = 1,
+    Bar = 2
+}
+
+/// <summary>
+/// The progress of one item. Kitchen items go through every step. Bar items skip the queue and
+/// the finishing step: received, being picked (Preparing), picked (Ready), delivered.
+/// </summary>
+public enum ItemPrepStatus
+{
+    Received = 1,
+    Queued = 2,
+    Preparing = 3,
+    Finishing = 4,
+    Ready = 5,
+    Delivered = 6
 }

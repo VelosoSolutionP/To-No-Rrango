@@ -33,3 +33,45 @@ public sealed class KnowledgeEntry : AggregateRoot
         UpdatedAt = now;
     }
 }
+
+/// <summary>
+/// A question the store's bot could not answer. Repeated questions add up, so the store sees
+/// what customers keep asking and writes the answer once.
+/// </summary>
+public sealed class KnowledgeGap : AggregateRoot
+{
+    public Guid TenantId { get; private set; }
+    public Guid EstablishmentId { get; private set; }
+    public string Question { get; private set; } = string.Empty;
+    public string QuestionKey { get; private set; } = string.Empty;
+    public int Times { get; private set; }
+    public string Source { get; private set; } = string.Empty;
+    public DateTimeOffset FirstAskedAt { get; private set; }
+    public DateTimeOffset LastAskedAt { get; private set; }
+    public DateTimeOffset? ResolvedAt { get; private set; }
+
+    private KnowledgeGap() { }
+
+    public KnowledgeGap(Guid tenantId, Guid establishmentId, string question, string questionKey, string source, DateTimeOffset now)
+    {
+        Id = GuidV7.New();
+        TenantId = Ensure.NotEmpty(tenantId, nameof(TenantId));
+        EstablishmentId = Ensure.NotEmpty(establishmentId, nameof(EstablishmentId));
+        Question = Ensure.MaxLength(Ensure.NotNullOrWhiteSpace(question, nameof(Question)).Trim(), 500, nameof(Question));
+        QuestionKey = Ensure.MaxLength(questionKey, 200, nameof(QuestionKey));
+        Source = Ensure.MaxLength(source, 30, nameof(Source));
+        Times = 1;
+        FirstAskedAt = now;
+        LastAskedAt = now;
+    }
+
+    public void AskedAgain(string question, DateTimeOffset now)
+    {
+        Question = Ensure.MaxLength(question.Trim(), 500, nameof(Question));
+        Times++;
+        LastAskedAt = now;
+        ResolvedAt = null;
+    }
+
+    public void Resolve(DateTimeOffset now) => ResolvedAt = now;
+}

@@ -370,6 +370,12 @@ internal static class ModuleEndpoints
         group.MapGet($"{Establishment}/zest/stats", async (Guid establishmentId, ZestSalesService service, CancellationToken ct) =>
             (await service.GetStatsAsync(establishmentId, ct)).ToHttpResult());
 
+        group.MapGet($"{Establishment}/zest/gaps", async (Guid establishmentId, ZestService service, CancellationToken ct) =>
+            (await service.ListGapsAsync(establishmentId, ct)).ToHttpResult());
+
+        group.MapPost("/zest/gaps/{gapId:guid}/resolve", async (Guid gapId, ZestService service, CancellationToken ct) =>
+            (await service.ResolveGapAsync(gapId, ct)).ToHttpResult());
+
         group.MapPost($"{Establishment}/zest/ask", async (Guid establishmentId, ZestAskRequest request, ZestService service, CancellationToken ct) =>
             (await service.AskAsync(establishmentId, request, ct)).ToHttpResult());
     }

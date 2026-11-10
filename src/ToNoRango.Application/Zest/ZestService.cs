@@ -26,8 +26,14 @@ public sealed record ZestAskRequest(string Message);
 
 public sealed record ZestAnswerDto(ZestIntent Intent, string Text);
 
+public sealed record KnowledgeGapDto(Guid Id, string Question, int Times, string Source, DateTimeOffset FirstAskedAt, DateTimeOffset LastAskedAt)
+{
+    public static KnowledgeGapDto From(KnowledgeGap gap) => new(gap.Id, gap.Question, gap.Times, gap.Source, gap.FirstAskedAt, gap.LastAskedAt);
+}
+
 public sealed class ZestService(
     IRepository<KnowledgeEntry> knowledge,
+    IRepository<KnowledgeGap> gaps,
     IRepository<DeliveryZone> zones,
     IRepository<PaymentSettings> paymentSettings,
     IRepository<Order> orders,
@@ -109,6 +115,55 @@ public sealed class ZestService(
         return await AnswerAsync(establishment, null, request.Message, cancellationToken);
     }
 
+    /// <summary>Keeps a question nobody could answer. The same question adds to its count instead of repeating.</summary>
+    public async Task RecordGapAsync(Establishment establishment, string question, string source, CancellationToken cancellationToken)
+    {
+        var key = ZestBrain.Normalize(question).Trim();
+        key = key.Length > 200 ? key[..200] : key;
+
+        if (key.Length < 3)
+        {
+            return;
+        }
+
+        var gap = await gaps.FirstOrDefaultAsync(item => item.EstablishmentId == establishment.Id && item.QuestionKey == key, cancellationToken);
+
+        if (gap is null)
+        {
+            gaps.Add(new KnowledgeGap(establishment.TenantId, establishment.Id, question.Length > 500 ? question[..500] : question, key, source, clock.UtcNow));
+        }
+        else
+        {
+            gap.AskedAgain(question.Length > 500 ? question[..500] : question, clock.UtcNow);
+        }
+    }
+
+    public async Task<Result<IReadOnlyList<KnowledgeGapDto>>> ListGapsAsync(Guid establishmentId, CancellationToken cancellationToken)
+    {
+        var list = await gaps.ListAsync(
+            gap => gap.EstablishmentId == establishmentId && gap.ResolvedAt == null,
+            gap => gap.Times,
+            cancellationToken,
+            descending: true,
+            take: 200);
+
+        return list.Select(KnowledgeGapDto.From).ToList();
+    }
+
+    public async Task<Result<bool>> ResolveGapAsync(Guid gapId, CancellationToken cancellationToken)
+    {
+        var gap = await gaps.FindAsync(gapId, cancellationToken);
+
+        if (gap is null)
+        {
+            return Result<bool>.Failure(AppErrors.NotFound("zest.gap_not_found", "Pergunta não encontrada."));
+        }
+
+        gap.Resolve(clock.UtcNow);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     /// <summary>Answers from the store's own data. The AI runs inside ZEST, never here.</summary>
     public async Task<ZestAnswerDto> AnswerAsync(Establishment establishment, string? phone, string message, CancellationToken cancellationToken)
     {
@@ -160,6 +215,8 @@ public sealed class ZestService(
             activeZones.Select(zone => new ZestZone(zone.District, zone.FeeInCents)).ToList(),
             items.Select(item => new ZestMenuItem(item.Name, item.PriceInCents, names.GetValueOrDefault(item.CategoryId, "Cardápio"), item.IsAvailable, item.Description)).ToList(),
             entries.Select(entry => new ZestKnowledge(entry.Topic, entry.Answer, entry.Keywords)).ToList(),
-            lastOrder);
+            lastOrder,
+            Domain.Establishments.OpeningSchedule.Describe(establishment.OpeningHours),
+            establishment.IsOpenAt(DateTimeOffset.UtcNow));
     }
 }

@@ -19,6 +19,7 @@ public sealed class MenuItemConfiguration : IEntityTypeConfiguration<MenuItem>
         builder.Property(item => item.ImageUrl).HasMaxLength(500);
         builder.Property(item => item.PriceInCents).IsRequired();
         builder.Property(item => item.SortOrder).IsRequired();
+        builder.Ignore(item => item.IsOnPromotion);
         builder.Property(item => item.CreatedAt).IsRequired();
         builder.Property(item => item.UpdatedAt).IsRequired();
 

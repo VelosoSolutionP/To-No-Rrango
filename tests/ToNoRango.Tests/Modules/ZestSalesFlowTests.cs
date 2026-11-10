@@ -163,11 +163,13 @@ public class ZestSalesFlowTests
     [Fact]
     public async Task Entrega_PeloCepCalculaTaxaEFechaResumo()
     {
-        var turn = await Conversation("quero 1 x burger", "2", "1", "01000-000", "123 apto 4", "1");
+        var turn = await Conversation("quero 1 x burger", "2", "1", "01000-000", "123 apto 4", "perto da padaria", "1");
 
         Assert.Equal(SalesStep.Confirm, turn.State.Step);
         Assert.Equal("Rua A", turn.State.Street);
         Assert.Equal("apto 4", turn.State.Complement);
+        Assert.Equal("perto da padaria", turn.State.Reference);
+        Assert.Contains("Referência: perto da padaria", turn.Reply);
         Assert.Equal(700, turn.State.DeliveryFeeInCents);
         Assert.Contains("R$ 27,00", turn.Reply);
     }

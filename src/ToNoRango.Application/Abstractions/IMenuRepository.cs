@@ -19,4 +19,12 @@ public interface IMenuRepository
     Task<MenuItem?> GetItemAsync(Guid itemId, CancellationToken cancellationToken);
 
     Task AddItemAsync(MenuItem item, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<MenuCombo>> ListCombosAsync(Guid establishmentId, CancellationToken cancellationToken);
+
+    Task<MenuCombo?> GetComboByMenuItemAsync(Guid menuItemId, CancellationToken cancellationToken);
+
+    Task AddComboAsync(MenuCombo combo, CancellationToken cancellationToken);
+
+    void RemoveCombo(MenuCombo combo);
 }

@@ -158,6 +158,8 @@ public sealed class DeliveryTrackingService(
     IEstablishmentRepository establishments,
     IDeliveryTrackingStore store,
     IGeocoder geocoder,
+    IRepository<ToNoRango.Domain.Delivery.Courier> couriers,
+    ToNoRango.SharedKernel.Abstractions.IUnitOfWork unitOfWork,
     TimeProvider clock)
 {
     private const int MaxLiveDeliveries = 100;
@@ -166,6 +168,10 @@ public sealed class DeliveryTrackingService(
     private static readonly CourierSessionDto Finished = new(false, null, null, null);
 
     public Task<Result<TrackingLinkDto>> StartAsync(Guid orderId, CancellationToken cancellationToken) =>
+        StartAsync(orderId, null, cancellationToken);
+
+    /// <summary>Starts the tracking link. When a courier is given, the order records who is delivering it.</summary>
+    public Task<Result<TrackingLinkDto>> StartAsync(Guid orderId, Guid? courierId, CancellationToken cancellationToken) =>
         Guarded.RunAsync<TrackingLinkDto>(async () =>
         {
             var order = await orders.GetByIdAsync(orderId, cancellationToken);
@@ -178,6 +184,19 @@ public sealed class DeliveryTrackingService(
             if (order.FulfillmentType != FulfillmentType.Delivery || IsClosed(order))
             {
                 return Result<TrackingLinkDto>.Failure(AppErrors.Conflict("tracking.not_available", "O rastreio vale só para pedido de entrega em andamento."));
+            }
+
+            if (courierId is Guid chosen && order.CourierId != chosen)
+            {
+                var courier = await couriers.FindAsync(chosen, cancellationToken);
+
+                if (courier is null || courier.EstablishmentId != order.EstablishmentId)
+                {
+                    return Result<TrackingLinkDto>.Failure(AppErrors.NotFound("tracking.courier_not_found", "Entregador não encontrado."));
+                }
+
+                order.AssignCourier(courier.Id, courier.Name, clock.GetUtcNow());
+                await unitOfWork.SaveChangesAsync(cancellationToken);
             }
 
             var existing = await store.FindByOrderAsync(order.Code);

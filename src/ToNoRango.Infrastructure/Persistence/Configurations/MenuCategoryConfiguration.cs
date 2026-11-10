@@ -17,6 +17,7 @@ public sealed class MenuCategoryConfiguration : IEntityTypeConfiguration<MenuCat
         builder.Property(category => category.Description).HasMaxLength(300);
         builder.Property(category => category.SortOrder).IsRequired();
         builder.Property(category => category.CreatedAt).IsRequired();
+        builder.Property(category => category.Station).HasConversion<int>().HasDefaultValue(ToNoRango.Domain.Orders.PrepStation.Kitchen);
         builder.Property(category => category.UpdatedAt).IsRequired();
 
         builder.HasIndex(category => category.TenantId);

@@ -48,6 +48,11 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer");
 
+                    b.Property<int>("Station")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
@@ -63,6 +68,54 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                     b.ToTable("menu_categories", "catalog");
                 });
 
+            modelBuilder.Entity("ToNoRango.Domain.Catalog.MenuCombo", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EstablishmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("MenuItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MenuItemId")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("menu_combos", "catalog");
+                });
+
+            modelBuilder.Entity("ToNoRango.Domain.Catalog.MenuComboLine", b =>
+                {
+                    b.Property<Guid>("MenuComboId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ConstituentMenuItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EstablishmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("MenuComboId", "ConstituentMenuItemId");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("menu_combo_lines", "catalog");
+                });
+
             modelBuilder.Entity("ToNoRango.Domain.Catalog.MenuItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -70,6 +123,9 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid>("CategoryId")
                         .HasColumnType("uuid");
+
+                    b.Property<long?>("CompareAtPriceInCents")
+                        .HasColumnType("bigint");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -312,6 +368,11 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("AcceptsOrdersWhenClosed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
                     b.Property<string>("AddressLine")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
@@ -357,6 +418,10 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
+
+                    b.Property<string>("OpeningHours")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("Phone")
                         .HasMaxLength(30)
@@ -408,6 +473,75 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId");
 
                     b.ToTable("establishments", "establishments");
+                });
+
+            modelBuilder.Entity("ToNoRango.Domain.Feedback.OrderRating", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("CourierCareScore")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("CourierComment")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("CourierId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CourierName")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<int?>("CourierPunctualityScore")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("CourierServiceScore")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EstablishmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("OrderCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("OverallScore")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ProductScore")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ServiceScore")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("StoreComment")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CourierId");
+
+                    b.HasIndex("OrderId")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("EstablishmentId", "CreatedAt");
+
+                    b.ToTable("order_ratings", "feedback");
                 });
 
             modelBuilder.Entity("ToNoRango.Domain.Finance.FinancialEntry", b =>
@@ -1107,6 +1241,9 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
 
+                    b.Property<Guid?>("MediaFileId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
@@ -1135,6 +1272,14 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("Attempts")
                         .HasColumnType("integer");
+
+                    b.Property<string>("AudioBase64")
+                        .HasMaxLength(512)
+                        .HasColumnType("text");
+
+                    b.Property<string>("AudioMimeType")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
 
                     b.Property<DateTimeOffset?>("ClaimedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1171,7 +1316,6 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("Text")
-                        .IsRequired()
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
 
@@ -1271,6 +1415,16 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("ConfirmedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTimeOffset?>("CourierAssignedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CourierId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CourierName")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1315,6 +1469,10 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
 
+                    b.Property<string>("DeliveryReference")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
                     b.Property<string>("DeliveryState")
                         .HasMaxLength(2)
                         .HasColumnType("character varying(2)");
@@ -1322,6 +1480,13 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                     b.Property<string>("DeliveryStreet")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<long>("DiscountInCents")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("DiscountReason")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
 
                     b.Property<Guid>("EstablishmentId")
                         .HasColumnType("uuid");
@@ -1349,6 +1514,9 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("ReadyAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTimeOffset?>("ScheduledFor")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
@@ -1357,6 +1525,10 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
 
                     b.Property<long>("SubtotalInCents")
                         .HasColumnType("bigint");
+
+                    b.Property<string>("TableLabel")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -1413,8 +1585,21 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("OrderId")
                         .HasColumnType("uuid");
 
+                    b.Property<int>("PrepStatus")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
+                    b.Property<DateTimeOffset?>("PrepUpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
+
+                    b.Property<int>("Station")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -1738,6 +1923,111 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                     b.ToTable("payment_settings", "payments");
                 });
 
+            modelBuilder.Entity("ToNoRango.Domain.Pdv.CashMovement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("AmountInCents")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("CashSessionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EstablishmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Method")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("OperatorName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CashSessionId");
+
+                    b.HasIndex("OrderId");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("cash_movements", "pdv");
+                });
+
+            modelBuilder.Entity("ToNoRango.Domain.Pdv.CashSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ClosedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("ClosingNotes")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<long?>("CountedCashInCents")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("EstablishmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long?>("ExpectedCashInCents")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("OpenedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("OpenedBy")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<long>("OpeningAmountInCents")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EstablishmentId")
+                        .IsUnique()
+                        .HasFilter("\"Status\" = 1");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("EstablishmentId", "OpenedAt");
+
+                    b.ToTable("cash_sessions", "pdv");
+                });
+
             modelBuilder.Entity("ToNoRango.Domain.Zest.KnowledgeEntry", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1777,6 +2067,63 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId");
 
                     b.ToTable("knowledge_entries", "zest");
+                });
+
+            modelBuilder.Entity("ToNoRango.Domain.Zest.KnowledgeGap", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EstablishmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("FirstAskedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("LastAskedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Question")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("QuestionKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Times")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("EstablishmentId", "QuestionKey")
+                        .IsUnique();
+
+                    b.ToTable("knowledge_gaps", "zest");
+                });
+
+            modelBuilder.Entity("ToNoRango.Domain.Catalog.MenuComboLine", b =>
+                {
+                    b.HasOne("ToNoRango.Domain.Catalog.MenuCombo", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("MenuComboId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("ToNoRango.Domain.Catalog.MenuOption", b =>
@@ -1860,6 +2207,20 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("ToNoRango.Domain.Pdv.CashMovement", b =>
+                {
+                    b.HasOne("ToNoRango.Domain.Pdv.CashSession", null)
+                        .WithMany("Movements")
+                        .HasForeignKey("CashSessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ToNoRango.Domain.Catalog.MenuCombo", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
             modelBuilder.Entity("ToNoRango.Domain.Catalog.MenuItem", b =>
                 {
                     b.Navigation("OptionGroups");
@@ -1885,6 +2246,11 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("ToNoRango.Domain.Orders.OrderItem", b =>
                 {
                     b.Navigation("Options");
+                });
+
+            modelBuilder.Entity("ToNoRango.Domain.Pdv.CashSession", b =>
+                {
+                    b.Navigation("Movements");
                 });
 #pragma warning restore 612, 618
         }

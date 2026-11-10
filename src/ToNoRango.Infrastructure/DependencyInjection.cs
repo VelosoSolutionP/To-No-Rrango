@@ -72,6 +72,8 @@ public static class DependencyInjection
 
         var evolutionBaseUrl = configuration["Evolution:BaseUrl"];
 
+        services.AddHttpClient<ISpeechToText, WhisperSpeechToText>(client => client.Timeout = TimeSpan.FromSeconds(45));
+        services.AddSingleton<ITextToSpeech, PiperTextToSpeech>();
         services.AddHttpClient<IWhatsAppSender, EvolutionWhatsAppSender>(client =>
         {
             if (!string.IsNullOrWhiteSpace(evolutionBaseUrl))

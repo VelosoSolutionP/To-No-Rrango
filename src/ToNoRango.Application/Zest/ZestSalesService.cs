@@ -72,7 +72,7 @@ public sealed class ZestSalesService(
         string idempotencyKey,
         CancellationToken cancellationToken)
     {
-        var turn = await RunTurnAsync(establishment, state, message, customerName, cancellationToken);
+        var turn = await RunTurnAsync(establishment, state, message, customerName, cancellationToken, phone);
 
         if (turn is null)
         {
@@ -147,9 +147,9 @@ public sealed class ZestSalesService(
             await conversations.CountAsync(conversation => conversation.EstablishmentId == establishmentId && conversation.SalesState != null && conversation.LastMessageAt >= clock.UtcNow.Add(-SaleTimeout), cancellationToken));
     }
 
-    private async Task<SalesTurn?> RunTurnAsync(Establishment establishment, SalesState state, string message, string? customerName, CancellationToken cancellationToken)
+    private async Task<SalesTurn?> RunTurnAsync(Establishment establishment, SalesState state, string message, string? customerName, CancellationToken cancellationToken, string? phone = null)
     {
-        var catalog = await BuildCatalogAsync(establishment, cancellationToken);
+        var catalog = await BuildCatalogAsync(establishment, cancellationToken, phone);
 
         if (state.Step == SalesStep.Idle && !ZestSalesFlow.WantsToOrder(message, catalog))
         {
@@ -192,7 +192,7 @@ public sealed class ZestSalesService(
             state.Notes,
             idempotencyKey,
             delivering
-                ? new DeliveryAddressRequest(state.Street!, state.Number!, state.Complement, state.District!, state.City!, state.State!, state.PostalCode!)
+                ? new DeliveryAddressRequest(state.Street!, state.Number!, state.Complement, state.District!, state.City!, state.State!, state.PostalCode!, state.Reference)
                 : null,
             state.Cart.Select(line => new CreateOrderItemRequest(line.ItemId, line.Quantity, null, line.OptionIds)).ToList());
 
@@ -206,7 +206,10 @@ public sealed class ZestSalesService(
         }
 
         var order = created.Value;
-        var confirmation = $"Pedido *{order.Code}* recebido! Total: {ZestSalesFlow.Money(order.TotalInCents)}.\nAcompanhe: {urls.TrackingUrl(order.Code)}";
+        var scheduled = order.ScheduledFor is { } at
+            ? $"\nA loja está fechada agora: seu pedido ficou *agendado para {ScheduleText(establishment, at)}* e você recebe a confirmação quando ela abrir."
+            : string.Empty;
+        var confirmation = $"Pedido *{order.Code}* recebido! Total: {ZestSalesFlow.Money(order.TotalInCents)}.{scheduled}\nAcompanhe: {urls.TrackingUrl(order.Code)}";
 
         if (state.Payment == "Screen")
         {
@@ -234,10 +237,31 @@ public sealed class ZestSalesService(
             : new ZestSaleResult(new SalesState(), new ZestSaleReply($"{confirmation}\n\nO pagamento por Pix será combinado com o estabelecimento."));
     }
 
-    private async Task<SalesCatalog> BuildCatalogAsync(Establishment establishment, CancellationToken cancellationToken)
+    public static string ScheduleText(Establishment establishment, DateTimeOffset at)
+    {
+        var local = TimeZoneInfo.ConvertTime(at, establishment.ResolveTimeZone());
+        var today = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, establishment.ResolveTimeZone()).Date;
+        string[] days = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
+        var day = local.Date == today ? "hoje" : local.Date == today.AddDays(1) ? "amanhã" : days[(int)local.DayOfWeek];
+
+        return $"{day} às {local:HH\\:mm}";
+    }
+
+    private async Task<SalesCatalog> BuildCatalogAsync(Establishment establishment, CancellationToken cancellationToken, string? phone = null)
     {
         var categories = await menu.ListCategoriesAsync(establishment.Id, false, cancellationToken);
         var items = await menu.ListItemsAsync(establishment.Id, false, cancellationToken);
+        var combos = await menu.ListCombosAsync(establishment.Id, cancellationToken);
+        var names = items.ToDictionary(item => item.Id, item => item.Name);
+
+        string? ComboText(Guid itemId)
+        {
+            var combo = combos.FirstOrDefault(candidate => candidate.MenuItemId == itemId);
+            return combo is null
+                ? null
+                : "Leva: " + string.Join(", ", combo.Lines.Where(line => names.ContainsKey(line.ConstituentMenuItemId))
+                    .Select(line => $"{line.Quantity}x {names[line.ConstituentMenuItemId]}"));
+        }
 
         var sections = categories
             .OrderBy(category => category.SortOrder)
@@ -259,11 +283,14 @@ public sealed class ZestSalesService(
                                 group.Options.OrderBy(option => option.SortOrder)
                                     .Select(option => new SalesOption(option.Id, option.Name, option.PriceInCents, option.IsAvailable))
                                     .ToList()))
-                            .ToList()))
+                            .ToList(),
+                        item.IsOnPromotion ? item.CompareAtPriceInCents : null,
+                        ComboText(item.Id)))
                     .ToList()))
             .ToList();
 
         var online = await payments.GetCheckoutOptionsAsync(establishment.TenantId, establishment.Id, false, cancellationToken);
+        var now = clock.UtcNow;
 
         return new SalesCatalog(
             urls.MenuUrl(establishment.Slug),
@@ -275,7 +302,39 @@ public sealed class ZestSalesService(
             establishment.State,
             establishment.PostalCode,
             online.PixOnline,
-            online.CheckoutLink);
+            online.CheckoutLink,
+            await SavedAddressAsync(establishment, phone, cancellationToken),
+            establishment.IsOpenAt(now),
+            establishment.IsOpenAt(now) || establishment.NextOpeningAfter(now) is not { } next ? null : ScheduleText(establishment, next));
+    }
+
+    /// <summary>The address of the last delivery to this phone, so a returning customer just confirms it.</summary>
+    private async Task<SavedAddress?> SavedAddressAsync(Establishment establishment, string? phone, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(phone))
+        {
+            return null;
+        }
+
+        var key = Domain.Common.PhoneNumber.Key(phone);
+        var last = await orders.ListAsync(
+            order => order.EstablishmentId == establishment.Id && order.CustomerPhoneKey == key && order.FulfillmentType == FulfillmentType.Delivery,
+            order => order.CreatedAt,
+            cancellationToken,
+            descending: true,
+            take: 1);
+
+        return last.Count == 0 || last[0].DeliveryStreet is null
+            ? null
+            : new SavedAddress(
+                last[0].DeliveryStreet!,
+                last[0].DeliveryNumber!,
+                last[0].DeliveryComplement,
+                last[0].DeliveryDistrict!,
+                last[0].DeliveryCity!,
+                last[0].DeliveryState!,
+                last[0].DeliveryPostalCode!,
+                last[0].DeliveryReference);
     }
 
     private sealed class Lookups(Establishment establishment, DeliveryService delivery, ILookupClient client) : ISalesLookups

@@ -11,17 +11,36 @@ public sealed record PublicMenuDto(
         Domain.Establishments.Establishment establishment,
         IReadOnlyList<MenuCategory> categories,
         IReadOnlyList<MenuItem> items) => new(
-            EstablishmentDto.From(establishment),
-            categories
-                .OrderBy(category => category.SortOrder)
-                .ThenBy(category => category.Name)
-                .Select(category => MenuCategoryDto.From(
-                    category,
-                    items.Where(item => item.CategoryId == category.Id)
-                        .OrderBy(item => item.SortOrder)
-                        .ThenBy(item => item.Name)
-                        .ToList()))
-                .ToList());
+        EstablishmentDto.From(establishment),
+        categories
+            .OrderBy(category => category.SortOrder)
+            .ThenBy(category => category.Name)
+            .Select(category => MenuCategoryDto.From(
+                category,
+                items.Where(item => item.CategoryId == category.Id)
+                    .OrderBy(item => item.SortOrder)
+                    .ThenBy(item => item.Name)
+                    .ToList()))
+            .ToList());
+
+    public static PublicMenuDto From(
+        Domain.Establishments.Establishment establishment,
+        IReadOnlyList<MenuCategory> categories,
+        IReadOnlyList<MenuItem> items,
+        IReadOnlyList<MenuCombo> combos,
+        IReadOnlyList<MenuItem> allItems) => new(
+        EstablishmentDto.From(establishment),
+        categories
+            .OrderBy(category => category.SortOrder)
+            .ThenBy(category => category.Name)
+            .Select(category => MenuCategoryDto.From(
+                category,
+                items.Where(item => item.CategoryId == category.Id)
+                    .OrderBy(item => item.SortOrder)
+                    .ThenBy(item => item.Name)
+                    .Select(item => MenuItemDto.From(item, combos, allItems))
+                    .ToList()))
+            .ToList());
 }
 
 public sealed record MenuCategoryDto(
@@ -30,7 +49,8 @@ public sealed record MenuCategoryDto(
     string? Description,
     int SortOrder,
     bool IsActive,
-    IReadOnlyList<MenuItemDto> Items)
+    IReadOnlyList<MenuItemDto> Items,
+    ToNoRango.Domain.Orders.PrepStation Station = ToNoRango.Domain.Orders.PrepStation.Kitchen)
 {
     public static MenuCategoryDto From(MenuCategory category, IReadOnlyList<MenuItem> items) => new(
         category.Id,
@@ -38,7 +58,17 @@ public sealed record MenuCategoryDto(
         category.Description,
         category.SortOrder,
         category.IsActive,
-        items.Select(MenuItemDto.From).ToList());
+        items.Select(MenuItemDto.From).ToList(),
+        category.Station);
+
+    public static MenuCategoryDto From(MenuCategory category, IReadOnlyList<MenuItemDto> items) => new(
+        category.Id,
+        category.Name,
+        category.Description,
+        category.SortOrder,
+        category.IsActive,
+        items,
+        category.Station);
 }
 
 public sealed record MenuItemDto(
@@ -51,7 +81,10 @@ public sealed record MenuItemDto(
     bool IsActive,
     bool IsAvailable,
     int SortOrder,
-    IReadOnlyList<MenuOptionGroupDto> OptionGroups)
+    IReadOnlyList<MenuOptionGroupDto> OptionGroups,
+    IReadOnlyList<MenuComboPartDto>? ComboParts = null,
+    long? ComboSavingsInCents = null,
+    long? CompareAtPriceInCents = null)
 {
     public static MenuItemDto From(MenuItem item) => new(
         item.Id,
@@ -67,8 +100,53 @@ public sealed record MenuItemDto(
             .OrderBy(group => group.SortOrder)
             .ThenBy(group => group.Name)
             .Select(MenuOptionGroupDto.From)
-            .ToList());
+            .ToList(),
+        CompareAtPriceInCents: item.IsOnPromotion ? item.CompareAtPriceInCents : null);
+
+    /// <summary>Builds the combo view, so the menu can show what the combo bundles and how much it saves.</summary>
+    public static MenuItemDto From(MenuItem item, IReadOnlyList<MenuCombo> combos, IReadOnlyList<MenuItem> allItems)
+    {
+        var combo = combos.FirstOrDefault(candidate => candidate.MenuItemId == item.Id);
+
+        if (combo is null)
+        {
+            return From(item);
+        }
+
+        var parts = combo.Lines
+            .Select(line => new { Line = line, Constituent = allItems.FirstOrDefault(candidate => candidate.Id == line.ConstituentMenuItemId) })
+            .Where(part => part.Constituent is not null)
+            .Select(part => new MenuComboPartDto(
+                part.Constituent!.Id,
+                part.Constituent.Name,
+                part.Line.Quantity,
+                part.Constituent.PriceInCents))
+            .ToList();
+
+        var separate = parts.Sum(part => part.PriceInCents * part.Quantity);
+
+        return new MenuItemDto(
+            item.Id,
+            item.CategoryId,
+            item.Name,
+            item.Description,
+            item.ImageUrl,
+            item.PriceInCents,
+            item.IsActive,
+            item.IsAvailable,
+            item.SortOrder,
+            item.OptionGroups
+                .OrderBy(group => group.SortOrder)
+                .ThenBy(group => group.Name)
+                .Select(MenuOptionGroupDto.From)
+                .ToList(),
+            parts,
+            separate > item.PriceInCents ? separate - item.PriceInCents : null,
+            item.IsOnPromotion ? item.CompareAtPriceInCents : null);
+    }
 }
+
+public sealed record MenuComboPartDto(Guid MenuItemId, string Name, int Quantity, long PriceInCents);
 
 public sealed record MenuOptionGroupDto(
     Guid Id,
@@ -108,9 +186,9 @@ public sealed record MenuOptionDto(
         option.SortOrder);
 }
 
-public sealed record CreateCategoryRequest(string Name, string? Description, int SortOrder);
+public sealed record CreateCategoryRequest(string Name, string? Description, int SortOrder, ToNoRango.Domain.Orders.PrepStation? Station = null);
 
-public sealed record UpdateCategoryRequest(string Name, string? Description, int SortOrder);
+public sealed record UpdateCategoryRequest(string Name, string? Description, int SortOrder, ToNoRango.Domain.Orders.PrepStation? Station = null);
 
 public sealed record SetMenuAvailabilityRequest(bool IsAvailable);
 
@@ -124,7 +202,9 @@ public sealed record CreateMenuItemRequest(
     long PriceInCents,
     int SortOrder,
     bool IsAvailable,
-    IReadOnlyList<MenuOptionGroupRequest>? OptionGroups);
+    IReadOnlyList<MenuOptionGroupRequest>? OptionGroups,
+    IReadOnlyList<MenuComboLineRequest>? ComboLines = null,
+    long? CompareAtPriceInCents = null);
 
 public sealed record UpdateMenuItemRequest(
     Guid CategoryId,
@@ -134,7 +214,11 @@ public sealed record UpdateMenuItemRequest(
     long PriceInCents,
     int SortOrder,
     bool IsAvailable,
-    IReadOnlyList<MenuOptionGroupRequest>? OptionGroups);
+    IReadOnlyList<MenuOptionGroupRequest>? OptionGroups,
+    IReadOnlyList<MenuComboLineRequest>? ComboLines = null,
+    long? CompareAtPriceInCents = null);
+
+public sealed record MenuComboLineRequest(Guid MenuItemId, int Quantity);
 
 public sealed record MenuOptionGroupRequest(
     string Name,

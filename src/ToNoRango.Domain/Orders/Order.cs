@@ -43,6 +43,18 @@ public sealed class Order : AggregateRoot
     public string? CancelledBy { get; private set; }
     public DateTimeOffset? PaidAt { get; private set; }
     public DateTimeOffset? StockDeductedAt { get; private set; }
+
+    /// <summary>Set when the order came in while the store was closed: it waits for confirmation and is made at this time.</summary>
+    public DateTimeOffset? ScheduledFor { get; private set; }
+    public long DiscountInCents { get; private set; }
+    public string? DiscountReason { get; private set; }
+
+    /// <summary>The table, for orders eaten at the place.</summary>
+    public string? TableLabel { get; private set; }
+    public string? DeliveryReference { get; private set; }
+    public Guid? CourierId { get; private set; }
+    public string? CourierName { get; private set; }
+    public DateTimeOffset? CourierAssignedAt { get; private set; }
     public IReadOnlyList<OrderItem> Items => _items;
     public IReadOnlyList<OrderStatusHistory> StatusHistory => _statusHistory;
 
@@ -116,7 +128,12 @@ public sealed class Order : AggregateRoot
         return order;
     }
 
-    public OrderItem AddItem(MenuItem item, int quantity, string? notes, IReadOnlyCollection<Guid>? optionIds)
+    public OrderItem AddItem(
+        MenuItem item,
+        int quantity,
+        string? notes,
+        IReadOnlyCollection<Guid>? optionIds,
+        PrepStation station = PrepStation.Kitchen)
     {
         ArgumentNullException.ThrowIfNull(item);
 
@@ -170,7 +187,8 @@ public sealed class Order : AggregateRoot
             item.Name,
             unitPrice,
             quantity,
-            notes);
+            notes,
+            station);
 
         foreach (var option in selectedOptions)
         {
@@ -217,12 +235,18 @@ public sealed class Order : AggregateRoot
         {
             case OrderStatus.Confirmed:
                 ConfirmedAt = now;
+                RaiseItems(ItemPrepStatus.Queued, now);
                 break;
             case OrderStatus.Ready:
                 ReadyAt = now;
+                RaiseItems(ItemPrepStatus.Ready, now);
+                break;
+            case OrderStatus.OutForDelivery:
+                RaiseItems(ItemPrepStatus.Ready, now);
                 break;
             case OrderStatus.Delivered:
                 DeliveredAt = now;
+                RaiseItems(ItemPrepStatus.Delivered, now);
                 break;
             case OrderStatus.Cancelled:
                 CancelledAt = now;
@@ -242,6 +266,96 @@ public sealed class Order : AggregateRoot
             normalizedReason));
     }
 
+    /// <summary>
+    /// Moves one item. Starting an item of a confirmed order puts the order in preparation.
+    /// Returns true when every item is ready, so the caller can mark the whole order ready.
+    /// </summary>
+    public bool AdvanceItem(Guid itemId, ItemPrepStatus target, string? changedBy, DateTimeOffset now)
+    {
+        if (Status is not (OrderStatus.Confirmed or OrderStatus.Preparing))
+        {
+            throw new InvalidOperationException("Só dá para mexer nos itens de um pedido confirmado ou em preparo.");
+        }
+
+        if (target is ItemPrepStatus.Received or ItemPrepStatus.Delivered)
+        {
+            throw new InvalidOperationException("Esta etapa do item muda junto com o pedido.");
+        }
+
+        var item = _items.FirstOrDefault(candidate => candidate.Id == itemId)
+            ?? throw new InvalidOperationException("Item não encontrado neste pedido.");
+
+        item.MoveTo(target, now);
+        UpdatedAt = now;
+
+        if (Status == OrderStatus.Confirmed && target >= ItemPrepStatus.Preparing)
+        {
+            ChangeStatus(OrderStatus.Preparing, changedBy, null, now);
+        }
+
+        return _items.All(candidate => candidate.PrepStatus >= ItemPrepStatus.Ready);
+    }
+
+    /// <summary>Marks an order placed while the store was closed. It stays waiting until the store confirms it.</summary>
+    public void ScheduleFor(DateTimeOffset when, DateTimeOffset now)
+    {
+        ScheduledFor = when;
+        UpdatedAt = now;
+    }
+
+    /// <summary>The customer may pay differently from what was chosen when ordering, as long as it is still unpaid.</summary>
+    public void ChangePaymentMethod(PaymentMethod method, DateTimeOffset now)
+    {
+        if (PaymentStatus != PaymentStatus.Pending)
+        {
+            throw new InvalidOperationException("O pagamento deste pedido já foi resolvido.");
+        }
+
+        PaymentMethod = method;
+        UpdatedAt = now;
+    }
+
+    public void AssignCourier(Guid courierId, string courierName, DateTimeOffset now)
+    {
+        CourierId = Ensure.NotEmpty(courierId, nameof(CourierId));
+        CourierName = Ensure.MaxLength(Ensure.NotNullOrWhiteSpace(courierName, nameof(CourierName)), 120, nameof(CourierName));
+        CourierAssignedAt = now;
+        UpdatedAt = now;
+    }
+
+    public void SetTable(string? tableLabel) =>
+        TableLabel = string.IsNullOrWhiteSpace(tableLabel) ? null : Ensure.MaxLength(tableLabel.Trim(), 20, nameof(TableLabel));
+
+    public void SetDeliveryReference(string? reference) =>
+        DeliveryReference = string.IsNullOrWhiteSpace(reference) ? null : Ensure.MaxLength(reference.Trim(), 150, nameof(DeliveryReference));
+
+    /// <summary>A discount given at the counter. It cannot exceed the products, and needs a reason.</summary>
+    public void ApplyDiscount(long discountInCents, string? reason, DateTimeOffset now)
+    {
+        if (discountInCents < 0 || discountInCents > SubtotalInCents)
+        {
+            throw new ArgumentOutOfRangeException(nameof(discountInCents), "O desconto não pode passar do valor dos produtos.");
+        }
+
+        if (discountInCents > 0 && string.IsNullOrWhiteSpace(reason))
+        {
+            throw new ArgumentException("Informe o motivo do desconto.", nameof(reason));
+        }
+
+        DiscountInCents = discountInCents;
+        DiscountReason = discountInCents == 0 ? null : Ensure.MaxLength(reason!.Trim(), 120, nameof(DiscountReason));
+        RecalculateTotals();
+        UpdatedAt = now;
+    }
+
+    private void RaiseItems(ItemPrepStatus floor, DateTimeOffset now)
+    {
+        foreach (var item in _items)
+        {
+            item.RaiseTo(floor, now);
+        }
+    }
+
     public void SetPaymentStatus(PaymentStatus status, DateTimeOffset now)
     {
         PaymentStatus = status;
@@ -256,6 +370,6 @@ public sealed class Order : AggregateRoot
     private void RecalculateTotals()
     {
         SubtotalInCents = _items.Sum(item => item.TotalInCents);
-        TotalInCents = checked(SubtotalInCents + DeliveryFeeInCents);
+        TotalInCents = checked(SubtotalInCents - DiscountInCents + DeliveryFeeInCents);
     }
 }

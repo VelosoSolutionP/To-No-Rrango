@@ -20,6 +20,8 @@ public sealed class OrderItemConfiguration : IEntityTypeConfiguration<OrderItem>
         builder.Property(item => item.Quantity).IsRequired();
         builder.Property(item => item.Notes).HasMaxLength(500);
         builder.Property(item => item.TotalInCents).IsRequired();
+        builder.Property(item => item.Station).HasConversion<int>().HasDefaultValue(ToNoRango.Domain.Orders.PrepStation.Kitchen);
+        builder.Property(item => item.PrepStatus).HasConversion<int>().HasDefaultValue(ToNoRango.Domain.Orders.ItemPrepStatus.Received);
 
         builder.HasIndex(item => item.TenantId);
         builder.HasIndex(item => item.OrderId);

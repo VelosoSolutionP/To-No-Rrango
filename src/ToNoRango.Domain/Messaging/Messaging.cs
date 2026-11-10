@@ -96,6 +96,8 @@ public sealed class OutboundMessage : AggregateRoot
     public string Phone { get; private set; } = string.Empty;
     public string Text { get; private set; } = string.Empty;
     public string? ImageBase64 { get; private set; }
+    public string? AudioBase64 { get; private set; }
+    public string? AudioMimeType { get; private set; }
     public OutboundStatus Status { get; private set; }
     public int Attempts { get; private set; }
     public string? LastError { get; private set; }
@@ -106,14 +108,25 @@ public sealed class OutboundMessage : AggregateRoot
 
     private OutboundMessage() { }
 
-    public OutboundMessage(Guid tenantId, Guid establishmentId, string phone, string text, DateTimeOffset now, string? imageBase64 = null)
+    public OutboundMessage(
+        Guid tenantId,
+        Guid establishmentId,
+        string phone,
+        string text,
+        DateTimeOffset now,
+        string? imageBase64 = null,
+        string? audioBase64 = null,
+        string? audioMimeType = null)
     {
         Id = GuidV7.New();
         TenantId = Ensure.NotEmpty(tenantId, nameof(TenantId));
         EstablishmentId = Ensure.NotEmpty(establishmentId, nameof(EstablishmentId));
         Phone = PhoneNumber.ToWhatsApp(Ensure.NotNullOrWhiteSpace(phone, nameof(Phone)));
-        Text = Ensure.MaxLength(Ensure.NotNullOrWhiteSpace(text, nameof(Text)), 4000, nameof(Text));
+        // An audio carries no caption, so its text can be empty.
+        Text = string.IsNullOrWhiteSpace(text) ? string.Empty : Ensure.MaxLength(text, 4000, nameof(Text));
         ImageBase64 = imageBase64;
+        AudioBase64 = audioBase64;
+        AudioMimeType = audioMimeType;
         Status = OutboundStatus.Pending;
         NextAttemptAt = now;
         CreatedAt = now;
@@ -192,6 +205,7 @@ public sealed class ConversationMessage : AggregateRoot
     public MessageAuthor Author { get; private set; }
     public string Text { get; private set; } = string.Empty;
     public string? ExternalId { get; private set; }
+    public Guid? MediaFileId { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
 
     private ConversationMessage() { }
@@ -204,7 +218,8 @@ public sealed class ConversationMessage : AggregateRoot
         MessageAuthor author,
         string text,
         string? externalId,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        Guid? mediaFileId = null)
     {
         Id = GuidV7.New();
         TenantId = Ensure.NotEmpty(tenantId, nameof(TenantId));
@@ -214,6 +229,7 @@ public sealed class ConversationMessage : AggregateRoot
         Author = author;
         Text = Ensure.MaxLength(Ensure.NotNullOrWhiteSpace(text, nameof(Text)), 4000, nameof(Text));
         ExternalId = externalId;
+        MediaFileId = mediaFileId;
         CreatedAt = now;
     }
 }

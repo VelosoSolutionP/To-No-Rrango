@@ -152,6 +152,7 @@ app.MapAuthEndpoints();
 app.MapVelosoIdEndpoints();
 app.MapPlatformEndpoints();
 app.MapModuleEndpoints();
+app.MapOperationEndpoints();
 app.MapWebhookEndpoints();
 
 app.Run();

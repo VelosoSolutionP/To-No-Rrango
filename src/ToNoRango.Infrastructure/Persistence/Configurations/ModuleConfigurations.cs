@@ -247,8 +247,10 @@ public sealed class OutboundMessageConfiguration : IEntityTypeConfiguration<Outb
         builder.HasKey(message => message.Id);
         builder.Property(message => message.Id).ValueGeneratedNever();
         builder.Property(message => message.Phone).HasMaxLength(30).IsRequired();
-        builder.Property(message => message.Text).HasMaxLength(4000).IsRequired();
+        builder.Property(message => message.Text).HasMaxLength(4000).IsRequired(false);
         builder.Property(message => message.ImageBase64).HasColumnType("text");
+        builder.Property(message => message.AudioBase64).HasColumnType("text");
+        builder.Property(message => message.AudioMimeType).HasMaxLength(60);
         builder.Property(message => message.Status).HasConversion<int>();
         builder.Property(message => message.LastError).HasMaxLength(300);
         builder.HasIndex(message => new { message.Status, message.NextAttemptAt });
@@ -284,6 +286,7 @@ public sealed class ConversationMessageConfiguration : IEntityTypeConfiguration<
         builder.Property(message => message.Author).HasConversion<int>();
         builder.Property(message => message.Text).HasMaxLength(4000).IsRequired();
         builder.Property(message => message.ExternalId).HasMaxLength(120);
+        builder.Property(message => message.MediaFileId);
         builder.HasIndex(message => new { message.ConversationId, message.CreatedAt });
         builder.HasIndex(message => new { message.EstablishmentId, message.ExternalId }).IsUnique().HasFilter("\"ExternalId\" IS NOT NULL");
         builder.HasIndex(message => message.TenantId);

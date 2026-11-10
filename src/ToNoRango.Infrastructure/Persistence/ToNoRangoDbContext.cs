@@ -64,6 +64,7 @@ public sealed class ToNoRangoDbContext : DbContext
     public DbSet<MenuItem> MenuItems => Set<MenuItem>();
     public DbSet<MenuOptionGroup> MenuOptionGroups => Set<MenuOptionGroup>();
     public DbSet<MenuOption> MenuOptions => Set<MenuOption>();
+    public DbSet<MenuCombo> MenuCombos => Set<MenuCombo>();
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<OrderItemOption> OrderItemOptions => Set<OrderItemOption>();
@@ -82,6 +83,8 @@ public sealed class ToNoRangoDbContext : DbContext
         ApplyTenantFilter<MenuItem>(modelBuilder);
         ApplyTenantFilter<MenuOptionGroup>(modelBuilder);
         ApplyTenantFilter<MenuOption>(modelBuilder);
+        ApplyTenantFilter<MenuCombo>(modelBuilder);
+        ApplyTenantFilter<MenuComboLine>(modelBuilder);
         ApplyTenantFilter<Order>(modelBuilder);
         ApplyTenantFilter<OrderItem>(modelBuilder);
         ApplyTenantFilter<OrderItemOption>(modelBuilder);
@@ -104,6 +107,10 @@ public sealed class ToNoRangoDbContext : DbContext
         ApplyTenantFilter<Conversation>(modelBuilder);
         ApplyTenantFilter<ConversationMessage>(modelBuilder);
         ApplyTenantFilter<KnowledgeEntry>(modelBuilder);
+        ApplyTenantFilter<ToNoRango.Domain.Pdv.CashSession>(modelBuilder);
+        ApplyTenantFilter<ToNoRango.Domain.Pdv.CashMovement>(modelBuilder);
+        ApplyTenantFilter<ToNoRango.Domain.Feedback.OrderRating>(modelBuilder);
+        ApplyTenantFilter<KnowledgeGap>(modelBuilder);
         ApplyTenantFilter<ToNoRango.Domain.Media.MediaFile>(modelBuilder);
 
         base.OnModelCreating(modelBuilder);

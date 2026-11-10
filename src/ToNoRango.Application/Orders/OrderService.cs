@@ -27,7 +27,10 @@ public sealed class OrderService(
         string slug,
         CreateOrderRequest request,
         CancellationToken cancellationToken = default,
-        OrderChannel channel = OrderChannel.Web)
+        OrderChannel channel = OrderChannel.Web,
+        string? createdBy = null,
+        Action<Order>? prepare = null,
+        Func<Order, CancellationToken, Task>? afterSave = null)
     {
         try
         {
@@ -50,6 +53,14 @@ public sealed class OrderService(
             if (orderLimitError is not null)
             {
                 return Result<OrderTrackingDto>.Failure(orderLimitError);
+            }
+
+            var openNow = establishment.IsOpenAt(clock.UtcNow);
+
+            if (!openNow && !establishment.AcceptsOrdersWhenClosed && channel != OrderChannel.Pdv)
+            {
+                return Result<OrderTrackingDto>.Failure(AppErrors.Validation(
+                    "O estabelecimento está fechado agora. Horários:\n" + Domain.Establishments.OpeningSchedule.Describe(establishment.OpeningHours)));
             }
 
             if (!IsFulfillmentEnabled(establishment, request.FulfillmentType))
@@ -116,9 +127,18 @@ public sealed class OrderService(
                 request.Notes,
                 request.IdempotencyKey,
                 deliveryFee,
-                channel == OrderChannel.WhatsApp ? "zest" : "cliente",
+                createdBy ?? (channel == OrderChannel.WhatsApp ? "zest" : "cliente"),
                 now,
                 channel);
+
+            order.SetDeliveryReference(address?.Reference);
+            var stations = (await menu.ListCategoriesAsync(establishment.Id, includeInactive: true, cancellationToken))
+                .ToDictionary(category => category.Id, category => category.Station);
+
+            if (!openNow && channel != OrderChannel.Pdv && establishment.NextOpeningAfter(now) is { } opening)
+            {
+                order.ScheduleFor(opening, now);
+            }
 
             foreach (var line in request.Items)
             {
@@ -130,10 +150,12 @@ public sealed class OrderService(
                         AppErrors.Validation("Um dos itens não está disponível neste estabelecimento."));
                 }
 
-                order.AddItem(item, line.Quantity, line.Notes, line.OptionIds);
+                order.AddItem(item, line.Quantity, line.Notes, line.OptionIds, stations.GetValueOrDefault(item.CategoryId, PrepStation.Kitchen));
             }
 
-            if (order.SubtotalInCents < establishment.MinimumOrderInCents)
+            prepare?.Invoke(order);
+
+            if (order.SubtotalInCents < establishment.MinimumOrderInCents && channel != OrderChannel.Pdv)
             {
                 return Result<OrderTrackingDto>.Failure(
                     AppErrors.Validation(
@@ -144,7 +166,15 @@ public sealed class OrderService(
             {
                 await orders.AddAsync(order, token);
                 await unitOfWork.SaveChangesAsync(token);
-                await customers.RegisterOrderAsync(order, token);
+                if (Domain.Common.PhoneNumber.Digits(order.CustomerPhone).Length >= 10)
+                {
+                    await customers.RegisterOrderAsync(order, token);
+                }
+
+                if (afterSave is not null)
+                {
+                    await afterSave(order, token);
+                }
 
                 // In a WhatsApp sale the conversation itself tells the customer the order was received.
                 if (channel != OrderChannel.WhatsApp)
@@ -205,6 +235,46 @@ public sealed class OrderService(
             }
 
             await lifecycle.ChangeStatusAsync(order, request.Status, request.ChangedBy, request.Reason, token);
+
+            return OrderDto.From(order);
+        }, cancellationToken));
+
+        if (result.IsSuccess)
+        {
+            await events.PublishAsync(result.Value.Code);
+        }
+
+        return result;
+    }
+
+    /// <summary>Moves one item in the kitchen. When every item is ready the whole order becomes ready.</summary>
+    public async Task<Result<OrderDto>> AdvanceItemAsync(Guid orderId, Guid itemId, ItemPrepStatus status, string? changedBy, CancellationToken cancellationToken = default)
+    {
+        var result = await Guarded.RunAsync<OrderDto>(() => unitOfWork.ExecuteInTransactionAsync<Result<OrderDto>>(async token =>
+        {
+            var order = await orders.GetByIdAsync(orderId, token);
+
+            if (order is null)
+            {
+                return Result<OrderDto>.Failure(AppErrors.NotFound("order.not_found", "Pedido não encontrado."));
+            }
+
+            var wasConfirmed = order.Status == OrderStatus.Confirmed;
+            var allReady = order.AdvanceItem(itemId, status, changedBy, clock.UtcNow);
+
+            if (wasConfirmed && order.Status == OrderStatus.Preparing)
+            {
+                await notifier.NotifyStatusAsync(order, token);
+            }
+
+            if (allReady && order.Status == OrderStatus.Preparing)
+            {
+                await lifecycle.ChangeStatusAsync(order, OrderStatus.Ready, changedBy, "Todos os itens prontos.", token);
+            }
+            else
+            {
+                await unitOfWork.SaveChangesAsync(token);
+            }
 
             return OrderDto.From(order);
         }, cancellationToken));

@@ -31,6 +31,11 @@ public static class Ensure
             ? throw new ArgumentOutOfRangeException(paramName, value, $"{paramName} cannot be negative.")
             : value;
 
+    public static int Positive(int value, string paramName)
+        => value <= 0
+            ? throw new ArgumentOutOfRangeException(paramName, value, $"{paramName} must be greater than zero.")
+            : value;
+
     public static long NotNegative(long value, string paramName)
         => value < 0
             ? throw new ArgumentOutOfRangeException(paramName, value, $"{paramName} cannot be negative.")

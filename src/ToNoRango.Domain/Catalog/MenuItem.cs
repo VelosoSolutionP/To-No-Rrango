@@ -14,6 +14,9 @@ public sealed class MenuItem : AggregateRoot
     public string? Description { get; private set; }
     public string? ImageUrl { get; private set; }
     public long PriceInCents { get; private set; }
+
+    /// <summary>The "de" price of a promotion. Only kept when it is higher than the current price.</summary>
+    public long? CompareAtPriceInCents { get; private set; }
     public bool IsActive { get; private set; } = true;
     public bool IsAvailable { get; private set; } = true;
     public int SortOrder { get; private set; }
@@ -68,6 +71,15 @@ public sealed class MenuItem : AggregateRoot
         SortOrder = Ensure.NotNegative(sortOrder, nameof(SortOrder));
         UpdatedAt = now;
     }
+
+    /// <summary>Starts or ends a promotion. A "de" price not above the current price ends it.</summary>
+    public void SetCompareAtPrice(long? compareAtPriceInCents, DateTimeOffset now)
+    {
+        CompareAtPriceInCents = compareAtPriceInCents is long value && value > PriceInCents ? value : null;
+        UpdatedAt = now;
+    }
+
+    public bool IsOnPromotion => CompareAtPriceInCents is long value && value > PriceInCents;
 
     public void SetAvailability(bool isAvailable, DateTimeOffset now)
     {

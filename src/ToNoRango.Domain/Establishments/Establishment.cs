@@ -28,6 +28,12 @@ public sealed class Establishment : AggregateRoot
     public long MinimumOrderInCents { get; private set; }
     public string PrimaryColor { get; private set; } = "#F97316";
     public string SecondaryColor { get; private set; } = "#7C3AED";
+
+    /// <summary>Weekly hours in the <see cref="OpeningSchedule"/> text form. Null means always open.</summary>
+    public string? OpeningHours { get; private set; }
+
+    /// <summary>When closed, orders still come in, wait for the store to confirm them and are scheduled for the next opening.</summary>
+    public bool AcceptsOrdersWhenClosed { get; private set; } = true;
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -118,6 +124,29 @@ public sealed class Establishment : AggregateRoot
         MinimumOrderInCents = Ensure.NotNegative(minimumOrderInCents, nameof(MinimumOrderInCents));
         UpdatedAt = now;
     }
+
+    public void SetOpeningHours(string? openingHours, bool acceptsOrdersWhenClosed, DateTimeOffset now)
+    {
+        OpeningHours = OpeningSchedule.Normalize(openingHours);
+        AcceptsOrdersWhenClosed = acceptsOrdersWhenClosed;
+        UpdatedAt = now;
+    }
+
+    public TimeZoneInfo ResolveTimeZone()
+    {
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById(TimeZone);
+        }
+        catch (Exception exception) when (exception is TimeZoneNotFoundException or InvalidTimeZoneException)
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
+        }
+    }
+
+    public bool IsOpenAt(DateTimeOffset utcNow) => OpeningSchedule.IsOpen(OpeningHours, utcNow, ResolveTimeZone());
+
+    public DateTimeOffset? NextOpeningAfter(DateTimeOffset utcNow) => OpeningSchedule.NextOpening(OpeningHours, utcNow, ResolveTimeZone());
 
     public void Activate(DateTimeOffset now)
     {

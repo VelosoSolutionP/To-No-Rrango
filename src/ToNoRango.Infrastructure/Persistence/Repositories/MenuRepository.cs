@@ -79,4 +79,26 @@ public sealed class MenuRepository(ToNoRangoDbContext dbContext) : IMenuReposito
         dbContext.MenuItems.Add(item);
         return Task.CompletedTask;
     }
+
+    public async Task<IReadOnlyList<MenuCombo>> ListCombosAsync(Guid establishmentId, CancellationToken cancellationToken)
+    {
+        return await dbContext.MenuCombos
+            .AsNoTracking()
+            .Include(combo => combo.Lines)
+            .Where(combo => combo.EstablishmentId == establishmentId)
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<MenuCombo?> GetComboByMenuItemAsync(Guid menuItemId, CancellationToken cancellationToken) =>
+        dbContext.MenuCombos
+            .Include(combo => combo.Lines)
+            .FirstOrDefaultAsync(combo => combo.MenuItemId == menuItemId, cancellationToken);
+
+    public Task AddComboAsync(MenuCombo combo, CancellationToken cancellationToken)
+    {
+        dbContext.MenuCombos.Add(combo);
+        return Task.CompletedTask;
+    }
+
+    public void RemoveCombo(MenuCombo combo) => dbContext.MenuCombos.Remove(combo);
 }

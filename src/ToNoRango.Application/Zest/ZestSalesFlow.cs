@@ -18,7 +18,9 @@ public enum SalesStep
     Payment = 10,
     Change = 11,
     Name = 12,
-    Confirm = 13
+    Confirm = 13,
+    SavedAddress = 14,
+    Reference = 15
 }
 
 public sealed class SalesLine
@@ -52,6 +54,10 @@ public sealed class SalesState
     public string? City { get; set; }
     public string? State { get; set; }
     public string? PostalCode { get; set; }
+    public string? Reference { get; set; }
+
+    /// <summary>Items found by a search, shown as a temporary list. Empty when browsing a category.</summary>
+    public List<Guid> SearchIds { get; set; } = [];
     public long DeliveryFeeInCents { get; set; }
     public string? Payment { get; set; }
     public string? Notes { get; set; }
@@ -65,7 +71,29 @@ public sealed record SalesOption(Guid Id, string Name, long PriceInCents, bool I
 
 public sealed record SalesGroup(string Name, int Min, int Max, IReadOnlyList<SalesOption> Options);
 
-public sealed record SalesItem(Guid Id, string Name, string? Description, long PriceInCents, bool IsAvailable, IReadOnlyList<SalesGroup> Groups);
+public sealed record SalesItem(
+    Guid Id,
+    string Name,
+    string? Description,
+    long PriceInCents,
+    bool IsAvailable,
+    IReadOnlyList<SalesGroup> Groups,
+    long? CompareAtPriceInCents = null,
+    string? ComboText = null);
+
+/// <summary>The address of the customer's last delivery, offered again so they do not type it twice.</summary>
+public sealed record SavedAddress(
+    string Street,
+    string Number,
+    string? Complement,
+    string District,
+    string City,
+    string State,
+    string PostalCode,
+    string? Reference)
+{
+    public string Text => $"{Street}, {Number}{(Complement is null ? string.Empty : $" {Complement}")} — {District}";
+}
 
 public sealed record SalesCategory(string Name, IReadOnlyList<SalesItem> Items);
 
@@ -79,7 +107,10 @@ public sealed record SalesCatalog(
     string? State,
     string? PostalCode,
     bool PixOnline = false,
-    bool CheckoutLink = false);
+    bool CheckoutLink = false,
+    SavedAddress? SavedAddress = null,
+    bool IsOpen = true,
+    string? ScheduledText = null);
 
 public interface ISalesLookups
 {
@@ -114,7 +145,10 @@ public static class ZestSalesFlow
     public static bool WantsToOrder(string message, SalesCatalog catalog)
     {
         var text = ZestBrain.Normalize(message);
-        return HasAny(text, OrderPhrases) || (HasAny(text, BuyVerbs) && FindMentionedItem(text, catalog) is not null);
+        return HasAny(text, OrderPhrases)
+            || (HasAny(text, BuyVerbs) && FindMentionedItem(text, catalog) is not null)
+            || SearchQuery(text) is not null
+            || text is "promocao" or "promocoes" or "promo" or "ofertas" or "combo" or "combos";
     }
 
     public static async Task<SalesTurn> HandleAsync(
@@ -175,6 +209,11 @@ public static class ZestSalesFlow
                 return await ReadCepAsync(state, text, catalog, lookups, cancellationToken);
             case SalesStep.AddressDetails:
                 return ReadAddressDetails(state, message, catalog, customerName);
+            case SalesStep.SavedAddress:
+                return await UseSavedAddressAsync(state, text, catalog, lookups, customerName, cancellationToken);
+            case SalesStep.Reference:
+                state.Reference = text is "nao" or "n" or "nenhum" or "sem" or "0" ? null : Truncate(message.Trim(), 150);
+                return ToPayment(state, catalog, customerName);
             case SalesStep.ManualAddress:
                 return await ReadManualAddressAsync(state, message, catalog, lookups, customerName, cancellationToken);
             case SalesStep.Payment:
@@ -196,13 +235,15 @@ public static class ZestSalesFlow
     public static string Prompt(SalesState state, SalesCatalog catalog) => state.Step switch
     {
         SalesStep.Category => CategoriesText(catalog),
-        SalesStep.Item => ItemsText(catalog.Categories[state.CategoryIndex ?? 0]),
+        SalesStep.Item => state.SearchIds.Count > 0 ? SearchText(state, catalog, null) : ItemsText(catalog.Categories[state.CategoryIndex ?? 0]),
         SalesStep.Options => OptionsText(state, catalog),
         SalesStep.Quantity => "Quantas unidades?",
         SalesStep.CartReview => "Responda *1* para adicionar mais itens ou *2* para finalizar.",
         SalesStep.Fulfillment => "Responda *1* para entrega ou *2* para retirada.",
         SalesStep.Cep => "Qual o seu CEP? Se não souber, escreva *sem cep*.",
         SalesStep.AddressDetails => "Qual o número e o complemento?",
+        SalesStep.SavedAddress => $"Entrego em *{catalog.SavedAddress?.Text}*?\n\n*1* Sim, neste endereço\n*2* Outro endereço",
+        SalesStep.Reference => "Tem algum ponto de referência? Escreva ou responda *não*.",
         SalesStep.ManualAddress => "Me manda assim: *rua, número, bairro*.",
         SalesStep.Payment => PaymentText(catalog),
         SalesStep.Change => "Precisa de troco? Escreva para quanto ou *não*.",
@@ -247,6 +288,22 @@ public static class ZestSalesFlow
 
     private static SalesTurn Start(SalesState state, string text, SalesCatalog catalog)
     {
+        var turn = StartCore(state, text, catalog);
+
+        return catalog.IsOpen || catalog.ScheduledText is null
+            ? turn
+            : turn with { Reply = $"Estamos fechados agora. Seu pedido fica *agendado para {catalog.ScheduledText}* e a loja confirma quando abrir.\n\n{turn.Reply}" };
+    }
+
+    private static SalesTurn StartCore(SalesState state, string text, SalesCatalog catalog)
+    {
+        var listed = TrySearch(state, text, catalog);
+
+        if (listed is not null)
+        {
+            return listed;
+        }
+
         var mentioned = FindMentionedItem(text, catalog);
 
         if (mentioned is { } item && item.IsAvailable)
@@ -275,6 +332,13 @@ public static class ZestSalesFlow
 
     private static SalesTurn ChooseCategory(SalesState state, string text, SalesCatalog catalog)
     {
+        var listed = TrySearch(state, text, catalog);
+
+        if (listed is not null)
+        {
+            return listed;
+        }
+
         var mentioned = FindMentionedItem(text, catalog);
 
         if (mentioned is { IsAvailable: true })
@@ -301,12 +365,21 @@ public static class ZestSalesFlow
     {
         if (HasAny(text, "voltar"))
         {
+            state.SearchIds = [];
             state.Step = SalesStep.Category;
             return Reply(state, CategoriesText(catalog));
         }
 
-        var category = catalog.Categories[state.CategoryIndex ?? 0];
-        var available = category.Items.Where(item => item.IsAvailable).ToList();
+        var listed = TrySearch(state, text, catalog);
+
+        if (listed is not null)
+        {
+            return listed;
+        }
+
+        var available = state.SearchIds.Count > 0
+            ? state.SearchIds.Select(id => FindItem(catalog, id)).Where(item => item is { IsAvailable: true }).Cast<SalesItem>().ToList()
+            : catalog.Categories[state.CategoryIndex ?? 0].Items.Where(item => item.IsAvailable).ToList();
         var (quantity, rest) = SplitLeadingQuantity(text);
         var item = Pick(available, candidate => candidate.Name, rest) ?? FindMentionedItem(text, catalog);
 
@@ -316,6 +389,7 @@ public static class ZestSalesFlow
         }
 
         state.PendingQuantity = quantity;
+        state.SearchIds = [];
         return BeginItem(state, item, catalog, null);
     }
 
@@ -510,7 +584,7 @@ public static class ZestSalesFlow
     private static SalesTurn ToDelivery(SalesState state, SalesCatalog catalog)
     {
         state.Fulfillment = "Delivery";
-        state.Step = SalesStep.Cep;
+        state.Step = catalog.SavedAddress is null ? SalesStep.Cep : SalesStep.SavedAddress;
 
         return Reply(state, Prompt(state, catalog));
     }
@@ -576,6 +650,48 @@ public static class ZestSalesFlow
         return Reply(state, $"{found.Street}, {found.District}. Taxa de entrega: {Money(quote.FeeInCents.Value)}.\n\nQual o número e o complemento?");
     }
 
+    private static async Task<SalesTurn> UseSavedAddressAsync(
+        SalesState state,
+        string text,
+        SalesCatalog catalog,
+        ISalesLookups lookups,
+        string? customerName,
+        CancellationToken cancellationToken)
+    {
+        var saved = catalog.SavedAddress;
+
+        if (saved is null || text == "2" || HasAny(text, "outro", "nao", "mudar", "novo"))
+        {
+            state.Step = SalesStep.Cep;
+            return Reply(state, Prompt(state, catalog));
+        }
+
+        if (text != "1" && !HasAny(text, "sim", "esse", "este", "pode", "isso", "mesmo"))
+        {
+            return Retry(state, catalog, "Não entendi.");
+        }
+
+        var quote = await lookups.QuoteAsync(saved.District, cancellationToken);
+
+        if (quote.FeeInCents is null)
+        {
+            state.Step = SalesStep.Cep;
+            return Reply(state, $"{quote.Error}\n\nTem outro CEP? Ou escreva *cancelar*.");
+        }
+
+        state.Street = saved.Street;
+        state.Number = saved.Number;
+        state.Complement = saved.Complement;
+        state.District = saved.District;
+        state.City = saved.City;
+        state.State = saved.State;
+        state.PostalCode = saved.PostalCode;
+        state.Reference = saved.Reference;
+        state.DeliveryFeeInCents = quote.FeeInCents.Value;
+
+        return ToPayment(state, catalog, customerName, $"Taxa de entrega: {Money(state.DeliveryFeeInCents)}.");
+    }
+
     private static SalesTurn ReadAddressDetails(SalesState state, string message, SalesCatalog catalog, string? customerName)
     {
         var parts = message.Trim().Split([' ', ','], 2, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -587,8 +703,9 @@ public static class ZestSalesFlow
 
         state.Number = parts[0];
         state.Complement = parts.Length > 1 ? Truncate(parts[1], 100) : null;
+        state.Step = SalesStep.Reference;
 
-        return ToPayment(state, catalog, customerName);
+        return Reply(state, Prompt(state, catalog));
     }
 
     private static async Task<SalesTurn> ReadManualAddressAsync(
@@ -628,7 +745,8 @@ public static class ZestSalesFlow
             return Reply(state, "Para este endereço preciso do CEP. Qual é?");
         }
 
-        return ToPayment(state, catalog, customerName, $"Taxa de entrega: {Money(state.DeliveryFeeInCents)}.");
+        state.Step = SalesStep.Reference;
+        return Reply(state, $"Taxa de entrega: {Money(state.DeliveryFeeInCents)}.\n\n{Prompt(state, catalog)}");
     }
 
     private static SalesTurn ToPayment(SalesState state, SalesCatalog catalog, string? customerName, string? intro = null)
@@ -718,11 +836,12 @@ public static class ZestSalesFlow
         state.Step = SalesStep.Confirm;
 
         var receive = state.Fulfillment == "Delivery"
-            ? $"Entrega em {state.Street}, {state.Number}{(state.Complement is null ? string.Empty : $" {state.Complement}")} — {state.District}\nTaxa: {Money(state.DeliveryFeeInCents)}"
+            ? $"Entrega em {state.Street}, {state.Number}{(state.Complement is null ? string.Empty : $" {state.Complement}")} — {state.District}{(state.Reference is null ? string.Empty : $"\nReferência: {state.Reference}")}\nTaxa: {Money(state.DeliveryFeeInCents)}"
             : "Retirada no local";
+        var schedule = catalog.IsOpen || catalog.ScheduledText is null ? string.Empty : $"\n*Agendado para {catalog.ScheduledText}* (a loja confirma quando abrir)";
         var payment = state.Payment switch { "Pix" => "Pix", "Cash" => "Dinheiro", "Checkout" => "Link do Mercado Pago", "Screen" => "Tela do pedido", _ => "Cartão na entrega" };
 
-        return Reply(state, $"{CartText(state)}\n{receive}\nPagamento: {payment}\n*Total: {Money(state.SubtotalInCents + state.DeliveryFeeInCents)}*\n\n*1* Confirmar pedido\n*2* Alterar");
+        return Reply(state, $"{CartText(state)}\n{receive}\nPagamento: {payment}\n*Total: {Money(state.SubtotalInCents + state.DeliveryFeeInCents)}*{schedule}\n\n*1* Confirmar pedido\n*2* Alterar");
     }
 
     private static SalesTurn Confirm(SalesState state, string text, SalesCatalog catalog)
@@ -754,7 +873,21 @@ public static class ZestSalesFlow
     private static string CategoriesText(SalesCatalog catalog)
     {
         var lines = SellableCategories(catalog).Select((category, index) => $"*{index + 1}* {category.Name}");
-        return $"O que você vai querer?\n\n{string.Join('\n', lines)}\n\nResponda o número ou peça direto, tipo *2 {FirstItemName(catalog)}*.";
+        var extras = new List<string>();
+
+        if (AllItems(catalog).Any(item => item is { IsAvailable: true, CompareAtPriceInCents: not null }))
+        {
+            extras.Add("*promoções*");
+        }
+
+        if (AllItems(catalog).Any(item => item is { IsAvailable: true, ComboText: not null }))
+        {
+            extras.Add("*combos*");
+        }
+
+        var shortcuts = extras.Count == 0 ? string.Empty : $"\nTambém pode escrever {string.Join(" ou ", extras)}.";
+
+        return $"O que você vai querer?\n\n{string.Join('\n', lines)}\n\nResponda o número ou peça direto, tipo *2 {FirstItemName(catalog)}*. Para procurar, escreva *buscar* e o nome.{shortcuts}\nCardápio com fotos: {catalog.MenuUrl}";
     }
 
     private static string FirstItemName(SalesCatalog catalog) =>
@@ -762,8 +895,102 @@ public static class ZestSalesFlow
 
     private static string ItemsText(SalesCategory category)
     {
-        var lines = category.Items.Where(item => item.IsAvailable).Select((item, index) => $"*{index + 1}* {item.Name} — {Money(item.PriceInCents)}");
+        var lines = category.Items.Where(item => item.IsAvailable).Select((item, index) => ItemLine(item, index));
         return $"*{category.Name}*\n\n{string.Join('\n', lines)}\n\nResponda o número do item.";
+    }
+
+    private static string ItemLine(SalesItem item, int index)
+    {
+        var price = item.CompareAtPriceInCents is long before && before > item.PriceInCents
+            ? $"~{Money(before)}~ *{Money(item.PriceInCents)}*"
+            : Money(item.PriceInCents);
+        var combo = item.ComboText is null ? string.Empty : $"\n   _{item.ComboText}_";
+
+        return $"*{index + 1}* {item.Name} — {price}{combo}";
+    }
+
+    private static IEnumerable<SalesItem> AllItems(SalesCatalog catalog) => catalog.Categories.SelectMany(category => category.Items);
+
+    /// <summary>
+    /// Lists items by search, promotion or combo. Only words the customer used to ask for a list
+    /// trigger it, so ordinary answers keep going to the current step.
+    /// </summary>
+    private static SalesTurn? TrySearch(SalesState state, string text, SalesCatalog catalog)
+    {
+        List<SalesItem> found;
+        string title;
+
+        if (text is "promocao" or "promocoes" or "promo" or "oferta" or "ofertas" || HasAny(text, "tem promocao", "ver promocoes"))
+        {
+            found = AllItems(catalog).Where(item => item is { IsAvailable: true, CompareAtPriceInCents: not null }).ToList();
+            title = "Promoções de hoje";
+        }
+        else if (text is "combo" or "combos" || HasAny(text, "tem combo", "ver combos"))
+        {
+            found = AllItems(catalog).Where(item => item is { IsAvailable: true, ComboText: not null }).ToList();
+            title = "Combos";
+        }
+        else
+        {
+            var query = SearchQuery(text);
+
+            if (query is null)
+            {
+                return null;
+            }
+
+            var words = query.Split(' ', StringSplitOptions.RemoveEmptyEntries).Where(word => word.Length >= 3).ToList();
+            found = words.Count == 0
+                ? []
+                : AllItems(catalog)
+                    .Where(item => item.IsAvailable)
+                    .Where(item => words.All(word => Has(ZestBrain.Normalize($"{item.Name} {item.Description}"), word)
+                        || ZestBrain.Normalize($"{item.Name} {item.Description}").Contains(word, StringComparison.Ordinal)))
+                    .ToList();
+            title = $"Encontrei para \"{query}\"";
+
+            if (found.Count == 0)
+            {
+                state.Step = state.Step == SalesStep.Idle ? SalesStep.Category : state.Step;
+                return Reply(state, $"Não encontrei nada com \"{query}\" no cardápio de hoje.\n\n{CategoriesText(catalog)}");
+            }
+        }
+
+        if (found.Count == 0)
+        {
+            state.Step = state.Step == SalesStep.Idle ? SalesStep.Category : state.Step;
+            return Reply(state, $"Hoje não temos {title.ToLowerInvariant()}.\n\n{CategoriesText(catalog)}");
+        }
+
+        if (found.Count == 1)
+        {
+            state.SearchIds = [];
+            return BeginItem(state, found[0], catalog, null);
+        }
+
+        state.SearchIds = found.Take(15).Select(item => item.Id).ToList();
+        state.Step = SalesStep.Item;
+        return Reply(state, SearchText(state, catalog, title));
+    }
+
+    private static string? SearchQuery(string text)
+    {
+        foreach (var prefix in new[] { "buscar ", "busca ", "procurar ", "procuro ", "pesquisar ", "tem algum ", "tem alguma " })
+        {
+            if (text.StartsWith(prefix, StringComparison.Ordinal) && text.Length > prefix.Length)
+            {
+                return text[prefix.Length..].Trim();
+            }
+        }
+
+        return null;
+    }
+
+    private static string SearchText(SalesState state, SalesCatalog catalog, string? title)
+    {
+        var items = state.SearchIds.Select(id => FindItem(catalog, id)).Where(item => item is not null).Cast<SalesItem>().ToList();
+        var lines = items.Select((item, index) => ItemLine(item, index));
+        return $"*{title ?? "Resultado"}*\n\n{string.Join('\n', lines)}\n\nResponda o número do item ou *voltar*.";
     }
 
     private static string OptionsText(SalesState state, SalesCatalog catalog)

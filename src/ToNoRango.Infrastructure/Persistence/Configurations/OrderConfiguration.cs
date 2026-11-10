@@ -37,6 +37,10 @@ public sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(order => order.IdempotencyKey).HasMaxLength(100);
         builder.Property(order => order.CancelReason).HasMaxLength(300);
         builder.Property(order => order.CancelledBy).HasMaxLength(120);
+        builder.Property(order => order.DiscountReason).HasMaxLength(120);
+        builder.Property(order => order.TableLabel).HasMaxLength(20);
+        builder.Property(order => order.DeliveryReference).HasMaxLength(150);
+        builder.Property(order => order.CourierName).HasMaxLength(120);
         builder.Property(order => order.CreatedAt).IsRequired();
         builder.Property(order => order.UpdatedAt).IsRequired();
 

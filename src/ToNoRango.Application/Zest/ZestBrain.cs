@@ -24,7 +24,9 @@ public sealed record ZestContext(
     IReadOnlyList<ZestZone> Zones,
     IReadOnlyList<ZestMenuItem> Items,
     IReadOnlyList<ZestKnowledge> Knowledge,
-    ZestOrder? LastOrder);
+    ZestOrder? LastOrder,
+    string? HoursText = null,
+    bool IsOpen = true);
 
 public enum ZestIntent
 {
@@ -38,6 +40,7 @@ public enum ZestIntent
     Payment,
     Greeting,
     Thanks,
+    Hours,
     Unknown
 }
 
@@ -100,6 +103,13 @@ public static class ZestBrain
             var categories = context.Items.Select(item => item.Category).Distinct().Take(8).ToList();
             var summary = categories.Count > 0 ? $" Temos: {string.Join(", ", categories)}." : string.Empty;
             return new ZestReply(ZestIntent.Menu, $"Nosso cardápio está aqui: {context.MenuUrl}.{summary}");
+        }
+
+        if (HasAny(text, "horario", "que horas", "aberto", "abre", "fecha", "funcionamento", "funciona hoje"))
+        {
+            return new ZestReply(ZestIntent.Hours, context.HoursText is null
+                ? "Ainda não tenho o horário cadastrado. Escreva *atendente* para falar com a equipe."
+                : $"{(context.IsOpen ? "Estamos abertos agora." : "Estamos fechados agora, mas você já pode deixar seu pedido agendado.")}\n\n*Horário*\n{context.HoursText}");
         }
 
         if (HasAny(text, "endereco", "onde fica", "localizacao", "onde voces"))

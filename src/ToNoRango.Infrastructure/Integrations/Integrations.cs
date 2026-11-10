@@ -356,6 +356,37 @@ public sealed class EvolutionWhatsAppSender(HttpClient http, IConfiguration conf
         return (false, null);
     }
 
+    public async Task<(string Base64, string Mime)?> GetMediaAsync(string instanceName, string apiKey, string messageId, CancellationToken cancellationToken)
+    {
+        using var response = await PostAsync(
+            $"chat/getBase64FromMediaMessage/{Uri.EscapeDataString(instanceName)}",
+            apiKey,
+            new { message = new { key = new { id = messageId } }, convertToMp4 = false },
+            cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(cancellationToken), cancellationToken: cancellationToken);
+        var root = document.RootElement;
+
+        return root.TryGetProperty("base64", out var base64) && base64.ValueKind == JsonValueKind.String
+            ? (base64.GetString()!, root.TryGetProperty("mimetype", out var mime) && mime.ValueKind == JsonValueKind.String ? mime.GetString()! : "audio/ogg")
+            : null;
+    }
+
+    public async Task SendAudioAsync(string instanceName, string apiKey, string phone, string audioBase64, CancellationToken cancellationToken)
+    {
+        using var response = await PostAsync(
+            $"message/sendWhatsAppAudio/{Uri.EscapeDataString(instanceName)}",
+            apiKey,
+            new { number = phone, audio = audioBase64 },
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
     public async Task LogoutAsync(string instanceName, CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(HttpMethod.Delete, $"instance/logout/{Uri.EscapeDataString(instanceName)}");

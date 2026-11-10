@@ -24,8 +24,9 @@ public sealed class MenuService(
 
         var categories = await menu.ListCategoriesAsync(establishment.Id, includeInactive: false, cancellationToken);
         var items = await menu.ListItemsAsync(establishment.Id, includeInactive: false, cancellationToken);
+        var combos = await menu.ListCombosAsync(establishment.Id, cancellationToken);
 
-        return PublicMenuDto.From(establishment, categories, items);
+        return PublicMenuDto.From(establishment, categories, items, combos, items);
     }
 
     public async Task<Result<PublicMenuDto>> GetAdminMenuAsync(Guid establishmentId, CancellationToken cancellationToken = default)
@@ -40,8 +41,9 @@ public sealed class MenuService(
 
         var categories = await menu.ListCategoriesAsync(establishment.Id, includeInactive: true, cancellationToken);
         var items = await menu.ListItemsAsync(establishment.Id, includeInactive: true, cancellationToken);
+        var combos = await menu.ListCombosAsync(establishment.Id, cancellationToken);
 
-        return PublicMenuDto.From(establishment, categories, items);
+        return PublicMenuDto.From(establishment, categories, items, combos, items);
     }
 
     public async Task<Result<MenuCategoryDto>> CreateCategoryAsync(
@@ -66,6 +68,7 @@ public sealed class MenuService(
                 request.Description,
                 request.SortOrder,
                 clock.UtcNow);
+            category.SetStation(request.Station ?? Domain.Orders.PrepStation.Kitchen, clock.UtcNow);
 
             await menu.AddCategoryAsync(category, cancellationToken);
             await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -94,6 +97,11 @@ public sealed class MenuService(
             }
 
             category.Update(request.Name, request.Description, request.SortOrder, clock.UtcNow);
+
+            if (request.Station is { } station)
+            {
+                category.SetStation(station, clock.UtcNow);
+            }
             await unitOfWork.SaveChangesAsync(cancellationToken);
 
             return MenuCategoryDto.From(category, Array.Empty<MenuItem>());
@@ -182,6 +190,8 @@ public sealed class MenuService(
                 now);
 
             item.ReplaceOptionGroups(MapGroups(request.OptionGroups), now);
+            item.SetCompareAtPrice(request.CompareAtPriceInCents, now);
+            await SaveComboAsync(establishment, item, request.ComboLines, now, cancellationToken);
 
             await menu.AddItemAsync(item, cancellationToken);
             await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -225,10 +235,16 @@ public sealed class MenuService(
                 request.IsAvailable,
                 request.SortOrder,
                 now);
+            item.SetCompareAtPrice(request.CompareAtPriceInCents, now);
 
             if (request.OptionGroups is not null)
             {
                 item.ReplaceOptionGroups(MapGroups(request.OptionGroups), now);
+            }
+
+            if (request.ComboLines is not null)
+            {
+                await SaveComboAsync(null, item, request.ComboLines, now, cancellationToken);
             }
 
             await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -325,5 +341,63 @@ public sealed class MenuService(
                         option.SortOrder))
                     .ToList()))
             .ToList();
+    }
+
+    /// <summary>
+    /// Saves what a combo bundles. An empty list turns the item back into a plain item. Every
+    /// constituent must be an item of the same establishment and cannot itself be a combo.
+    /// </summary>
+    private async Task SaveComboAsync(
+        Domain.Establishments.Establishment? establishment,
+        MenuItem item,
+        IReadOnlyList<MenuComboLineRequest>? lines,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        if (lines is null)
+        {
+            return;
+        }
+
+        var existing = await menu.GetComboByMenuItemAsync(item.Id, cancellationToken);
+
+        if (lines.Count == 0)
+        {
+            if (existing is not null)
+            {
+                menu.RemoveCombo(existing);
+            }
+
+            return;
+        }
+
+        var combos = await menu.ListCombosAsync(item.EstablishmentId, cancellationToken);
+
+        foreach (var line in lines)
+        {
+            var constituent = line.MenuItemId == item.Id ? item : await menu.GetItemAsync(line.MenuItemId, cancellationToken);
+
+            if (constituent is null || constituent.EstablishmentId != item.EstablishmentId)
+            {
+                throw new InvalidOperationException("Um dos itens do combo não pertence a este estabelecimento.");
+            }
+
+            if (combos.Any(combo => combo.MenuItemId == constituent.Id && combo.MenuItemId != item.Id))
+            {
+                throw new InvalidOperationException($"'{constituent.Name}' já é um combo e não pode entrar em outro combo.");
+            }
+        }
+
+        var definitions = lines.Select(line => new MenuComboLineDefinition(line.MenuItemId, line.Quantity)).ToList();
+
+        if (existing is null)
+        {
+            var combo = new MenuCombo(item.TenantId, item.EstablishmentId, item.Id, now);
+            combo.ReplaceLines(definitions, now);
+            await menu.AddComboAsync(combo, cancellationToken);
+            return;
+        }
+
+        existing.ReplaceLines(definitions, now);
     }
 }

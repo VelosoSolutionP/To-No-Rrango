@@ -11,6 +11,9 @@ public sealed class MenuCategory : AggregateRoot
     public string? Description { get; private set; }
     public int SortOrder { get; private set; }
     public bool IsActive { get; private set; } = true;
+
+    /// <summary>Where the items of this category are made: kitchen (food) or bar (drinks).</summary>
+    public Orders.PrepStation Station { get; private set; } = Orders.PrepStation.Kitchen;
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -39,6 +42,12 @@ public sealed class MenuCategory : AggregateRoot
         Name = Ensure.MaxLength(Ensure.NotNullOrWhiteSpace(name, nameof(Name)), 80, nameof(Name));
         Description = NormalizeOptional(description);
         SortOrder = Ensure.NotNegative(sortOrder, nameof(SortOrder));
+        UpdatedAt = now;
+    }
+
+    public void SetStation(Orders.PrepStation station, DateTimeOffset now)
+    {
+        Station = Enum.IsDefined(station) ? station : Orders.PrepStation.Kitchen;
         UpdatedAt = now;
     }
 

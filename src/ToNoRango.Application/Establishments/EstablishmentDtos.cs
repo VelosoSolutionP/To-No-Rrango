@@ -24,7 +24,12 @@ public sealed record EstablishmentDto(
     long DeliveryFeeInCents,
     long MinimumOrderInCents,
     string PrimaryColor,
-    string SecondaryColor)
+    string SecondaryColor,
+    string? OpeningHours = null,
+    bool AcceptsOrdersWhenClosed = true,
+    bool IsOpenNow = true,
+    DateTimeOffset? NextOpeningAt = null,
+    string? HoursText = null)
 {
     public static EstablishmentDto From(Establishment establishment) => new(
         establishment.Id,
@@ -48,7 +53,12 @@ public sealed record EstablishmentDto(
         establishment.DeliveryFeeInCents,
         establishment.MinimumOrderInCents,
         establishment.PrimaryColor,
-        establishment.SecondaryColor);
+        establishment.SecondaryColor,
+        establishment.OpeningHours,
+        establishment.AcceptsOrdersWhenClosed,
+        establishment.IsOpenAt(DateTimeOffset.UtcNow),
+        establishment.IsOpenAt(DateTimeOffset.UtcNow) ? null : establishment.NextOpeningAfter(DateTimeOffset.UtcNow),
+        OpeningSchedule.Describe(establishment.OpeningHours));
 }
 
 public sealed record CreateEstablishmentRequest(
@@ -91,4 +101,6 @@ public sealed record UpdateEstablishmentRequest(
     long DeliveryFeeInCents,
     long MinimumOrderInCents,
     string? LogoUrl = null,
-    string? CoverUrl = null);
+    string? CoverUrl = null,
+    string? OpeningHours = null,
+    bool? AcceptsOrdersWhenClosed = null);

@@ -98,6 +98,12 @@ public sealed class EstablishmentService(
                 request.MinimumOrderInCents,
                 now);
 
+            // Hours are only touched when the form sends them, so older clients do not erase them.
+            if (request.AcceptsOrdersWhenClosed is bool acceptsWhenClosed)
+            {
+                establishment.SetOpeningHours(request.OpeningHours, acceptsWhenClosed, now);
+            }
+
             if (request.IsActive)
             {
                 establishment.Activate(now);

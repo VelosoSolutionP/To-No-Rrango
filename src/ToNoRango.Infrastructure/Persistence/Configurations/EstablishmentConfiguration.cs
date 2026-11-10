@@ -28,6 +28,8 @@ public sealed class EstablishmentConfiguration : IEntityTypeConfiguration<Establ
         builder.Property(establishment => establishment.SecondaryColor).HasMaxLength(7).IsRequired();
         builder.Property(establishment => establishment.DeliveryFeeInCents).IsRequired();
         builder.Property(establishment => establishment.MinimumOrderInCents).IsRequired();
+        builder.Property(establishment => establishment.OpeningHours).HasMaxLength(500);
+        builder.Property(establishment => establishment.AcceptsOrdersWhenClosed).HasDefaultValue(true);
         builder.Property(establishment => establishment.CreatedAt).IsRequired();
         builder.Property(establishment => establishment.UpdatedAt).IsRequired();
 

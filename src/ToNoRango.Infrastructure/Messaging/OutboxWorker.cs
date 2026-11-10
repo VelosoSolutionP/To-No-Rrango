@@ -81,7 +81,11 @@ public sealed class OutboxWorker(
 
                 var apiKey = protector.Unprotect(settings.EncryptedApiKey!);
 
-                if (message.ImageBase64 is null)
+                if (message.AudioBase64 is not null)
+                {
+                    await sender.SendAudioAsync(settings.InstanceName!, apiKey, message.Phone, message.AudioBase64, cancellationToken);
+                }
+                else if (message.ImageBase64 is null)
                 {
                     await sender.SendTextAsync(settings.InstanceName!, apiKey, message.Phone, message.Text, cancellationToken);
                 }

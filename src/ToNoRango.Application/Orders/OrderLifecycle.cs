@@ -181,7 +181,8 @@ public sealed class OrderNotifier(
 {
     public async Task NotifyStatusAsync(Order order, CancellationToken cancellationToken)
     {
-        if (!sender.IsConfigured)
+        // Counter sales without a phone have nobody to tell.
+        if (!sender.IsConfigured || Domain.Common.PhoneNumber.Digits(order.CustomerPhone).Length < 10)
         {
             return;
         }
