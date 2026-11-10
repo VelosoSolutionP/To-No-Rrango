@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import type { CategoryPayload, MenuCategory } from "@/lib/types";
+import type { CategoryPayload, MenuCategory, PrepStation } from "@/lib/types";
 
 interface CategoryModalProps {
   category: MenuCategory | null;
@@ -15,8 +15,10 @@ export function CategoryModal({ category, busy, error, onClose, onSave }: Catego
   const [name, setName] = useState(category?.name ?? "");
   const [description, setDescription] = useState(category?.description ?? "");
   const [sortOrder, setSortOrder] = useState(String(category?.sortOrder ?? 0));
+  const [station, setStation] = useState<PrepStation>(category?.station ?? "Kitchen");
 
   useEffect(() => {
+    setStation(category?.station ?? "Kitchen");
     setName(category?.name ?? "");
     setDescription(category?.description ?? "");
     setSortOrder(String(category?.sortOrder ?? 0));
@@ -28,6 +30,7 @@ export function CategoryModal({ category, busy, error, onClose, onSave }: Catego
       name: name.trim(),
       description: description.trim() || null,
       sortOrder: Number(sortOrder) || 0,
+      station,
     });
   }
 
@@ -74,6 +77,14 @@ export function CategoryModal({ category, busy, error, onClose, onSave }: Catego
               type="number"
               value={sortOrder}
             />
+          </label>
+
+          <label className="field">
+            <span>Onde é preparado</span>
+            <select onChange={(event) => setStation(event.target.value as PrepStation)} value={station}>
+              <option value="Kitchen">Cozinha (comidas: fila, preparo, finalização)</option>
+              <option value="Bar">Bar (bebidas: separação)</option>
+            </select>
           </label>
 
           {error ? <p className="form-error">{error}</p> : null}

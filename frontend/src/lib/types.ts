@@ -36,6 +36,22 @@ export interface Establishment {
   minimumOrderInCents: number;
   primaryColor: string;
   secondaryColor: string;
+  openingHours?: string | null;
+  acceptsOrdersWhenClosed?: boolean;
+  isOpenNow?: boolean;
+  nextOpeningAt?: string | null;
+  hoursText?: string | null;
+}
+
+export type PrepStation = "Kitchen" | "Bar";
+
+export type ItemPrepStatus = "Received" | "Queued" | "Preparing" | "Finishing" | "Ready" | "Delivered";
+
+export interface MenuComboPart {
+  menuItemId: string;
+  name: string;
+  quantity: number;
+  priceInCents: number;
 }
 
 export interface MenuOption {
@@ -67,6 +83,9 @@ export interface MenuItem {
   isAvailable: boolean;
   sortOrder: number;
   optionGroups: MenuOptionGroup[];
+  comboParts?: MenuComboPart[] | null;
+  comboSavingsInCents?: number | null;
+  compareAtPriceInCents?: number | null;
 }
 
 export interface MenuCategory {
@@ -76,6 +95,7 @@ export interface MenuCategory {
   sortOrder: number;
   isActive: boolean;
   items: MenuItem[];
+  station?: PrepStation;
 }
 
 export interface PublicMenu {
@@ -91,6 +111,7 @@ export interface DeliveryAddress {
   city: string;
   state: string;
   postalCode: string;
+  reference?: string | null;
 }
 
 export interface CreateOrderItem {
@@ -126,6 +147,9 @@ export interface OrderItem {
   notes: string | null;
   totalInCents: number;
   options: OrderItemOption[];
+  station?: PrepStation;
+  prepStatus?: ItemPrepStatus;
+  prepUpdatedAt?: string | null;
 }
 
 export interface OrderStatusHistory {
@@ -142,7 +166,11 @@ export interface OrderTracking {
   status: OrderStatus;
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
-  channel?: "Web" | "WhatsApp";
+  channel?: "Web" | "WhatsApp" | "Pdv";
+  scheduledFor?: string | null;
+  discountInCents?: number;
+  tableLabel?: string | null;
+  courierName?: string | null;
   customerName: string;
   customerPhoneMasked: string;
   subtotalInCents: number;
@@ -165,6 +193,8 @@ export interface AdminOrder extends OrderTracking {
   notes: string | null;
   deliveryAddress: DeliveryAddress | null;
   updatedAt: string;
+  discountReason?: string | null;
+  deliveryReference?: string | null;
 }
 
 export type UserRole = "Owner" | "Manager" | "Attendant" | "Kitchen";
@@ -249,12 +279,15 @@ export interface UpdateEstablishmentPayload {
   isDineInEnabled: boolean;
   deliveryFeeInCents: number;
   minimumOrderInCents: number;
+  openingHours?: string | null;
+  acceptsOrdersWhenClosed?: boolean | null;
 }
 
 export interface CategoryPayload {
   name: string;
   description: string | null;
   sortOrder: number;
+  station?: PrepStation;
 }
 
 export interface MenuOptionPayload {
@@ -282,6 +315,8 @@ export interface MenuItemPayload {
   sortOrder: number;
   isAvailable: boolean;
   optionGroups: MenuOptionGroupPayload[];
+  comboLines?: Array<{ menuItemId: string; quantity: number }> | null;
+  compareAtPriceInCents?: number | null;
 }
 
 export interface UpdateOrderStatusPayload {
@@ -289,3 +324,37 @@ export interface UpdateOrderStatusPayload {
   reason: string | null;
   changedBy: string | null;
 }
+
+export interface RatingState {
+  canRate: boolean;
+  isRated: boolean;
+  courierName: string | null;
+}
+
+export interface RatePayload {
+  serviceScore: number;
+  productScore: number;
+  overallScore: number;
+  storeComment: string | null;
+  courierServiceScore: number | null;
+  courierPunctualityScore: number | null;
+  courierCareScore: number | null;
+  courierComment: string | null;
+}
+
+export const prepLabels: Record<PrepStation, Partial<Record<ItemPrepStatus, string>>> = {
+  Kitchen: {
+    Received: "Recebido",
+    Queued: "Na fila",
+    Preparing: "Em preparação",
+    Finishing: "Em finalização",
+    Ready: "Pronto",
+    Delivered: "Entregue",
+  },
+  Bar: {
+    Received: "Recebido",
+    Preparing: "Em separação",
+    Ready: "Separado",
+    Delivered: "Entregue",
+  },
+};

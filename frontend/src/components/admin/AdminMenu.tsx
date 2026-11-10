@@ -167,8 +167,15 @@ export function AdminMenu({
                           {!item.isAvailable ? (
                             <span className="admin-badge warning">Indisponível</span>
                           ) : null}
+                          {(item.compareAtPriceInCents ?? 0) > item.priceInCents ? (
+                            <span className="admin-badge">Promoção · de {formatBRL(item.compareAtPriceInCents!)}</span>
+                          ) : null}
+                          {item.comboParts?.length ? <span className="admin-badge">Combo</span> : null}
                         </div>
                         {item.description ? <p className="muted">{item.description}</p> : null}
+                        {item.comboParts?.length ? (
+                          <p className="muted">Leva: {item.comboParts.map((part) => `${part.quantity}× ${part.name}`).join(" + ")}</p>
+                        ) : null}
                         {item.optionGroups.length > 0 ? (
                           <div className="admin-option-summary">
                             {item.optionGroups.map((group) => (

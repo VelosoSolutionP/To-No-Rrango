@@ -171,6 +171,12 @@ public sealed class ZestSalesService(
 
         var answer = await zest.AnswerAsync(establishment, phone, message, cancellationToken);
 
+        if (answer.Intent is ZestIntent.Unknown && phone is not null && message.Contains('?'))
+        {
+            // A real question in the middle of a sale that nobody could answer is kept for the store to answer.
+            await zest.RecordGapAsync(establishment, message, "whatsapp", cancellationToken);
+        }
+
         if (answer.Intent is ZestIntent.Unknown or ZestIntent.Greeting or ZestIntent.Thanks)
         {
             return turn.Reply;

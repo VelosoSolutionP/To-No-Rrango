@@ -165,6 +165,7 @@ export function CheckoutModal({ establishment, lines, onClose, onSuccess }: Chec
               street: address.street.trim(),
               number: address.number.trim(),
               complement: address.complement?.trim() || null,
+              reference: address.reference?.trim() || null,
               district: address.district.trim(),
               city: address.city.trim(),
               state: address.state.trim(),
@@ -289,6 +290,15 @@ export function CheckoutModal({ establishment, lines, onClose, onSuccess }: Chec
                     maxLength={100}
                     onChange={(event) => updateAddress("complement", event.target.value)}
                     value={address.complement ?? ""}
+                  />
+                </label>
+                <label className="field">
+                  <span>Ponto de referência</span>
+                  <input
+                    maxLength={150}
+                    onChange={(event) => updateAddress("reference", event.target.value)}
+                    placeholder="Ex.: portão azul, ao lado da padaria"
+                    value={address.reference ?? ""}
                   />
                 </label>
                 <label className="field">

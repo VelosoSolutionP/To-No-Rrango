@@ -64,6 +64,9 @@ export function AdminEstablishment({
     establishment?.isDeliveryEnabled ?? true,
   );
   const [isDineInEnabled, setIsDineInEnabled] = useState(establishment?.isDineInEnabled ?? false);
+  const [hours, setHours] = useState<DayHours[]>(() => parseHours(establishment?.openingHours));
+  const [alwaysOpen, setAlwaysOpen] = useState(!establishment?.openingHours);
+  const [acceptsWhenClosed, setAcceptsWhenClosed] = useState(establishment?.acceptsOrdersWhenClosed ?? true);
 
   useEffect(() => {
     setName(establishment?.name ?? "");
@@ -84,6 +87,9 @@ export function AdminEstablishment({
     setIsPickupEnabled(establishment?.isPickupEnabled ?? true);
     setIsDeliveryEnabled(establishment?.isDeliveryEnabled ?? true);
     setIsDineInEnabled(establishment?.isDineInEnabled ?? false);
+    setHours(parseHours(establishment?.openingHours));
+    setAlwaysOpen(!establishment?.openingHours);
+    setAcceptsWhenClosed(establishment?.acceptsOrdersWhenClosed ?? true);
   }, [establishment]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -115,6 +121,8 @@ export function AdminEstablishment({
           ...common,
           timeZone,
           isActive,
+          openingHours: alwaysOpen ? null : serializeHours(hours),
+          acceptsOrdersWhenClosed: acceptsWhenClosed,
         });
         return;
       }
@@ -351,6 +359,50 @@ export function AdminEstablishment({
           </p>
         </section>
 
+        {establishment ? (
+          <section className="admin-form-card card">
+            <h3>Horário de funcionamento</h3>
+            <label className="admin-check">
+              <input checked={alwaysOpen} onChange={(event) => setAlwaysOpen(event.target.checked)} type="checkbox" />
+              Aberto o tempo todo (sem horário)
+            </label>
+            {!alwaysOpen ? (
+              <div className="hours-grid">
+                {hours.map((day, index) => (
+                  <div className={`hours-row ${day.open ? "" : "is-closed"}`} key={day.day}>
+                    <label className="admin-check">
+                      <input
+                        checked={day.open}
+                        onChange={(event) => setHours((current) => current.map((item, i) => (i === index ? { ...item, open: event.target.checked } : item)))}
+                        type="checkbox"
+                      />
+                      {dayNames[day.day]}
+                    </label>
+                    {day.open ? (
+                      <>
+                        <input aria-label={`${dayNames[day.day]} abre`} onChange={(event) => setHours((current) => current.map((item, i) => (i === index ? { ...item, from1: event.target.value } : item)))} type="time" value={day.from1} />
+                        <span>às</span>
+                        <input aria-label={`${dayNames[day.day]} fecha`} onChange={(event) => setHours((current) => current.map((item, i) => (i === index ? { ...item, to1: event.target.value } : item)))} type="time" value={day.to1} />
+                        <span>e</span>
+                        <input aria-label={`${dayNames[day.day]} reabre`} onChange={(event) => setHours((current) => current.map((item, i) => (i === index ? { ...item, from2: event.target.value } : item)))} type="time" value={day.from2} />
+                        <span>às</span>
+                        <input aria-label={`${dayNames[day.day]} fecha de novo`} onChange={(event) => setHours((current) => current.map((item, i) => (i === index ? { ...item, to2: event.target.value } : item)))} type="time" value={day.to2} />
+                      </>
+                    ) : (
+                      <span className="muted">Fechado</span>
+                    )}
+                  </div>
+                ))}
+                <small className="muted">O segundo turno é opcional. Para virar a noite (ex.: 18:00 às 02:00), coloque o fechamento menor que a abertura.</small>
+              </div>
+            ) : null}
+            <label className="admin-check">
+              <input checked={acceptsWhenClosed} onChange={(event) => setAcceptsWhenClosed(event.target.checked)} type="checkbox" />
+              Aceitar pedidos com a loja fechada (ficam agendados e esperam a confirmação)
+            </label>
+          </section>
+        ) : null}
+
         {error ? <p className="form-error">{error}</p> : null}
 
         <div className="admin-form-actions">
@@ -361,4 +413,47 @@ export function AdminEstablishment({
       </form>
     </section>
   );
+}
+
+interface DayHours {
+  day: number;
+  open: boolean;
+  from1: string;
+  to1: string;
+  from2: string;
+  to2: string;
+}
+
+const dayNames = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+const weekOrder = [1, 2, 3, 4, 5, 6, 0];
+
+/** Reads "1=11:00-15:00,18:00-23:00;2=..." into one row per day, Monday first. */
+function parseHours(text: string | null | undefined): DayHours[] {
+  const byDay = new Map<number, string[]>();
+
+  for (const part of (text ?? "").split(";").filter(Boolean)) {
+    const [day, ranges] = part.split("=");
+    byDay.set(Number(day), (ranges ?? "").split(",").filter(Boolean));
+  }
+
+  return weekOrder.map((day) => {
+    const ranges = byDay.get(day) ?? [];
+    const [from1 = "11:00", to1 = "23:00"] = (ranges[0] ?? "").split("-").filter(Boolean);
+    const [from2 = "", to2 = ""] = (ranges[1] ?? "").split("-").filter(Boolean);
+    return { day, open: text ? ranges.length > 0 : true, from1, to1, from2, to2 };
+  });
+}
+
+function serializeHours(days: DayHours[]): string | null {
+  const parts = days
+    .filter((day) => day.open && day.from1 && day.to1)
+    .map((day) => {
+      const ranges = [`${day.from1}-${day.to1}`];
+      if (day.from2 && day.to2) {
+        ranges.push(`${day.from2}-${day.to2}`);
+      }
+      return `${day.day}=${ranges.join(",")}`;
+    });
+
+  return parts.length > 0 ? parts.join(";") : null;
 }

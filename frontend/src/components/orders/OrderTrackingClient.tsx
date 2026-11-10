@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, formatBRL, formatDateTime } from "@/lib/api";
-import type { OrderStatus, OrderTracking } from "@/lib/types";
+import { prepLabels, type OrderStatus, type OrderTracking } from "@/lib/types";
 import { DeliveryMap } from "./DeliveryMap";
 import { OrderPaymentPanel } from "./OrderPaymentPanel";
+import { OrderRating } from "./OrderRating";
 
 interface OrderTrackingClientProps {
   code: string;
@@ -132,7 +133,17 @@ export function OrderTrackingClient({ code }: OrderTrackingClientProps) {
         <p className="muted">{statusDescriptions[order.status]}</p>
         <strong className="order-code">{order.code}</strong>
         <span className="tracking-updated">Atualizado em {formatDateTime(order.createdAt)}</span>
+        {order.scheduledFor && order.status === "Pending" ? (
+          <p className="tracking-scheduled">
+            A loja estava fechada: seu pedido está agendado para {formatDateTime(order.scheduledFor)} e será confirmado quando ela abrir.
+          </p>
+        ) : null}
+        {order.courierName && order.fulfillmentType === "Delivery" && order.status !== "Delivered" && order.status !== "Cancelled" ? (
+          <p className="tracking-courier">Entregador: {order.courierName}</p>
+        ) : null}
       </section>
+
+      <OrderRating code={order.code} delivered={order.status === "Delivered"} />
 
       <OrderPaymentPanel onPaid={reload} order={order} />
 
@@ -180,6 +191,11 @@ export function OrderTrackingClient({ code }: OrderTrackingClientProps) {
                   </p>
                 ) : null}
                 {item.notes ? <p className="muted">“{item.notes}”</p> : null}
+                {item.prepStatus && order.status !== "Cancelled" && order.status !== "Pending" ? (
+                  <span className={`prep-chip prep-${item.prepStatus.toLowerCase()}`}>
+                    {item.station === "Bar" ? "Bebida" : "Cozinha"} · {prepLabels[item.station ?? "Kitchen"][item.prepStatus] ?? item.prepStatus}
+                  </span>
+                ) : null}
               </div>
               <strong>{formatBRL(item.totalInCents)}</strong>
             </article>
@@ -191,6 +207,12 @@ export function OrderTrackingClient({ code }: OrderTrackingClientProps) {
             <span>Subtotal</span>
             <strong>{formatBRL(order.subtotalInCents)}</strong>
           </div>
+          {order.discountInCents ? (
+            <div className="summary-row">
+              <span>Desconto</span>
+              <strong>− {formatBRL(order.discountInCents)}</strong>
+            </div>
+          ) : null}
           {order.deliveryFeeInCents > 0 ? (
             <div className="summary-row">
               <span>Entrega</span>

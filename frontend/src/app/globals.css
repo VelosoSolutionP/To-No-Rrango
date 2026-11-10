@@ -4797,3 +4797,39 @@ body {
   background: var(--success);
   animation: pulse 1.6s infinite;
 }
+
+
+/* ---- Cardápio: busca, filtros, horário, promoção e combo ---- */
+button.store-status { background: none; border: 0; color: inherit; font: inherit; cursor: pointer; padding: 0; }
+.store-status.is-closed .status-dot { background: var(--warning); box-shadow: none; }
+.store-hours { margin: 8px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); color: var(--silver-text); font: 13px/1.5 var(--mono); white-space: pre-wrap; }
+.menu-closed-banner { max-width: 1180px; margin: 12px auto 0; padding: 12px 16px; border-radius: var(--radius); border: 1px solid color-mix(in srgb, var(--warning) 45%, transparent); background: color-mix(in srgb, var(--warning) 10%, var(--surface)); color: var(--foreground); font-size: 14px; }
+.menu-tools { max-width: 1180px; margin: 14px auto 0; padding: 0 16px; display: grid; gap: 10px; }
+.menu-search { display: flex; align-items: center; gap: 8px; padding: 0 14px; min-height: 48px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--surface); }
+.menu-search span { color: var(--muted); font-size: 18px; }
+.menu-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--foreground); font: inherit; font-size: 16px; }
+.menu-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.menu-filter { min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--silver-text); font: inherit; font-size: 14px; cursor: pointer; }
+.menu-filter.is-active { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 16%, var(--surface)); color: var(--foreground); }
+.menu-sort { min-height: 40px; margin-left: auto; padding: 0 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--foreground); font: inherit; font-size: 14px; }
+.item-card-image em.is-promo { background: var(--brand); color: var(--brand-ink); }
+.item-card-image em.is-combo { background: var(--brand-2); color: #120a2a; }
+.item-combo-parts { margin: 6px 0 0; font-size: 13px; color: var(--brand-2); }
+.item-price-before { color: var(--muted); font-size: 13px; margin-right: 6px; }
+.item-saving { margin-left: 8px; font-size: 12px; color: var(--success); }
+@media (max-width: 560px) { .menu-sort { margin-left: 0; width: 100%; } }
+.item-combo-list { margin: 8px 0 0; padding-left: 18px; color: var(--brand-2); font-size: 14px; }
+
+/* ---- Acompanhamento: item a item e avaliação ---- */
+.prep-chip { display: block; width: fit-content; margin-top: 6px; padding: 3px 10px; border-radius: 999px; font-size: 12px; border: 1px solid var(--border-strong); color: var(--silver-text); background: var(--surface-2); }
+.prep-chip.prep-preparing, .prep-chip.prep-finishing { border-color: var(--brand); color: var(--foreground); background: color-mix(in srgb, var(--brand) 14%, var(--surface)); }
+.prep-chip.prep-ready, .prep-chip.prep-delivered { border-color: var(--success); color: var(--success); }
+.tracking-scheduled { margin: 10px 0 0; padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--warning) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--warning) 40%, transparent); font-size: 14px; }
+.tracking-courier { margin: 8px 0 0; color: var(--silver-text); }
+.rating-card h3 { margin: 16px 0 6px; font-size: 15px; color: var(--silver-text); }
+.rating-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 0; }
+.rating-stars { display: flex; gap: 2px; }
+.rating-stars button { width: 40px; height: 40px; border: 0; background: none; font-size: 26px; color: var(--border-strong); cursor: pointer; }
+.rating-stars button.is-on { color: var(--warning); }
+.rating-card textarea { width: 100%; min-height: 64px; margin-top: 8px; padding: 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); color: var(--foreground); font: inherit; }
+.rating-card .primary-button { margin-top: 14px; }

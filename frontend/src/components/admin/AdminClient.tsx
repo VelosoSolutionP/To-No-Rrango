@@ -12,6 +12,7 @@ import type {
   CategoryPayload,
   CreateEstablishmentPayload,
   Establishment,
+  ItemPrepStatus,
   MenuCategory,
   MenuItem,
   MenuItemPayload,
@@ -33,10 +34,15 @@ import { Inventory } from "./modules/Inventory";
 import { Kitchen } from "./modules/Kitchen";
 import { LiveDeliveries } from "./modules/LiveDeliveries";
 import { Overview } from "./modules/Overview";
+import { Pdv } from "./modules/Pdv";
+import { Ratings } from "./modules/Ratings";
+import { Reports } from "./modules/Reports";
+import { ZestIa } from "./modules/ZestIa";
+import { SubTabs } from "./modules/shared";
 import { Customers } from "./modules/Parties";
 import { Settings } from "./modules/Settings";
 
-type Tab = "overview" | "orders" | "tracking" | "kitchen" | "menu" | "inventory" | "customers" | "distribution" | "finance" | "fiscal" | "settings";
+type Tab = "overview" | "orders" | "kitchen" | "tracking" | "pdv" | "menu" | "inventory" | "customers" | "distribution" | "finance" | "fiscal" | "reports" | "zest" | "settings";
 
 const roleName: Record<UserRole, string> = { Owner: "Dono", Manager: "Gerente", Attendant: "Atendente", Kitchen: "Cozinha" };
 
@@ -46,14 +52,17 @@ const everyone: UserRole[] = ["Owner", "Manager", "Attendant", "Kitchen"];
 const tabs: Array<{ id: Tab; group: string; label: string; roles: UserRole[]; modules?: string[] }> = [
   { id: "overview", group: "Operação", label: "Visão geral", roles: ["Owner", "Manager", "Attendant"] },
   { id: "orders", group: "Operação", label: "Pedidos", roles: everyone, modules: ["pedidos"] },
-  { id: "tracking", group: "Operação", label: "Rastreio", roles: ["Owner", "Manager", "Attendant"], modules: ["rastreio"] },
   { id: "kitchen", group: "Operação", label: "Cozinha", roles: everyone, modules: ["pedidos"] },
+  { id: "tracking", group: "Operação", label: "Entregas", roles: ["Owner", "Manager", "Attendant"], modules: ["rastreio"] },
+  { id: "pdv", group: "Operação", label: "PDV", roles: ["Owner", "Manager", "Attendant"], modules: ["pedidos"] },
   { id: "menu", group: "Gestão", label: "Cardápio", roles: management, modules: ["cardapio"] },
   { id: "inventory", group: "Gestão", label: "Estoque", roles: management, modules: ["estoque"] },
   { id: "customers", group: "Gestão", label: "Clientes", roles: ["Owner", "Manager", "Attendant"], modules: ["clientes"] },
   { id: "distribution", group: "Gestão", label: "Distribuição", roles: management, modules: ["pedidos"] },
   { id: "finance", group: "Gestão", label: "Financeiro", roles: management, modules: ["financeiro"] },
   { id: "fiscal", group: "Gestão", label: "Fiscal", roles: management, modules: ["fiscal", "fiscal_nfce"] },
+  { id: "reports", group: "Gestão", label: "Relatórios", roles: management, modules: ["pedidos"] },
+  { id: "zest", group: "Inteligência", label: "ZEST IA", roles: management, modules: ["ia"] },
   { id: "settings", group: "Ajustes", label: "Configurações", roles: management },
 ];
 
@@ -81,6 +90,7 @@ export function AdminClient() {
   const [mutationBusy, setMutationBusy] = useState(false);
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [navOpen, setNavOpen] = useState(false);
+  const [reportView, setReportView] = useState<"sales" | "ratings">("ratings");
 
   const selectedEstablishment = useMemo(
     () => establishments.find((establishment) => establishment.id === selectedId) ?? null,
@@ -235,7 +245,7 @@ export function AdminClient() {
   }, [selectedId, session]);
 
   useEffect(() => {
-    if (!session || !selectedId || (tab !== "orders" && tab !== "kitchen" && tab !== "overview")) {
+    if (!session || !selectedId || (tab !== "orders" && tab !== "kitchen" && tab !== "overview" && tab !== "pdv")) {
       return;
     }
 
@@ -384,6 +394,17 @@ export function AdminClient() {
     });
   }
 
+  async function advanceItem(orderId: string, itemId: string, status: ItemPrepStatus) {
+    if (!http) {
+      return;
+    }
+
+    await runMutation(async () => {
+      await http.patch(`/orders/${orderId}/items/${itemId}/prep`, { status });
+      await refreshOrders();
+    });
+  }
+
   async function markPaid(orderId: string) {
     if (!http) {
       return;
@@ -525,7 +546,7 @@ export function AdminClient() {
                 onMarkPaid={session.role !== "Kitchen" ? markPaid : undefined}
                 onRefresh={refreshOrders}
                 onRefund={canManage && session.modules.includes("pagamentos") ? refundOrder : undefined}
-                onTrack={http && session.role !== "Kitchen" && session.modules.includes("rastreio") ? async (orderId) => (await http.post<{ token: string }>(`/orders/${orderId}/tracking`)).token : undefined}
+                onTrack={http && session.role !== "Kitchen" && session.modules.includes("rastreio") ? async (orderId, courierId) => (await http.post<{ token: string }>(`/orders/${orderId}/courier`, { courierId: courierId ?? null })).token : undefined}
                 onLoadCouriers={http && session.role !== "Kitchen" && session.modules.includes("rastreio") ? () => http.get<CourierContact[]>(`/establishments/${selectedId}/couriers`) : undefined}
                 onOpenMap={session.role !== "Kitchen" && session.modules.includes("rastreio") ? () => goTo("tracking") : undefined}
                 onUpdateStatus={updateOrderStatus}
@@ -534,7 +555,24 @@ export function AdminClient() {
             ) : null}
 
             {tab === "tracking" && hasEstablishment && http ? <LiveDeliveries establishmentId={selectedId} http={http} /> : null}
-            {tab === "kitchen" && hasEstablishment ? <Kitchen error={mutationError ?? dataError} onAdvance={updateOrderStatus} orders={orders} /> : null}
+            {tab === "kitchen" && hasEstablishment ? <Kitchen error={mutationError ?? dataError} onAdvance={updateOrderStatus} onAdvanceItem={http ? advanceItem : undefined} orders={orders} /> : null}
+            {tab === "pdv" && hasEstablishment && http ? <Pdv canManage={canManage} establishmentId={selectedId} http={http} menu={menu} onChanged={refreshOrders} orders={orders} /> : null}
+            {tab === "reports" && hasEstablishment && http ? (
+              <>
+                {session.modules.includes("relatorios") ? (
+                  <SubTabs
+                    onChange={setReportView}
+                    options={[
+                      { value: "ratings", label: "Avaliações" },
+                      { value: "sales", label: "Vendas" },
+                    ]}
+                    value={reportView}
+                  />
+                ) : null}
+                {reportView === "sales" && session.modules.includes("relatorios") ? <Reports establishmentId={selectedId} http={http} /> : <Ratings establishmentId={selectedId} http={http} />}
+              </>
+            ) : null}
+            {tab === "zest" && hasEstablishment && http ? <ZestIa establishmentId={selectedId} http={http} /> : null}
 
             {tab === "menu" && hasEstablishment ? (
               <AdminMenu

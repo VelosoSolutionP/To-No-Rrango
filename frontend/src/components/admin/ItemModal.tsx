@@ -105,6 +105,13 @@ export function ItemModal({
   const [sortOrder, setSortOrder] = useState(String(item?.sortOrder ?? 0));
   const [isAvailable, setIsAvailable] = useState(item?.isAvailable ?? true);
   const [groups, setGroups] = useState<GroupDraft[]>(() => toDrafts(item));
+  const [comparePrice, setComparePrice] = useState(item?.compareAtPriceInCents ? moneyToInput(item.compareAtPriceInCents) : "");
+  const [comboLines, setComboLines] = useState<Array<{ menuItemId: string; quantity: number }>>(
+    () => item?.comboParts?.map((part) => ({ menuItemId: part.menuItemId, quantity: part.quantity })) ?? [],
+  );
+  const [comboPick, setComboPick] = useState("");
+  const otherItems = categories.flatMap((category) => category.items).filter((candidate) => candidate.id !== item?.id && !(candidate.comboParts?.length));
+  const comboSeparate = comboLines.reduce((total, line) => total + (otherItems.find((candidate) => candidate.id === line.menuItemId)?.priceInCents ?? 0) * line.quantity, 0);
 
   useEffect(() => {
     setCategoryId(item?.categoryId ?? defaultCategoryId);
@@ -115,6 +122,8 @@ export function ItemModal({
     setSortOrder(String(item?.sortOrder ?? 0));
     setIsAvailable(item?.isAvailable ?? true);
     setGroups(toDrafts(item));
+    setComparePrice(item?.compareAtPriceInCents ? moneyToInput(item.compareAtPriceInCents) : "");
+    setComboLines(item?.comboParts?.map((part) => ({ menuItemId: part.menuItemId, quantity: part.quantity })) ?? []);
   }, [defaultCategoryId, item]);
 
   function updateGroup(key: string, patch: Partial<GroupDraft>) {
@@ -186,6 +195,8 @@ export function ItemModal({
       sortOrder: Number(sortOrder) || 0,
       isAvailable,
       optionGroups,
+      compareAtPriceInCents: comparePrice.trim() ? inputToCents(comparePrice) || null : null,
+      comboLines,
     });
   }
 
@@ -234,6 +245,77 @@ export function ItemModal({
               />
             </label>
           </div>
+
+          <div className="admin-form-grid">
+            <label className="field">
+              <span>Promoção: preço &quot;de&quot; (R$)</span>
+              <input
+                min={0}
+                onChange={(event) => setComparePrice(event.target.value)}
+                placeholder="Vazio = sem promoção"
+                step="0.01"
+                type="number"
+                value={comparePrice}
+              />
+              <small className="muted">Preencha com o preço antigo, maior que o atual. Apague para encerrar.</small>
+            </label>
+          </div>
+
+          <fieldset className="admin-combo">
+            <legend>Combo — itens que este produto leva</legend>
+            {comboLines.length === 0 ? <p className="muted">Deixe vazio se não for combo.</p> : null}
+            {comboLines.map((line) => {
+              const part = otherItems.find((candidate) => candidate.id === line.menuItemId);
+              return (
+                <div className="admin-combo-line" key={line.menuItemId}>
+                  <input
+                    aria-label="Quantidade"
+                    max={20}
+                    min={1}
+                    onChange={(event) =>
+                      setComboLines((current) =>
+                        current.map((entry) => (entry.menuItemId === line.menuItemId ? { ...entry, quantity: Math.max(1, Number(event.target.value) || 1) } : entry)),
+                      )
+                    }
+                    type="number"
+                    value={line.quantity}
+                  />
+                  <span>{part?.name ?? "Item removido"}</span>
+                  <button className="link-button" onClick={() => setComboLines((current) => current.filter((entry) => entry.menuItemId !== line.menuItemId))} type="button">
+                    Tirar
+                  </button>
+                </div>
+              );
+            })}
+            <div className="admin-combo-line">
+              <select onChange={(event) => setComboPick(event.target.value)} value={comboPick}>
+                <option value="">Escolha um item do cardápio…</option>
+                {otherItems
+                  .filter((candidate) => !comboLines.some((line) => line.menuItemId === candidate.id))
+                  .map((candidate) => (
+                    <option key={candidate.id} value={candidate.id}>
+                      {candidate.name}
+                    </option>
+                  ))}
+              </select>
+              <button
+                className="secondary-button"
+                disabled={!comboPick}
+                onClick={() => {
+                  setComboLines((current) => [...current, { menuItemId: comboPick, quantity: 1 }]);
+                  setComboPick("");
+                }}
+                type="button"
+              >
+                Adicionar ao combo
+              </button>
+            </div>
+            {comboLines.length > 0 ? (
+              <small className="muted">
+                Separados custariam R$ {(comboSeparate / 100).toFixed(2).replace(".", ",")}. O preço acima é o preço do combo.
+              </small>
+            ) : null}
+          </fieldset>
 
           <label className="field">
             <span>Nome</span>

@@ -19,7 +19,7 @@ interface AdminOrdersProps {
   onUpdateStatus: (orderId: string, status: OrderStatus, reason: string | null) => Promise<void>;
   onMarkPaid?: (orderId: string) => Promise<void>;
   onRefund?: (orderId: string) => Promise<void>;
-  onTrack?: (orderId: string) => Promise<string>;
+  onTrack?: (orderId: string, courierId?: string) => Promise<string>;
   onLoadCouriers?: () => Promise<CourierContact[]>;
   onOpenMap?: () => void;
 }
@@ -194,7 +194,7 @@ export function AdminOrders({
     setTrackingError(null);
 
     try {
-      const token = await onTrack(order.id);
+      const token = await onTrack(order.id, courier.id);
       const url = `${window.location.origin}/entrega/${token}`;
       const target = `https://wa.me/${courier.phone}?text=${encodeURIComponent(`Entrega do pedido ${order.code}. Abra para iniciar: ${url}`)}`;
       setTracking({ orderId: order.id, url });
@@ -276,7 +276,11 @@ export function AdminOrders({
               <button className={`vx-order-row ${order.id === selected.id ? "is-active" : ""}`} key={order.id} onClick={() => setSelectedId(order.id)} type="button">
                 <strong>{order.code.slice(-8)}</strong>
                 <strong>{formatBRL(order.totalInCents)}</strong>
-                <small>{order.customerName} · {fulfillmentLabels[order.fulfillmentType]}</small>
+                <small>
+                  {order.customerName} · {order.channel === "Pdv" ? "Balcão" : fulfillmentLabels[order.fulfillmentType]}
+                  {order.tableLabel ? ` · Mesa ${order.tableLabel}` : ""}
+                  {order.scheduledFor && order.status === "Pending" ? " · Agendado" : ""}
+                </small>
                 <small>{statusLabels[order.status]}</small>
               </button>
             ))}
@@ -296,6 +300,11 @@ export function AdminOrders({
               <div><dt>Telefone</dt><dd>{selected.customerPhone}</dd></div>
               <div><dt>Recebimento</dt><dd>{fulfillmentLabels[selected.fulfillmentType]}</dd></div>
               <div><dt>Pagamento</dt><dd>{paymentLabels[selected.paymentMethod]} · {paymentStatusLabels[selected.paymentStatus]}</dd></div>
+              {selected.scheduledFor ? <div><dt>Agendado para</dt><dd>{new Date(selected.scheduledFor).toLocaleString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</dd></div> : null}
+              {selected.tableLabel ? <div><dt>Mesa</dt><dd>{selected.tableLabel}</dd></div> : null}
+              {selected.courierName ? <div><dt>Entregador</dt><dd>{selected.courierName}</dd></div> : null}
+              {selected.deliveryReference ? <div><dt>Referência</dt><dd>{selected.deliveryReference}</dd></div> : null}
+              {selected.discountInCents ? <div><dt>Desconto</dt><dd>{formatBRL(selected.discountInCents)} · {selected.discountReason}</dd></div> : null}
             </dl>
 
             <ul className="vx-lines">

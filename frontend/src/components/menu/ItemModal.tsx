@@ -115,7 +115,22 @@ export function ItemModal({ item, onClose, onAdd }: ItemModalProps) {
             <p className="eyebrow">Personalize seu pedido</p>
             <h2>{item.name}</h2>
             {item.description ? <p className="muted">{item.description}</p> : null}
-            <p className="item-price">{formatBRL(item.priceInCents)}</p>
+            {item.comboParts && item.comboParts.length > 0 ? (
+              <ul className="item-combo-list">
+                {item.comboParts.map((part) => (
+                  <li key={part.menuItemId}>
+                    {part.quantity}× {part.name}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <p className="item-price">
+              {(item.compareAtPriceInCents ?? 0) > item.priceInCents ? (
+                <s className="item-price-before">{formatBRL(item.compareAtPriceInCents!)}</s>
+              ) : null}
+              {formatBRL(item.priceInCents)}
+              {item.comboSavingsInCents ? <span className="item-saving">economize {formatBRL(item.comboSavingsInCents)}</span> : null}
+            </p>
           </div>
 
           {item.optionGroups.map((group) => (

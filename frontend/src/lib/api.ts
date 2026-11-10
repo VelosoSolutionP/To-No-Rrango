@@ -5,6 +5,8 @@ import type {
   OrderPayment,
   OrderTracking,
   PublicMenu,
+  RatePayload,
+  RatingState,
 } from "./types";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
@@ -109,6 +111,17 @@ export const api = {
 
   orderEventsUrl(code: string): string {
     return `${API_BASE_URL}/api/public/orders/${encodeURIComponent(code)}/events`;
+  },
+
+  getRating(code: string): Promise<RatingState> {
+    return apiFetch<RatingState>(`/api/public/orders/${encodeURIComponent(code)}/rating`, { cache: "no-store" });
+  },
+
+  rateOrder(code: string, payload: RatePayload): Promise<RatingState> {
+    return apiFetch<RatingState>(`/api/public/orders/${encodeURIComponent(code)}/rating`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
   },
 
   trackOrder(code: string): Promise<OrderTracking> {

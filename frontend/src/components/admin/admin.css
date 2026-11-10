@@ -1665,3 +1665,87 @@
     height: 52vh;
   }
 }
+
+/* ---- Cozinha: item a item, setor, atraso ---- */
+.vx .kitchen-card.is-late { border-color: var(--danger); box-shadow: 0 0 0 1px color-mix(in srgb, var(--danger) 40%, transparent); }
+.vx .kitchen-card.is-late header span { color: var(--danger); font-weight: 700; }
+.vx .kitchen-scheduled { color: var(--warning); }
+.vx .kitchen-card ul li { list-style: none; }
+.vx .kitchen-item { width: 100%; min-height: 52px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 8px 10px; margin: 4px 0; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); color: var(--foreground); font: inherit; font-size: 15px; text-align: left; cursor: pointer; }
+.vx .kitchen-item:disabled { cursor: default; opacity: 1; }
+.vx .kitchen-item-step { font-size: 12px; color: var(--muted); }
+.vx .kitchen-item.prep-preparing, .vx .kitchen-item.prep-finishing { border-color: var(--brand); }
+.vx .kitchen-item.prep-ready, .vx .kitchen-item.prep-delivered { border-color: var(--success); }
+.vx .kitchen-item.prep-ready .kitchen-item-step { color: var(--success); }
+.vx .kitchen-station { margin-left: 6px; padding: 1px 6px; border-radius: 6px; background: var(--brand-2); color: #120a2a; font-size: 11px; font-style: normal; }
+
+/* ---- PDV ---- */
+.vx .pdv-status { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); font-size: 0.85rem; }
+.vx .pdv-status.is-open { border-color: var(--success); color: var(--success); }
+.vx .pdv-open { max-width: 420px; display: grid; gap: 0.75rem; padding: 1.2rem; }
+.vx .pdv-sale { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(320px, 1fr); gap: 1rem; align-items: start; }
+.vx .pdv-search { width: 100%; min-height: 48px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--foreground); font: inherit; font-size: 16px; }
+.vx .pdv-grid { margin-top: 0.75rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.6rem; }
+.vx .pdv-product { min-height: 84px; display: flex; flex-direction: column; justify-content: space-between; gap: 6px; padding: 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); color: var(--foreground); font: inherit; text-align: left; cursor: pointer; }
+.vx .pdv-product:active { transform: scale(0.98); }
+.vx .pdv-product span { color: var(--brand); font-weight: 700; }
+.vx .pdv-cart { position: sticky; top: 1rem; display: grid; gap: 0.7rem; padding: 1rem; }
+.vx .pdv-lines { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.4rem; }
+.vx .pdv-lines li { display: grid; grid-template-columns: 1fr auto auto; gap: 0.6rem; align-items: center; }
+.vx .pdv-lines small { display: block; color: var(--muted); }
+.vx .pdv-qty { display: flex; align-items: center; gap: 6px; }
+.vx .pdv-qty button { width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--foreground); font-size: 18px; cursor: pointer; }
+.vx .pdv-choice { display: flex; flex-wrap: wrap; gap: 6px; }
+.vx .pdv-choice button, .vx .pdv-option { min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); color: var(--silver-text); font: inherit; cursor: pointer; }
+.vx .pdv-choice button.is-active, .vx .pdv-option.is-active { border-color: var(--brand); color: var(--foreground); background: color-mix(in srgb, var(--brand) 16%, var(--surface)); }
+.vx .pdv-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.5rem; }
+.vx .pdv-total { display: grid; gap: 2px; text-align: right; }
+.vx .pdv-total strong { font-family: var(--display); font-size: 1.5rem; }
+.vx .pdv-change { color: var(--success); font-weight: 700; font-size: 1.1rem; }
+.vx .pdv-finish { min-height: 56px; font-size: 1.05rem; }
+.vx .pdv-options { margin-top: 0.75rem; padding: 1rem; display: grid; gap: 0.6rem; }
+.vx .pdv-options fieldset { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.vx .pdv-options legend { margin-bottom: 6px; font-weight: 600; }
+.vx .pdv-option-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
+.vx .pdv-receive { display: grid; gap: 0.6rem; }
+.vx .pdv-receive-card { display: grid; grid-template-columns: 1fr auto; gap: 0.5rem; padding: 0.9rem; }
+.vx .pdv-receive-card small { display: block; color: var(--muted); }
+.vx .pdv-receive-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+.vx .pdv-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.6rem; }
+.vx .pdv-summary .card { padding: 0.8rem 1rem; display: grid; gap: 4px; }
+.vx .pdv-summary small { color: var(--muted); }
+.vx .pdv-summary strong { font-size: 1.2rem; }
+.vx .pdv-expected { border-color: var(--brand); }
+.vx .pdv-forms { margin: 1rem 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; }
+.vx .pdv-forms .card { padding: 1rem; display: grid; gap: 0.5rem; }
+.vx .pdv-forms input { min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); color: var(--foreground); font: inherit; }
+.vx .pdv-ok { color: var(--success); margin: 0; }
+.vx .is-negative { color: var(--danger); }
+.vx .pdv-history { margin-top: 1.5rem; }
+.vx .pdv-table td, .vx .pdv-history td { padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+@media (max-width: 900px) { .vx .pdv-sale { grid-template-columns: 1fr; } .vx .pdv-cart { position: static; } }
+
+/* ---- Avaliações e ZEST IA ---- */
+.vx .ratings-problems { margin: 1rem 0; padding: 1rem; border-color: var(--warning); }
+.vx .ratings-problems ul { margin: 0.5rem 0 0; padding-left: 1.1rem; }
+.vx .ratings-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.6rem; }
+.vx .ratings-list .card { padding: 0.9rem; display: grid; gap: 0.35rem; }
+.vx .ratings-list header { display: flex; justify-content: space-between; gap: 0.5rem; }
+.vx .ratings-list p { margin: 0; }
+.vx .zest-gap-actions { display: flex; gap: 0.5rem; align-items: center; justify-content: flex-end; }
+.vx .zest-teach { margin: 1rem 0; padding: 1rem; display: grid; gap: 0.6rem; }
+.vx .zest-teach textarea { width: 100%; padding: 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); color: var(--foreground); font: inherit; }
+
+/* ---- Combo no cadastro ---- */
+.admin-combo { border: 1px solid var(--border); border-radius: 12px; padding: 0.8rem; display: grid; gap: 0.5rem; }
+.admin-combo legend { padding: 0 6px; font-weight: 600; }
+.admin-combo-line { display: flex; gap: 0.5rem; align-items: center; }
+.admin-combo-line input[type="number"] { width: 70px; }
+.admin-combo-line select { flex: 1; min-height: 40px; }
+
+/* ---- Horário ---- */
+.hours-grid { display: grid; gap: 0.4rem; margin: 0.5rem 0; }
+.hours-row { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.hours-row .admin-check { min-width: 120px; }
+.hours-row input[type="time"] { min-height: 40px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2); color: var(--foreground); }
+.hours-row.is-closed { opacity: 0.6; }

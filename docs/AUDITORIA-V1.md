@@ -61,6 +61,43 @@ Legenda: **OK** funciona e tem teste · **Parcial** existe mas incompleto · **A
 4. PVA da Receita para validar SINTEGRA e SPED.
 5. Celular na rua para testar o rastreio.
 
-## Registro de execução
+## Registro de execução — 2026-11-10
 
-As fases seguintes são registradas abaixo, cada uma com o que mudou e como foi validado.
+### 1. Já existia e foi preservado
+Cardápio, carrinho, checkout, Mercado Pago (Pix, cartão, link), webhook, venda pela conversa, fila de envio com novas tentativas, passagem para humano, Kanban por status, rastreio com GPS real, estoque com ficha técnica, financeiro, NFC-e via ACBr, SINTEGRA e SPED. Nenhuma rota, tela ou tabela foi removida; a migração `V1Operacao` só acrescenta.
+
+### 2. Corrigido
+- Trabalho de combos e áudio deixado pela metade por outro agente (não compilava): terminado.
+- Pedido de balcão sem telefone não cria cliente nem tenta mandar WhatsApp.
+
+### 3. Implementado
+| Funcionalidade | Onde | Validação |
+|---|---|---|
+| Promoção (preço de/por) | `MenuItem.CompareAtPriceInCents`, cardápio, WhatsApp, painel | teste de domínio, E2E API, navegador |
+| Combos (cadastro, exibição, economia) | `MenuCombo`, `ItemModal` do painel, cardápio | E2E API (criar, trocar linhas, recusar combo de si mesmo), navegador |
+| Busca, filtros (promoções, combos, disponíveis) e ordenação no cardápio | `MenuClient.tsx` | navegador (celular 390px) |
+| Ponto de referência no endereço | web e WhatsApp | teste do fluxo |
+| WhatsApp: busca, promoções, combos, link do cardápio, endereço salvo do cliente, horário | `ZestSalesFlow`, `ZestBrain` | 8 testes novos + simulação pela API |
+| Horário de funcionamento e pedido fora do horário (agendado, espera confirmação, ou recusado se a loja quiser) | `OpeningSchedule`, `Establishment`, configurações | 3 testes + E2E API |
+| Setor por categoria (cozinha/bar) e status por item, pedido fica pronto quando todos os itens ficam prontos | `Order.AdvanceItem`, Kanban | 3 testes + E2E API + clique no navegador |
+| Cozinha: filtro por setor, atraso (25 min) em vermelho, agendado, toque no item | `Kitchen.tsx` | navegador |
+| Entregador gravado no pedido ao enviar o link | `Order.AssignCourier` | E2E API |
+| Avaliação da loja e do entregador, médias, problemas recorrentes | `OrderRating`, `RatingService`, página do pedido, Relatórios | 2 testes + E2E API + navegador |
+| PDV: abertura, suprimento, sangria, venda de balcão/mesa/entrega com troco, desconto só gerente com motivo, receber pedido do cardápio, cancelar venda, fechamento com conferência e diferença justificada, histórico | `CashSession`, `PdvService`, aba PDV | 2 testes + 19 checagens E2E + navegador |
+| Áudio: transcrição com whisper local e resposta em voz com piper (pt_BR) | `Speech.cs`, `WhatsAppService` | E2E com simulador da Evolution: nota de voz → texto → venda → texto e nota de voz enviados |
+| Perguntas sem resposta (lacunas) e tela para responder | `KnowledgeGap`, aba ZEST IA | E2E |
+
+### 4. Refatorado
+Menu do painel: Operação (Visão geral, Pedidos, Cozinha, Entregas, PDV), Gestão (Cardápio, Estoque, Clientes, Distribuição, Financeiro, Fiscal, Relatórios), Inteligência (ZEST IA), Ajustes (Configurações).
+
+### 5. Depende de credencial ou serviço externo
+- Mercado Pago: credencial de uma loja e compra real.
+- Evolution: instância real (testado só com simulador).
+- Áudio em produção: subir o whisper-server (modelo base) e apontar `Transcription__Url`; voz precisa de `Voice__PiperPath` e `Voice__Model` onde a API roda (o contêiner atual não tem piper).
+- Fiscal: certificado A1, CSC, ACBrMonitor; NF-e de saída (modelo 55), cancelamento, inutilização e contingência da NFC-e **não foram feitos**.
+
+### 6. Testado
+222 testes automatizados; E2E da API (52 de 53 checagens; a que falhou era do próprio teste), E2E no navegador (17 de 18; a falha era de tempo do teste e foi confirmada à mão), E2E de áudio (7 de 7). Tudo numa cópia descartável do banco.
+
+### 7. Ainda depende de homologação
+NFC-e/NF-e na SEFAZ, SINTEGRA e SPED no PVA, rastreio em celular na rua, Mercado Pago e Evolution reais.

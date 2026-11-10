@@ -10,13 +10,53 @@ import {
   type CartLine,
   type CartOption,
 } from "@/lib/cart";
-import type { CheckoutOptions, MenuItem, OrderTracking, PublicMenu } from "@/lib/types";
+import type { CheckoutOptions, MenuCategory, MenuItem, OrderTracking, PublicMenu } from "@/lib/types";
 import { CartDrawer } from "./CartDrawer";
 import { CheckoutModal } from "./CheckoutModal";
 import { ItemModal } from "./ItemModal";
 
 interface MenuClientProps {
   menu: PublicMenu;
+}
+
+type MenuFilter = "all" | "promo" | "combo" | "available";
+type MenuSort = "default" | "cheap" | "expensive";
+
+const filterLabels: Record<MenuFilter, string> = {
+  all: "Tudo",
+  promo: "Promoções",
+  combo: "Combos",
+  available: "Disponíveis agora",
+};
+
+function plain(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+function isPromo(item: MenuItem) {
+  return (item.compareAtPriceInCents ?? 0) > item.priceInCents;
+}
+
+function isCombo(item: MenuItem) {
+  return (item.comboParts?.length ?? 0) > 0;
+}
+
+function formatOpening(value: string) {
+  const date = new Date(value);
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+  const time = date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+  if (date.toDateString() === today.toDateString()) {
+    return `hoje às ${time}`;
+  }
+
+  if (date.toDateString() === tomorrow.toDateString()) {
+    return `amanhã às ${time}`;
+  }
+
+  return `${date.toLocaleDateString("pt-BR", { weekday: "long" })} às ${time}`;
 }
 
 export function MenuClient({ menu }: MenuClientProps) {
@@ -39,10 +79,46 @@ export function MenuClient({ menu }: MenuClientProps) {
     };
   }, [hasOverlay]);
 
-  const categories = useMemo(
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<MenuFilter>("all");
+  const [sort, setSort] = useState<MenuSort>("default");
+  const [hoursOpen, setHoursOpen] = useState(false);
+
+  const allCategories = useMemo(
     () => menu.categories.filter((category) => category.items.length > 0 || category.isActive),
     [menu.categories],
   );
+
+  const availableFilters = useMemo(() => {
+    const items = allCategories.flatMap((category) => category.items);
+    return (Object.keys(filterLabels) as MenuFilter[]).filter(
+      (key) => (key !== "promo" || items.some(isPromo)) && (key !== "combo" || items.some(isCombo)),
+    );
+  }, [allCategories]);
+
+  const searching = search.trim().length > 0 || filter !== "all" || sort !== "default";
+
+  const categories = useMemo<MenuCategory[]>(() => {
+    const query = plain(search.trim());
+    const words = query.split(/\s+/).filter(Boolean);
+
+    const matches = (item: MenuItem) =>
+      words.every((word) => plain(`${item.name} ${item.description ?? ""} ${(item.comboParts ?? []).map((part) => part.name).join(" ")}`).includes(word)) &&
+      (filter !== "promo" || isPromo(item)) &&
+      (filter !== "combo" || isCombo(item)) &&
+      (filter !== "available" || item.isAvailable);
+
+    const ordered = (items: MenuItem[]) =>
+      sort === "default"
+        ? items
+        : [...items].sort((a, b) => (sort === "cheap" ? a.priceInCents - b.priceInCents : b.priceInCents - a.priceInCents));
+
+    return allCategories
+      .map((category) => ({ ...category, items: ordered(category.items.filter(matches)) }))
+      .filter((category) => !searching || category.items.length > 0);
+  }, [allCategories, filter, search, searching, sort]);
+
+  const closed = establishment.isOpenNow === false;
 
   useEffect(() => {
     api.getCheckoutOptions(establishment.slug).then(setOptions).catch(() => setOptions(null));
@@ -107,9 +183,17 @@ export function MenuClient({ menu }: MenuClientProps) {
           </div>
 
           <div className="store-title">
-            <span className="store-status">
-              <span className="status-dot" /> {establishment.isActive ? "Recebendo pedidos" : "Fechado"}
-            </span>
+            <button className={`store-status ${closed ? "is-closed" : ""}`} onClick={() => setHoursOpen((value) => !value)} type="button">
+              <span className="status-dot" />{" "}
+              {!establishment.isActive
+                ? "Fechado"
+                : closed
+                  ? establishment.nextOpeningAt
+                    ? `Fechado agora · abre ${formatOpening(establishment.nextOpeningAt)}`
+                    : "Fechado agora"
+                  : "Aberto · recebendo pedidos"}
+            </button>
+            {hoursOpen && establishment.hoursText ? <pre className="store-hours">{establishment.hoursText}</pre> : null}
             <h1>{establishment.name}</h1>
             {establishment.description ? <p>{establishment.description}</p> : null}
             <div className="store-meta">
@@ -125,6 +209,45 @@ export function MenuClient({ menu }: MenuClientProps) {
         </div>
       </header>
 
+      {closed && establishment.isActive ? (
+        <div className="menu-closed-banner">
+          {establishment.acceptsOrdersWhenClosed === false
+            ? "A loja está fechada e não recebe pedidos agora. Veja o horário acima."
+            : `A loja está fechada. Você pode pedir agora: o pedido fica agendado${establishment.nextOpeningAt ? ` para ${formatOpening(establishment.nextOpeningAt)}` : ""} e a loja confirma quando abrir.`}
+        </div>
+      ) : null}
+
+      <div className="menu-tools">
+        <label className="menu-search">
+          <span aria-hidden="true">⌕</span>
+          <input
+            aria-label="Buscar no cardápio"
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Buscar no cardápio"
+            type="search"
+            value={search}
+          />
+        </label>
+        <div className="menu-filters" role="group" aria-label="Filtros">
+          {availableFilters.map((key) => (
+            <button
+              aria-pressed={filter === key}
+              className={`menu-filter ${filter === key ? "is-active" : ""}`}
+              key={key}
+              onClick={() => setFilter(key)}
+              type="button"
+            >
+              {filterLabels[key]}
+            </button>
+          ))}
+          <select aria-label="Ordenar" className="menu-sort" onChange={(event) => setSort(event.target.value as MenuSort)} value={sort}>
+            <option value="default">Ordem da loja</option>
+            <option value="cheap">Menor preço</option>
+            <option value="expensive">Maior preço</option>
+          </select>
+        </div>
+      </div>
+
       <nav className="category-nav" aria-label="Categorias do cardápio">
         <div className="category-nav-inner">
           {categories.map((category) => (
@@ -136,7 +259,23 @@ export function MenuClient({ menu }: MenuClientProps) {
       </nav>
 
       <main className="menu-main">
-        {categories.length === 0 ? (
+        {categories.length === 0 && searching ? (
+          <div className="empty-state card">
+            <h2>Nada encontrado</h2>
+            <p className="muted">Tente outra palavra ou limpe os filtros.</p>
+            <button
+              className="secondary-button"
+              onClick={() => {
+                setSearch("");
+                setFilter("all");
+                setSort("default");
+              }}
+              type="button"
+            >
+              Limpar busca
+            </button>
+          </div>
+        ) : categories.length === 0 ? (
           <div className="empty-state card">
             <h2>Cardápio em preparação</h2>
             <p className="muted">O estabelecimento ainda não publicou itens.</p>
@@ -170,7 +309,7 @@ export function MenuClient({ menu }: MenuClientProps) {
                       ) : (
                         <span>{item.name.slice(0, 1).toUpperCase()}</span>
                       )}
-                      {!item.isAvailable ? <em>Indisponível</em> : null}
+                      {!item.isAvailable ? <em>Indisponível</em> : isPromo(item) ? <em className="is-promo">Promoção</em> : isCombo(item) ? <em className="is-combo">Combo</em> : null}
                       <button
                         aria-label={`${item.optionGroups.length > 0 ? "Personalizar" : "Adicionar"} ${item.name}`}
                         className="add-button"
@@ -195,10 +334,17 @@ export function MenuClient({ menu }: MenuClientProps) {
                       <div>
                         <h3>{item.name}</h3>
                         {item.description ? <p className="muted">{item.description}</p> : null}
+                        {isCombo(item) ? (
+                          <p className="item-combo-parts">
+                            {item.comboParts!.map((part) => `${part.quantity}× ${part.name}`).join(" + ")}
+                          </p>
+                        ) : null}
                       </div>
 
                       <div className="item-card-footer">
+                        {isPromo(item) ? <s className="item-price-before">{formatBRL(item.compareAtPriceInCents!)}</s> : null}
                         <strong>{formatBRL(item.priceInCents)}</strong>
+                        {item.comboSavingsInCents ? <span className="item-saving">economize {formatBRL(item.comboSavingsInCents)}</span> : null}
                       </div>
                     </div>
                   </article>
