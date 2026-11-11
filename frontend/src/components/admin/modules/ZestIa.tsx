@@ -3,6 +3,7 @@
 import { type FormEvent, useState } from "react";
 import { formatDateTime, type AdminHttp } from "@/lib/admin-api";
 import { Empty, ErrorMessage, ModuleHeading, text, useAction, useLoad } from "./shared";
+import { Automation, ConnectCard, Inbox } from "./Zest";
 
 interface Gap {
   id: string;
@@ -89,6 +90,11 @@ export function ZestIa({ http, establishmentId }: { http: AdminHttp; establishme
         hint="Perguntas dos clientes que ficaram sem resposta. Responda uma vez e o atendimento passa a usar a sua resposta."
       />
       <ErrorMessage message={gaps.error ?? knowledge.error ?? action.error ?? connection.error ?? connectorAction.error} />
+
+      <h3>WhatsApp da loja</h3>
+      <ConnectCard establishmentId={establishmentId} http={http} />
+      <Automation establishmentId={establishmentId} http={http} />
+      <Inbox establishmentId={establishmentId} http={http} />
 
       <article className="card zest-teach">
         <h3>Conexão com o ZEST</h3>

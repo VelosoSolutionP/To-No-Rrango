@@ -178,7 +178,7 @@ interface Stats {
   activeSales: number;
 }
 
-function ConnectCard({ http, establishmentId }: Props) {
+export function ConnectCard({ http, establishmentId }: Props) {
   const connection = useLoad(() => http.get<Connection>(`/establishments/${establishmentId}/whatsapp/connection`), [establishmentId]);
   const [qr, setQr] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -276,7 +276,7 @@ function ConnectCard({ http, establishmentId }: Props) {
   );
 }
 
-function Automation({ http, establishmentId }: Props) {
+export function Automation({ http, establishmentId }: Props) {
   const settings = useLoad(() => http.get<{ autoReply: boolean }>(`/establishments/${establishmentId}/whatsapp`), [establishmentId]);
   const connection = useLoad(() => http.get<Connection>(`/establishments/${establishmentId}/whatsapp/connection`), [establishmentId]);
   const action = useAction(settings.reload);
@@ -328,7 +328,7 @@ function Sell({ storeName, ...props }: Props & { storeName: string }) {
   );
 }
 
-function Inbox({ http, establishmentId }: Props) {
+export function Inbox({ http, establishmentId }: Props) {
   const conversations = useLoad(() => http.get<Conversation[]>(`/establishments/${establishmentId}/conversations`), [establishmentId]);
   const [selected, setSelected] = useState<Conversation | null>(null);
   const messages = useLoad(
