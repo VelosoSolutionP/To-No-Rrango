@@ -29,6 +29,7 @@ import { OrdersBoard, type TrackResult } from "./OrdersBoard";
 import { AdminContext } from "./AdminContext";
 import "./admin.css";
 import "./admin-theme.css";
+import "./admin-neon.css";
 import { Distribution } from "./modules/Distribution";
 import { Finance } from "./modules/Finance";
 import { Inventory } from "./modules/Inventory";
@@ -65,6 +66,23 @@ const tabs: Array<{ id: Tab; group: string; label: string; roles: UserRole[]; mo
   { id: "zest", group: "Inteligência", label: "ZEST IA", roles: management, modules: ["ia"] },
   { id: "settings", group: "Ajustes", label: "Configurações", roles: management },
 ];
+
+/**
+ * Produtos do ecossistema dentro do painel (Escopo Mestre, seção 6 e 7): a operação do restaurante,
+ * a Central Fiscal e a ZEST ficam separadas. Cada uma mostra só o seu menu.
+ */
+type Product = "operacao" | "fiscal" | "zest";
+const productOf = (tab: Tab): Product => (tab === "fiscal" ? "fiscal" : tab === "zest" ? "zest" : "operacao");
+const products: Array<{ id: Product; label: string; icon: string }> = [
+  { id: "operacao", label: "Operação", icon: "establishment" },
+  { id: "fiscal", label: "Fiscal", icon: "fiscal" },
+  { id: "zest", label: "ZEST", icon: "zest" },
+];
+const tabIcons: Record<Tab, string> = {
+  overview: "overview", orders: "orders", kitchen: "kitchen", pdv: "pos", distribution: "truck",
+  products: "box", menu: "menu", customers: "customers", suppliers: "parties",
+  inventory: "inventory", finance: "finance", fiscal: "fiscal", reports: "reports", zest: "zest", settings: "settings",
+};
 
 function messageOf(error: unknown): string {
   if (error instanceof ApiError) {
@@ -480,6 +498,15 @@ export function AdminClient() {
     setNavOpen(false);
   }
 
+  const activeProduct = productOf(tab);
+  const productTabs = visibleTabs.filter((item) => productOf(item.id) === activeProduct);
+  function openProduct(product: Product) {
+    const first = visibleTabs.find((item) => productOf(item.id) === product);
+    if (first) {
+      goTo(first.id);
+    }
+  }
+
   return (
     <AdminContext.Provider value={{ http, establishmentId: selectedId }}>
       <div className={`vx ${navOpen ? "is-open" : ""}`}>
@@ -487,14 +514,34 @@ export function AdminClient() {
           <Link className="vx-brand" href="/">
             <span className="vx-mark">TR</span>
             <div>
-              <strong>To-No-Rango</strong>
-              <small>Veloso · ZEST</small>
+              <strong>To-No-<em>Rango</em></strong>
+              <small>Por Veloso Solution</small>
             </div>
           </Link>
+          <div aria-label="Produtos" className="vx-products" role="tablist">
+            {products.map((product) => {
+              const available = visibleTabs.some((item) => productOf(item.id) === product.id);
+              return (
+                <button
+                  aria-selected={activeProduct === product.id}
+                  className={`vx-product vx-product-${product.id} ${activeProduct === product.id ? "is-active" : ""}`}
+                  disabled={!available || (!hasEstablishment && product.id !== "operacao")}
+                  key={product.id}
+                  onClick={() => openProduct(product.id)}
+                  role="tab"
+                  title={available ? product.label : `${product.label} não está no seu contrato`}
+                  type="button"
+                >
+                  <Icon name={product.icon} size={17} />
+                  <span>{product.label}</span>
+                </button>
+              );
+            })}
+          </div>
           <nav aria-label="Áreas do painel" className="vx-nav">
-            {visibleTabs.map((item, index) => (
+            {productTabs.map((item, index) => (
               <Fragment key={item.id}>
-                {item.group !== visibleTabs[index - 1]?.group ? <p className="vx-sec">{item.group}</p> : null}
+                {item.group !== productTabs[index - 1]?.group ? <p className="vx-sec">{item.group}</p> : null}
                 <button
                   aria-current={tab === item.id ? "page" : undefined}
                   className={tab === item.id ? "is-active" : ""}
@@ -502,6 +549,7 @@ export function AdminClient() {
                   onClick={() => goTo(item.id)}
                   type="button"
                 >
+                  <i className="vx-orb"><Icon name={tabIcons[item.id]} size={16} /></i>
                   <span>{item.label}</span>
                   {item.id === "orders" && pendingOrders > 0 ? <b>{pendingOrders}</b> : null}
                   {item.locked ? <i className="vx-lock" title="Em levantamento de requisitos"><Icon name="lock" size={14} /></i> : null}
@@ -527,6 +575,7 @@ export function AdminClient() {
                   {establishments.map((establishment) => <option key={establishment.id} value={establishment.id}>{establishment.name}</option>)}
                 </select>
               ) : selectedEstablishment ? <span className="vx-top-store">{selectedEstablishment.name}</span> : null}
+              {pendingOrders > 0 ? <button className="vx-pill vx-pill-hot" onClick={() => goTo("orders")} type="button"><i />{pendingOrders} {pendingOrders === 1 ? "novo" : "novos"}</button> : null}
               {openOrders > 0 ? <span className="vx-pill"><i />{openOrders} em andamento</span> : null}
               {selectedEstablishment ? <a className="vx-top-link" href={`/menu/${selectedEstablishment.slug}`} rel="noreferrer" target="_blank">Ver cardápio</a> : null}
             </div>

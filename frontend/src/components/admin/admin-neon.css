@@ -1,0 +1,1012 @@
+/*
+ * Painel — linguagem do login (v3, 11/11/2026).
+ * Carregado por último: só reveste. Nenhuma regra de negócio, rota ou dado depende deste arquivo.
+ *
+ * Grafite e vidro nas superfícies, borda neon laranja → lilás (a mesma do cartão do login),
+ * relevo de verdade (luz em cima, sombra embaixo), laranja nas ações e alertas, lilás no que é
+ * inteligência. Efeitos só com transform/opacity/sombra: nada de animação permanente além do
+ * "ao vivo"; quem pede menos movimento no aparelho recebe a tela parada.
+ */
+.vx {
+  --nx-bg: #07070a;
+  --nx-glass: rgba(19, 19, 25, 0.78);
+  --nx-glass-2: rgba(27, 27, 35, 0.85);
+  --nx-well: rgba(0, 0, 0, 0.32);
+  --nx-orange: #ff6a1a;
+  --nx-orange-2: #ff8f4d;
+  --nx-lilac: #a98bff;
+  --nx-lilac-2: #c9b6ff;
+  --nx-neon: linear-gradient(135deg, #ff6a1a 0%, #ff8f4d 30%, #a98bff 75%, #7c5cff 100%);
+  --nx-neon-soft: linear-gradient(135deg, rgba(255, 106, 26, 0.55), rgba(169, 139, 255, 0.32) 60%, rgba(169, 139, 255, 0.06));
+  --nx-silver: linear-gradient(180deg, #f3f4f7 0%, #b3b8c2 50%, #e3e5ea 100%);
+  --nx-raise: 0 24px 50px -28px rgba(0, 0, 0, 0.95), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  --nx-orb: radial-gradient(circle at 30% 25%, #ffd2b3, #ff8f4d 35%, #e2520a 80%);
+  --nx-orb-shadow: 0 10px 20px -8px rgba(255, 106, 26, 0.9), inset 0 -3px 6px rgba(0, 0, 0, 0.25), inset 0 2px 3px rgba(255, 255, 255, 0.6);
+
+  /* Ações em laranja, inteligência em lilás (Escopo Mestre 3.2). */
+  --accent: var(--nx-orange);
+  --accent-2: var(--nx-orange-2);
+  --accent-ink: #1a0b02;
+  --accent-soft: rgba(255, 106, 26, 0.14);
+  --brand: var(--nx-orange);
+  --brand-2: var(--nx-lilac);
+  --vx-bg: var(--nx-bg);
+  --vx-side: transparent;
+  --vx-panel: var(--nx-glass);
+  --vx-panel-2: var(--nx-glass-2);
+  --vx-line: rgba(255, 255, 255, 0.07);
+  --vx-line-2: rgba(255, 255, 255, 0.11);
+
+  position: relative;
+  isolation: isolate;
+  gap: 18px;
+  padding: 18px 18px 18px 0;
+  background:
+    radial-gradient(700px 420px at 4% 108%, rgba(255, 106, 26, 0.22), transparent 65%),
+    radial-gradient(800px 520px at 100% 0%, rgba(124, 92, 255, 0.18), transparent 60%),
+    var(--nx-bg);
+  background-attachment: fixed;
+}
+
+/* Chão em grade com perspectiva, como no login. Fica atrás de tudo e não recebe clique. */
+.vx::before {
+  content: "";
+  position: fixed;
+  z-index: -1;
+  left: -20%;
+  right: -20%;
+  bottom: -40%;
+  height: 70%;
+  background:
+    linear-gradient(rgba(255, 106, 26, 0.13) 1px, transparent 1px) 0 0 / 100% 46px,
+    linear-gradient(90deg, rgba(169, 139, 255, 0.1) 1px, transparent 1px) 0 0 / 46px 100%;
+  transform: perspective(600px) rotateX(62deg);
+  transform-origin: top;
+  -webkit-mask-image: linear-gradient(to top, #000 10%, transparent 85%);
+  mask-image: linear-gradient(to top, #000 10%, transparent 85%);
+  pointer-events: none;
+}
+
+/* ---------- Superfície com borda neon (usada no menu, nos cards e nos modais) ---------- */
+.vx .vx-side,
+.vx .card,
+.vx .zx-card,
+.vx .modal,
+.vx .drawer,
+.vx .admin-modal {
+  background: var(--nx-glass);
+  border: 0;
+  box-shadow: var(--nx-raise);
+}
+
+.vx .vx-side::before,
+.vx .card::before,
+.vx .zx-card::before,
+.vx .modal::before,
+.vx .drawer::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.2px;
+  background: var(--nx-neon-soft);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.vx .card,
+.vx .zx-card {
+  position: relative;
+}
+
+.vx .card,
+.vx .zx-card {
+  border-radius: 20px;
+}
+
+/* ---------- Menu lateral flutuante ---------- */
+.vx .vx-side {
+  position: sticky;
+  top: 18px;
+  height: calc(100vh - 36px);
+  margin-left: 18px;
+  border-radius: 24px;
+  border-right: 0;
+  padding-bottom: 6px;
+  overflow: hidden;
+}
+
+.vx .vx-brand {
+  padding: 18px 16px 14px;
+  border-bottom: 0;
+}
+
+.vx .vx-mark {
+  background: #15151b;
+  color: #fff;
+  font-weight: 900;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.09), 0 8px 18px -8px #000;
+}
+
+.vx .vx-brand strong {
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+}
+
+.vx .vx-brand strong em {
+  color: var(--nx-orange);
+  font-style: normal;
+}
+
+.vx .vx-brand small {
+  color: #777784;
+  letter-spacing: 0.18em;
+  font-size: 0.6rem;
+  text-transform: uppercase;
+}
+
+/* Seletor de produto: três botões com relevo; o ativo acende. */
+.vx .vx-products {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+  margin: 0 12px 6px;
+  padding: 4px;
+  border-radius: 15px;
+  background: rgba(0, 0, 0, 0.38);
+  box-shadow: inset 0 2px 7px rgba(0, 0, 0, 0.65);
+}
+
+.vx .vx-product {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  padding: 8px 0 7px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: #7a7a86;
+  font: inherit;
+  font-size: 0.66rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.15s, color 0.15s;
+}
+
+.vx .vx-product:hover:not(:disabled) {
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.vx .vx-product:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.vx .vx-product.is-active {
+  color: #1a0b02;
+  background: linear-gradient(180deg, #ff9a5c, #ff6a1a);
+  box-shadow: 0 8px 18px -6px rgba(255, 106, 26, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.vx .vx-product-zest:not(.is-active) {
+  color: var(--nx-lilac);
+}
+
+.vx .vx-product-zest.is-active {
+  color: #140a2b;
+  background: linear-gradient(180deg, #d4c6ff, #8f6bff);
+  box-shadow: 0 8px 18px -6px rgba(124, 92, 255, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.vx .vx-sec {
+  padding-top: 14px;
+  color: #5f5f6b;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+}
+
+/* Só a lista rola: marca, seletor de produto e o cartão do usuário ficam sempre à vista. */
+.vx .vx-nav {
+  min-height: 0;
+  padding: 0 10px 8px;
+  scrollbar-width: thin;
+}
+
+.vx .vx-nav button {
+  gap: 11px;
+  min-height: 40px;
+  border-radius: 12px;
+  color: #b0b0bd;
+  font-weight: 600;
+  transition: transform 0.18s, background 0.18s, color 0.18s;
+}
+
+.vx .vx-nav button:hover:not(:disabled) {
+  transform: translateX(3px);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+}
+
+/* O marcador redondo e a linha da timeline antiga dão lugar ao ícone em relevo. */
+.vx .vx-nav button::before,
+.vx .vx-nav button::after {
+  display: none !important;
+}
+
+.vx .vx-nav button {
+  padding-left: 8px;
+}
+
+.vx .vx-orb {
+  display: grid;
+  place-items: center;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: linear-gradient(180deg, #25252e, #16161c);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 4px 10px -4px #000;
+  color: #9a9aa6;
+  font-style: normal;
+  transition: background 0.18s, box-shadow 0.18s, color 0.18s;
+}
+
+.vx .vx-nav button.is-active {
+  background: linear-gradient(90deg, rgba(255, 106, 26, 0.2), rgba(255, 106, 26, 0.02));
+  box-shadow: inset 2px 0 0 var(--nx-orange);
+  color: #fff;
+}
+
+.vx .vx-nav button.is-active .vx-orb {
+  background: var(--nx-orb);
+  color: #1a0b02;
+  box-shadow: 0 0 18px -2px rgba(255, 106, 26, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.vx .vx-nav button.is-active svg {
+  color: #1a0b02;
+}
+
+.vx .vx-nav b {
+  border-radius: 999px;
+  background: var(--nx-orange);
+  color: #1a0b02;
+  font-weight: 800;
+  box-shadow: 0 0 12px rgba(255, 106, 26, 0.7);
+}
+
+.vx .vx-foot {
+  margin: auto 10px 4px;
+  padding: 10px;
+  border-top: 0;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.vx .vx-avatar {
+  background: var(--nx-silver);
+  color: #17181c;
+  font-weight: 900;
+  box-shadow: 0 0 0 2px #0b0b0f, 0 0 0 3.5px rgba(255, 106, 26, 0.7);
+}
+
+/* ---------- Cabeçalho ---------- */
+.vx .vx-top {
+  height: 58px;
+  margin-bottom: 4px;
+  padding: 0 0.3rem;
+  border-bottom: 0;
+  background: transparent;
+  backdrop-filter: none;
+}
+
+.vx .vx-top h1 {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #8a8a96;
+}
+
+.vx .vx-top h1::before {
+  content: "";
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 10px;
+  vertical-align: -1px;
+  background: var(--nx-orange);
+  transform: skewX(-18deg);
+  box-shadow: 0 0 12px var(--nx-orange);
+}
+
+.vx .vx-pill,
+.vx .vx-top-link,
+.vx .vx-top-store,
+.vx .admin-establishment-select,
+.vx .vx-menu-button {
+  height: 36px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--nx-glass);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  color: #c9c9d3;
+  font-weight: 700;
+}
+
+.vx .vx-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 13px;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.vx .vx-pill i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 10px var(--ok, #4ee08a);
+}
+
+.vx .vx-pill-hot {
+  cursor: pointer;
+  color: #1a0b02;
+  background: linear-gradient(180deg, #ffa066, #ff6a1a);
+  box-shadow: 0 8px 20px -8px rgba(255, 106, 26, 0.9);
+}
+
+.vx .vx-pill-hot i {
+  background: #1a0b02;
+  box-shadow: none;
+}
+
+.vx .vx-top-link,
+.vx .vx-top-store {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 14px;
+}
+
+.vx .vx-top-link {
+  color: #fff;
+}
+
+.vx .vx-main {
+  padding: 0.6rem 0.3rem 2rem;
+}
+
+/* ---------- Títulos de módulo: itálico pesado com a marca em laranja ---------- */
+.vx .admin-section-heading .eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #a6a6b2;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.vx .admin-section-heading .eyebrow::before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  background: var(--nx-orange);
+  transform: skewX(-18deg);
+  box-shadow: 0 0 12px var(--nx-orange);
+}
+
+.vx .admin-section-heading h2,
+.vx .ov-hero h2 {
+  font-style: italic;
+  font-weight: 900;
+  letter-spacing: -0.035em;
+}
+
+.vx .vx-panel-title h3,
+.vx .chart-head h3,
+.vx h3 {
+  font-style: italic;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.vx .vx-panel-title h3 em,
+.vx .ov-hero h2 em {
+  color: var(--nx-orange);
+  font-style: italic;
+  text-shadow: 0 0 26px rgba(255, 106, 26, 0.45);
+}
+
+/* ---------- Botões com relevo ---------- */
+.vx .primary-button,
+.vx .primary-button-full {
+  border: 0;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffa066, #ff6a1a 60%, #f05a0c);
+  color: #1a0b02;
+  font-weight: 800;
+  box-shadow: 0 14px 28px -12px rgba(255, 106, 26, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.55), inset 0 -3px 0 rgba(0, 0, 0, 0.18);
+  transition: transform 0.15s, box-shadow 0.15s, filter 0.15s;
+}
+
+.vx .primary-button:hover:not(:disabled),
+.vx .primary-button-full:hover:not(:disabled) {
+  background: linear-gradient(180deg, #ffa066, #ff6a1a 60%, #f05a0c);
+  filter: brightness(1.06);
+  transform: translateY(-2px);
+}
+
+.vx .primary-button:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: 0 6px 14px -8px rgba(255, 106, 26, 0.85), inset 0 2px 4px rgba(0, 0, 0, 0.25);
+}
+
+.vx .secondary-button,
+.vx .secondary-button-small {
+  border: 0;
+  border-radius: 14px;
+  background: var(--nx-glass-2);
+  color: #f1f1f5;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1), 0 10px 20px -14px #000;
+  transition: transform 0.15s;
+}
+
+.vx .secondary-button:hover:not(:disabled),
+.vx .secondary-button-small:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: inset 0 0 0 1px rgba(255, 143, 77, 0.45), 0 10px 22px -12px rgba(255, 106, 26, 0.5);
+}
+
+.vx .link-button {
+  color: var(--nx-orange-2);
+  font-weight: 800;
+}
+
+/* ---------- Campos: poço escuro com brilho lilás no foco ---------- */
+.vx .field input,
+.vx .field textarea,
+.vx .field select,
+.vx .module-line input,
+.vx .module-line select,
+.vx .module-form select,
+.vx .module-stack select,
+.vx .dt-search,
+.vx .pdv-search {
+  border: 0;
+  border-radius: 13px;
+  background: rgba(0, 0, 0, 0.38);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), inset 0 2px 6px rgba(0, 0, 0, 0.45);
+  transition: box-shadow 0.15s;
+}
+
+.vx .field input:focus,
+.vx .field textarea:focus,
+.vx .field select:focus,
+.vx .pdv-search:focus {
+  outline: 0;
+  box-shadow: inset 0 0 0 1.5px rgba(169, 139, 255, 0.7), 0 0 18px -6px rgba(169, 139, 255, 0.8);
+}
+
+/* ---------- Indicadores: orbe, número em itálico com degradê, inclinação 3D ---------- */
+.vx .kpi-strip,
+.vx .stat-grid {
+  perspective: 900px;
+}
+
+.vx .kpi,
+.vx .stat-tile {
+  position: relative;
+  overflow: hidden;
+  border: 0;
+  border-radius: 20px;
+  background: var(--nx-glass);
+  box-shadow: var(--nx-raise);
+  transition: transform 0.25s, box-shadow 0.25s;
+}
+
+.vx .kpi::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.2px;
+  background: var(--nx-neon-soft);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.vx .kpi::after,
+.vx .stat-tile::after {
+  content: "";
+  position: absolute;
+  left: -30%;
+  top: -60%;
+  width: 90%;
+  height: 120%;
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.07), transparent 45%);
+  transform: rotate(8deg);
+  pointer-events: none;
+}
+
+.vx .kpi:hover,
+.vx .stat-tile:hover {
+  transform: rotateX(6deg) rotateY(-6deg) translateY(-4px);
+  box-shadow: 0 30px 50px -26px #000, 0 0 30px -14px rgba(255, 106, 26, 0.5);
+}
+
+.vx .kpi strong,
+.vx .stat-tile strong {
+  font-style: italic;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  background: linear-gradient(180deg, #fff, #c9cbd3);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.vx .kpi small,
+.vx .stat-tile > span {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #82828e;
+}
+
+.vx .kpi.is-alert::before {
+  background: linear-gradient(135deg, #ff4f5e, #ff8f4d);
+}
+
+.vx .kpi.is-alert {
+  box-shadow: var(--nx-raise), 0 0 34px -12px rgba(255, 79, 94, 0.7);
+}
+
+.vx .kpi.is-alert strong {
+  background: linear-gradient(180deg, #ffc2c8, #ff4f5e);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.vx .kpi.is-warn strong {
+  background: linear-gradient(180deg, #ffe0a6, #ffb43a);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* Ícone do indicador vira orbe com luz. */
+.vx .vx-chip {
+  border: 0;
+  border-radius: 13px;
+  background: radial-gradient(circle at 30% 25%, #fff, #c7cbd3 40%, #7d828d 90%);
+  color: #16171b;
+  box-shadow: 0 10px 20px -8px rgba(200, 205, 215, 0.5), inset 0 -3px 6px rgba(0, 0, 0, 0.25), inset 0 2px 3px #fff;
+}
+
+.vx .vx-chip-orange {
+  background: var(--nx-orb);
+  color: #1a0b02;
+  box-shadow: var(--nx-orb-shadow);
+}
+
+.vx .vx-chip-lilac {
+  background: radial-gradient(circle at 30% 25%, #efe6ff, #b49cff 35%, #6b48f0 85%);
+  color: #130a2b;
+  box-shadow: 0 10px 20px -8px rgba(124, 92, 255, 0.9), inset 0 -3px 6px rgba(0, 0, 0, 0.25), inset 0 2px 3px rgba(255, 255, 255, 0.6);
+}
+
+/* ---------- Tabelas ---------- */
+.vx .admin-table-wrap,
+.vx .dt-table {
+  border-radius: 16px;
+}
+
+.vx .admin-table tbody tr,
+.vx .dt-table tbody tr {
+  transition: background 0.15s, box-shadow 0.15s;
+}
+
+.vx .admin-table tbody tr:hover,
+.vx .dt-table tbody tr:hover {
+  background: linear-gradient(90deg, rgba(255, 106, 26, 0.08), transparent 70%);
+  box-shadow: inset 2px 0 0 var(--nx-orange);
+}
+
+.vx .admin-table th,
+.vx .dt-table th {
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: #7c7c88;
+}
+
+/* ---------- Modais e gavetas: painel holográfico que sobe com profundidade ---------- */
+.vx .modal-backdrop,
+.vx .drawer-backdrop {
+  background: rgba(5, 5, 8, 0.62);
+  backdrop-filter: blur(6px);
+  perspective: 1200px;
+}
+
+.vx .modal,
+.vx .admin-modal {
+  border-radius: 26px;
+  background: linear-gradient(180deg, rgba(28, 28, 36, 0.96), rgba(16, 16, 21, 0.96));
+  box-shadow: 0 40px 90px -30px rgba(0, 0, 0, 0.95), 0 0 50px -16px rgba(255, 106, 26, 0.4), 0 0 70px -24px rgba(124, 92, 255, 0.45);
+  animation: nx-sobe 0.42s cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
+  transform-origin: 50% 100%;
+}
+
+.vx .modal::before,
+.vx .drawer::before {
+  background: var(--nx-neon);
+}
+
+/* A gaveta continua presa à direita (position: fixed da regra base), agora flutuando. */
+.vx .drawer {
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  border-left: 0;
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(28, 28, 36, 0.97), rgba(14, 14, 19, 0.97));
+  box-shadow: -30px 0 70px -20px rgba(0, 0, 0, 0.9), 0 0 50px -18px rgba(255, 106, 26, 0.4), 0 0 70px -26px rgba(124, 92, 255, 0.45);
+  animation: nx-desliza 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.05) both;
+}
+
+.vx .drawer-head h2 {
+  font-style: italic;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.vx .drawer-backdrop {
+  background: rgba(5, 5, 8, 0.62);
+  backdrop-filter: blur(6px);
+}
+
+@media (max-width: 620px) {
+  .vx .drawer {
+    top: 8px;
+    right: 8px;
+    bottom: 8px;
+    width: calc(100vw - 16px);
+  }
+}
+
+.vx .modal-close,
+.vx .drawer-close {
+  border: 0;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.06);
+  transition: transform 0.15s, background 0.15s;
+}
+
+.vx .modal-close:hover,
+.vx .drawer-close:hover {
+  transform: rotate(90deg);
+  background: rgba(255, 106, 26, 0.2);
+}
+
+@keyframes nx-sobe {
+  from { opacity: 0; transform: translateY(36px) rotateX(16deg) scale(0.95); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes nx-desliza {
+  from { opacity: 0; transform: translateX(40px) rotateY(-10deg); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---------- Visão geral ---------- */
+.vx .ov-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.vx .ov-tag {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  color: #a6a6b2;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.vx .ov-tag::before {
+  content: "";
+  width: 13px;
+  height: 13px;
+  background: var(--nx-orange);
+  transform: skewX(-18deg);
+  box-shadow: 0 0 12px var(--nx-orange);
+}
+
+.vx .ov-hero h2 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 2.6rem);
+  line-height: 1;
+}
+
+.vx .ov-hero .muted {
+  margin: 8px 0 0;
+}
+
+.vx .ov-actions {
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+}
+
+/* Filho de grid não encolhe sozinho: sem isto a esteira empurrava a página para fora do celular. */
+.vx .admin-section > * {
+  min-width: 0;
+}
+
+.vx .ov-belt {
+  max-width: 100%;
+  padding: 18px;
+  margin-bottom: 18px;
+}
+
+.vx .ov-belt .vx-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.vx .ov-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #7d7d89;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.vx .ov-live i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #4ee08a;
+  animation: nx-pulso 2s infinite;
+}
+
+@keyframes nx-pulso {
+  0% { box-shadow: 0 0 0 0 rgba(78, 224, 138, 0.6); }
+  70% { box-shadow: 0 0 0 7px rgba(78, 224, 138, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(78, 224, 138, 0); }
+}
+
+.vx .ov-lanes {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.vx .ov-lane {
+  position: relative;
+  min-height: 220px;
+  padding: 10px;
+  border-radius: 16px;
+  background: var(--nx-well);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.55);
+}
+
+.vx .ov-lane::before {
+  content: "";
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  top: 36px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 143, 77, 0.6), transparent);
+}
+
+.vx .ov-lane h4 {
+  display: flex;
+  justify-content: space-between;
+  margin: 2px 4px 16px;
+  color: #7d7d89;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.vx .ov-lane h4 b {
+  color: #fff;
+  letter-spacing: 0;
+}
+
+.vx .ov-empty {
+  margin: 18px 0;
+  color: #55555f;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+/* Comanda de papel: recorte serrilhado embaixo; atrasada fica "quente". */
+.vx .ov-ticket {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  margin-bottom: 12px;
+  padding: 11px 12px 10px;
+  border: 0;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #23232c, #1a1a21);
+  box-shadow: 0 12px 22px -12px #000, inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  color: #f1f1f5;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.18s;
+}
+
+.vx .ov-ticket::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: -4px;
+  height: 8px;
+  background: radial-gradient(circle at 4px 0, transparent 3.5px, #1a1a21 4px) 0 0 / 10px 8px repeat-x;
+}
+
+.vx .ov-ticket:hover {
+  transform: translateY(-3px) rotate(-0.6deg);
+}
+
+.vx .ov-ticket-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 900;
+}
+
+.vx .ov-ticket-top span {
+  color: #b9b9c4;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.vx .ov-ticket-items {
+  overflow: hidden;
+  color: #a2a2ae;
+  font-size: 0.8rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.vx .ov-ticket-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+}
+
+.vx .ov-time {
+  margin-left: auto;
+  color: #b9b9c4;
+  font-size: 0.78rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.vx .ov-ticket.is-hot {
+  background: linear-gradient(180deg, #2d1a12, #1d1512);
+  box-shadow: 0 0 0 1px rgba(255, 106, 26, 0.55), 0 0 22px -4px rgba(255, 106, 26, 0.55), 0 12px 22px -12px #000;
+}
+
+.vx .ov-ticket.is-hot::after {
+  background: radial-gradient(circle at 4px 0, transparent 3.5px, #1d1512 4px) 0 0 / 10px 8px repeat-x;
+}
+
+.vx .ov-ticket.is-hot .ov-time {
+  color: var(--nx-orange-2);
+  text-shadow: 0 0 10px rgba(255, 106, 26, 0.8);
+}
+
+/* ---------- Celular e tablet ---------- */
+@media (max-width: 960px) {
+  .vx {
+    padding: 0 12px 12px;
+    gap: 0;
+  }
+
+  /* No celular o menu volta a ser gaveta: fica fora da tela até tocar no botão. */
+  .vx .vx-side {
+    position: fixed;
+    top: 10px;
+    bottom: 10px;
+    left: 10px;
+    height: auto;
+    margin-left: 0;
+    transform: translateX(calc(-100% - 20px));
+  }
+
+  .vx.is-open .vx-side {
+    transform: none;
+  }
+
+  /* Gaveta aberta por cima do conteúdo: vidro quase opaco, senão o texto de trás atravessa. */
+  .vx .vx-side {
+    background: linear-gradient(180deg, rgba(24, 24, 31, 0.98), rgba(12, 12, 16, 0.98));
+  }
+
+  .vx.is-open .vx-backdrop {
+    background: rgba(4, 4, 7, 0.7);
+    backdrop-filter: blur(4px);
+  }
+
+  .vx .vx-top {
+    padding: 0;
+  }
+
+  .vx .vx-menu-button {
+    width: 40px;
+    padding: 0;
+  }
+
+  .vx .ov-lanes {
+    grid-template-columns: repeat(4, 80%);
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    padding-bottom: 4px;
+  }
+
+  .vx .ov-lane {
+    scroll-snap-align: start;
+  }
+}
+
+@media (max-width: 620px) {
+  .vx .vx-top h1 {
+    letter-spacing: 0.12em;
+  }
+
+  .vx .vx-top-store,
+  .vx .vx-top-link {
+    display: none;
+  }
+
+  .vx .ov-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .vx .ov-actions button {
+    flex: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vx *,
+  .vx *::before,
+  .vx *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
