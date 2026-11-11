@@ -128,12 +128,12 @@
 .vx .vx-mark {
   background: #15151b;
   color: #fff;
-  font-weight: 900;
+  font-weight: 700;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.09), 0 8px 18px -8px #000;
 }
 
 .vx .vx-brand strong {
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: -0.02em;
   text-transform: uppercase;
 }
@@ -293,7 +293,7 @@
 .vx .vx-avatar {
   background: var(--nx-silver);
   color: #17181c;
-  font-weight: 900;
+  font-weight: 700;
   box-shadow: 0 0 0 2px #0b0b0f, 0 0 0 3.5px rgba(255, 106, 26, 0.7);
 }
 
@@ -408,23 +408,20 @@
 
 .vx .admin-section-heading h2,
 .vx .ov-hero h2 {
-  font-style: italic;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: -0.035em;
 }
 
 .vx .vx-panel-title h3,
 .vx .chart-head h3,
 .vx h3 {
-  font-style: italic;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: -0.02em;
 }
 
 .vx .vx-panel-title h3 em,
 .vx .ov-hero h2 em {
   color: var(--nx-orange);
-  font-style: italic;
   text-shadow: 0 0 26px rgba(255, 106, 26, 0.45);
 }
 
@@ -550,8 +547,7 @@
 
 .vx .kpi strong,
 .vx .stat-tile strong {
-  font-style: italic;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: -0.03em;
   background: linear-gradient(180deg, #fff, #c9cbd3);
   -webkit-background-clip: text;
@@ -669,8 +665,7 @@
 }
 
 .vx .drawer-head h2 {
-  font-style: italic;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: -0.03em;
 }
 
@@ -884,7 +879,7 @@
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .vx .ov-ticket-top span {
@@ -913,7 +908,7 @@
   margin-left: auto;
   color: #b9b9c4;
   font-size: 0.78rem;
-  font-weight: 900;
+  font-weight: 700;
   white-space: nowrap;
 }
 
@@ -1041,15 +1036,13 @@
 }
 
 .vx .pos-open-card h2 {
-  font-style: italic;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: -0.03em;
 }
 
 .vx .pos-open-value,
 .vx .cash-received strong {
-  font-style: italic;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: -0.03em;
   background: linear-gradient(180deg, #ffd9c2, #ff6a1a);
   -webkit-background-clip: text;
@@ -1135,8 +1128,7 @@
 
 .vx .cash-money-face strong {
   font-size: 1.15rem;
-  font-weight: 900;
-  font-style: italic;
+  font-weight: 700;
   letter-spacing: -0.02em;
 }
 
@@ -1194,7 +1186,7 @@
   background: var(--nx-orange);
   color: #1a0b02;
   font-size: 0.72rem;
-  font-weight: 900;
+  font-weight: 700;
   font-style: normal;
   text-shadow: none;
   box-shadow: 0 0 12px rgba(255, 106, 26, 0.8);
@@ -1216,7 +1208,7 @@
   border-radius: 50%;
   background: #23232c;
   color: #fff;
-  font-weight: 900;
+  font-weight: 700;
   line-height: 1;
   cursor: pointer;
   box-shadow: 0 4px 10px -2px #000, inset 0 0 0 1px rgba(255, 255, 255, 0.15);
@@ -1334,7 +1326,7 @@
 }
 
 .vx .pos-paper .pos-paper-head span {
-  font-weight: 900;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -1363,7 +1355,7 @@
   border-radius: 8px;
   background: #fff;
   color: #1d1d22;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .vx .pos-paper li b {
@@ -1439,8 +1431,7 @@
   z-index: 2;
   color: #e9e9ef;
   font-size: 1.15rem;
-  font-weight: 900;
-  font-style: italic;
+  font-weight: 700;
   text-align: center;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
 }
@@ -1485,7 +1476,7 @@
 }
 
 .vx .table-island > span {
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .vx .tables-legend i {
@@ -1500,4 +1491,48 @@
   .vx .tables-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+/* =====================================================================================
+   Tipografia (11/11/2026, pedido do dono): sem itálico, sem peso black.
+   Títulos e números na Sora (display do projeto), texto na Inter. Números com largura fixa.
+   ===================================================================================== */
+.vx .admin-section-heading h2,
+.vx .ov-hero h2,
+.vx .vx-panel-title h3,
+.vx .chart-head h3,
+.vx h3,
+.vx .drawer-head h2,
+.vx .pos-open-card h2,
+.vx .vx-brand strong {
+  font-family: var(--display);
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.vx .ov-hero h2 {
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+.vx .ov-hero h2 em,
+.vx .vx-panel-title h3 em {
+  font-style: normal;
+  font-weight: 700;
+}
+
+.vx .kpi strong,
+.vx .stat-tile strong,
+.vx .pos-open-value,
+.vx .cash-received strong,
+.vx .pos-total strong,
+.vx .ov-ticket-top,
+.vx .table-island > strong,
+.vx .cash-money-face strong {
+  font-family: var(--display);
+  font-style: normal;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
