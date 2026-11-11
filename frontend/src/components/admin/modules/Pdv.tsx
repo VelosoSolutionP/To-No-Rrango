@@ -276,6 +276,78 @@ function Keypad({ value, onChange }: { value: string; onChange: (value: string) 
 
 const centsFromDigits = (digits: string) => Number(digits || "0");
 
+/** Cédulas e moedas do real, em centavos. */
+const denominations: Array<{ cents: number; label: string; kind: "note" | "coin" }> = [
+  { cents: 20000, label: "200", kind: "note" },
+  { cents: 10000, label: "100", kind: "note" },
+  { cents: 5000, label: "50", kind: "note" },
+  { cents: 2000, label: "20", kind: "note" },
+  { cents: 1000, label: "10", kind: "note" },
+  { cents: 500, label: "5", kind: "note" },
+  { cents: 200, label: "2", kind: "note" },
+  { cents: 100, label: "1", kind: "coin" },
+  { cents: 50, label: "0,50", kind: "coin" },
+  { cents: 25, label: "0,25", kind: "coin" },
+  { cents: 10, label: "0,10", kind: "coin" },
+  { cents: 5, label: "0,05", kind: "coin" },
+];
+
+/**
+ * Contagem do caixa como o operador faz na gaveta: toca na cédula/moeda e o total soma sozinho.
+ * Devolve o mesmo valor em centavos (string de dígitos) que o teclado devolvia, então quem usa
+ * não muda. "Digitar valor" continua para quem prefere o teclado.
+ */
+function CashCounter({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [mode, setMode] = useState<"count" | "type">("count");
+  const [counts, setCounts] = useState<Record<number, number>>({});
+  /* Quem usa zerou o valor (registrou a sangria, fechou o caixa): a contagem na tela zera junto. */
+  useEffect(() => {
+    if (!value) setCounts({});
+  }, [value]);
+
+  function bump(cents: number, delta: number) {
+    const next = { ...counts, [cents]: Math.max(0, Math.min(999, (counts[cents] ?? 0) + delta)) };
+    setCounts(next);
+    onChange(String(denominations.reduce((sum, item) => sum + item.cents * (next[item.cents] ?? 0), 0)));
+  }
+
+  function switchTo(next: "count" | "type") {
+    setMode(next);
+    setCounts({});
+    onChange("");
+  }
+
+  return (
+    <div className="cash-counter">
+      <div className="cash-counter-modes" role="tablist">
+        <button aria-selected={mode === "count"} className={mode === "count" ? "is-active" : ""} onClick={() => switchTo("count")} role="tab" type="button">Contar cédulas</button>
+        <button aria-selected={mode === "type"} className={mode === "type" ? "is-active" : ""} onClick={() => switchTo("type")} role="tab" type="button">Digitar valor</button>
+      </div>
+      {mode === "type" ? (
+        <Keypad onChange={onChange} value={value} />
+      ) : (
+        <div className="cash-money">
+          {denominations.map((item) => {
+            const count = counts[item.cents] ?? 0;
+            return (
+              <div className={`cash-money-item is-${item.kind} cash-${item.label.replace(",", "")} ${count ? "has-count" : ""}`} key={item.cents}>
+                <button aria-label={`Somar ${item.kind === "note" ? "cédula" : "moeda"} de R$ ${item.label}`} className="cash-money-face" onClick={() => bump(item.cents, 1)} type="button">
+                  <small>R$</small>
+                  <strong>{item.label}</strong>
+                  {count ? <b>{count}×</b> : null}
+                </button>
+                {count ? (
+                  <button aria-label={`Tirar uma de R$ ${item.label}`} className="cash-money-minus" onClick={() => bump(item.cents, -1)} type="button">−</button>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OpenCash({ busy, onOpen }: { busy: boolean; onOpen: (cents: number) => Promise<boolean> }) {
   const [digits, setDigits] = useState("");
 
@@ -285,7 +357,7 @@ function OpenCash({ busy, onOpen }: { busy: boolean; onOpen: (cents: number) => 
         <small>Abertura de caixa</small>
         <h2>Quanto tem de troco na gaveta?</h2>
         <strong className="pos-open-value">{formatBRL(centsFromDigits(digits))}</strong>
-        <Keypad onChange={setDigits} value={digits} />
+        <CashCounter onChange={setDigits} value={digits} />
         <button className="primary-button primary-button-full" disabled={busy} onClick={() => void onOpen(centsFromDigits(digits))} type="button">
           Abrir caixa
         </button>
@@ -528,10 +600,19 @@ function SaleView({
           {lines.length > 0 ? <button className="link-button danger" onClick={() => setLines([])} type="button">Limpar</button> : null}
         </header>
 
-        <ul className="pos-lines">
+        <div aria-hidden="true" className={`pos-printer ${lines.length ? "is-printing" : ""}`}>
+          <span className="pos-printer-led" />
+          <span className="pos-printer-label">{isComanda ? "Comanda" : "Cupom"}</span>
+          <span className="pos-printer-slot" />
+        </div>
+        <ul className="pos-lines pos-paper">
+          <li className="pos-paper-head" aria-hidden="true">
+            <span>{menu?.establishment.name ?? "Venda"}</span>
+            <small>{isComanda ? `Comanda · mesa ${comanda}` : "Prévia do cupom"}</small>
+          </li>
           {lines.length === 0 ? <li className="pos-empty">Toque nos produtos para montar o pedido.</li> : null}
           {lines.map((line) => (
-            <li key={line.key}>
+            <li className="pos-paper-line" key={line.key}>
               <div>
                 <strong>{line.item.name}</strong>
                 {line.optionNames.length > 0 ? <small>{line.optionNames.join(", ")}</small> : null}
@@ -780,6 +861,7 @@ function TablesView({
                 onClick={() => onSelect(label)}
                 type="button"
               >
+                <i aria-hidden="true" className="table-3d"><i className="table-top" /><i className="table-chairs" /></i>
                 <strong>{label}</strong>
                 {info ? (
                   <>
@@ -961,7 +1043,7 @@ function CashPanel({
           <small>{kind === "close" ? "Dinheiro contado na gaveta" : "Valor"}</small>
           <strong>{formatBRL(countedCents)}</strong>
         </div>
-        <Keypad onChange={setCounted} value={counted} />
+        <CashCounter key={kind} onChange={setCounted} value={counted} />
         {kind === "close" && difference !== null ? (
           <p className={difference === 0 ? "pos-change" : "form-error"}>
             {difference === 0 ? "Confere com o esperado." : difference > 0 ? `Sobra de ${formatBRL(difference)}` : `Falta de ${formatBRL(-difference)}`}

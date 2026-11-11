@@ -39,6 +39,8 @@
 
   position: relative;
   isolation: isolate;
+  /* Decoração (chão em grade, luzes) nunca abre rolagem para o lado; clip não quebra o sticky. */
+  overflow-x: clip;
   gap: 18px;
   padding: 18px 18px 18px 0;
   background:
@@ -1008,5 +1010,494 @@
   .vx *::after {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+/* =====================================================================================
+   PDV (11/11/2026): contagem por cédulas, impressora do cupom e mesas 3D.
+   ===================================================================================== */
+
+/* ---------- Abertura / repasse de caixa: contar cédulas e moedas ---------- */
+.vx .pos-open-card {
+  width: min(560px, 100%);
+  border: 0;
+  border-radius: 26px;
+  background: var(--nx-glass);
+  box-shadow: var(--nx-raise), 0 0 50px -20px rgba(255, 106, 26, 0.45);
+  position: relative;
+}
+
+.vx .pos-open-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.2px;
+  background: var(--nx-neon);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.vx .pos-open-card h2 {
+  font-style: italic;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.vx .pos-open-value,
+.vx .cash-received strong {
+  font-style: italic;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  background: linear-gradient(180deg, #ffd9c2, #ff6a1a);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 14px rgba(255, 106, 26, 0.45));
+}
+
+.vx .cash-counter {
+  display: grid;
+  gap: 12px;
+}
+
+.vx .cash-counter-modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.38);
+  box-shadow: inset 0 2px 7px rgba(0, 0, 0, 0.6);
+}
+
+.vx .cash-counter-modes button {
+  height: 36px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #8e8e9a;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.vx .cash-counter-modes button.is-active {
+  color: #1a0b02;
+  background: linear-gradient(180deg, #ff9a5c, #ff6a1a);
+  box-shadow: 0 8px 16px -8px rgba(255, 106, 26, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.vx .cash-money {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  perspective: 700px;
+}
+
+.vx .cash-money-item {
+  position: relative;
+}
+
+/* Cédula: retângulo com relevo e a cor de cada nota do real. Moeda: disco metálico. */
+.vx .cash-money-face {
+  --nota: #7c8a9a;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 58px;
+  border: 0;
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 78% 50%, rgba(255, 255, 255, 0.22) 0 13px, transparent 14px),
+    linear-gradient(135deg, color-mix(in srgb, var(--nota) 92%, #fff) 0%, var(--nota) 55%, color-mix(in srgb, var(--nota) 70%, #000) 100%);
+  box-shadow: 0 10px 16px -10px #000, inset 0 0 0 1.5px rgba(255, 255, 255, 0.25), inset 0 -3px 0 rgba(0, 0, 0, 0.22);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+  transform: rotateX(14deg);
+  transition: transform 0.15s, box-shadow 0.15s;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+.vx .cash-money-face small {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  font-size: 0.6rem;
+  font-weight: 800;
+  opacity: 0.85;
+}
+
+.vx .cash-money-face strong {
+  font-size: 1.15rem;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: -0.02em;
+}
+
+.vx .cash-money-face:hover {
+  transform: rotateX(0deg) translateY(-3px);
+}
+
+.vx .cash-money-face:active {
+  transform: rotateX(0deg) translateY(1px) scale(0.97);
+}
+
+.vx .cash-200 .cash-money-face { --nota: #8a7a5e; }
+.vx .cash-100 .cash-money-face { --nota: #3f74b6; }
+.vx .cash-50 .cash-money-face { --nota: #b8862d; }
+.vx .cash-20 .cash-money-face { --nota: #c59a2a; }
+.vx .cash-10 .cash-money-face { --nota: #b5554a; }
+.vx .cash-5 .cash-money-face { --nota: #7a5a9e; }
+.vx .cash-2 .cash-money-face { --nota: #3e7f97; }
+
+.vx .is-coin .cash-money-face {
+  width: 58px;
+  margin-inline: auto;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 28%, #fff7dc, #d8c07a 38%, #9c8443 75%, #6b5a2a);
+  box-shadow: 0 10px 14px -8px #000, inset 0 0 0 3px rgba(255, 255, 255, 0.25), inset 0 -3px 4px rgba(0, 0, 0, 0.35);
+  color: #2b230d;
+  text-shadow: none;
+}
+
+.vx .cash-1 .cash-money-face,
+.vx .cash-025 .cash-money-face {
+  background: radial-gradient(circle at 35% 28%, #ffffff, #c9ccd4 38%, #8d929c 75%, #5d626b);
+  color: #1e2026;
+}
+
+.vx .is-coin .cash-money-face small {
+  position: static;
+  font-size: 0.5rem;
+  line-height: 1;
+}
+
+.vx .is-coin .cash-money-face strong {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+/* Contador: selo laranja na quina da cédula. */
+.vx .cash-money-face b {
+  position: absolute;
+  top: -8px;
+  right: -6px;
+  min-width: 26px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--nx-orange);
+  color: #1a0b02;
+  font-size: 0.72rem;
+  font-weight: 900;
+  font-style: normal;
+  text-shadow: none;
+  box-shadow: 0 0 12px rgba(255, 106, 26, 0.8);
+  animation: nx-pop 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.6);
+}
+
+.vx .cash-money-item.has-count .cash-money-face {
+  box-shadow: 0 10px 16px -10px #000, 0 0 0 2px rgba(255, 106, 26, 0.75), 0 0 18px -4px rgba(255, 106, 26, 0.7);
+}
+
+.vx .cash-money-minus {
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  width: 24px;
+  height: 24px;
+  margin-left: -12px;
+  border: 0;
+  border-radius: 50%;
+  background: #23232c;
+  color: #fff;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 4px 10px -2px #000, inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+}
+
+@keyframes nx-pop {
+  from { transform: scale(0.4); }
+  to { transform: scale(1); }
+}
+
+.vx .keypad button {
+  border: 0;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #2a2a34, #1b1b22);
+  box-shadow: 0 8px 14px -10px #000, inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 -2px 0 rgba(0, 0, 0, 0.3);
+  transition: transform 0.12s;
+}
+
+.vx .keypad button:hover {
+  transform: translateY(-2px);
+}
+
+/* ---------- Venda: a impressora que cospe o cupom ---------- */
+.vx .pos-ticket {
+  grid-template-rows: auto auto minmax(80px, 1fr) auto auto;
+  border: 0;
+  border-radius: 22px;
+  background: var(--nx-glass);
+  box-shadow: var(--nx-raise);
+}
+
+.vx .pos-printer {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 46px;
+  margin: 10px 12px 0;
+  padding: 0 14px;
+  border-radius: 14px 14px 6px 6px;
+  background: linear-gradient(180deg, #3a3a46 0%, #22222b 55%, #17171d 100%);
+  box-shadow: 0 14px 20px -12px #000, inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 -2px 0 rgba(0, 0, 0, 0.5);
+}
+
+.vx .pos-printer-led {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4ee08a;
+  box-shadow: 0 0 8px #4ee08a;
+}
+
+.vx .pos-printer.is-printing .pos-printer-led {
+  background: var(--nx-orange);
+  box-shadow: 0 0 10px var(--nx-orange);
+  animation: nx-led 1s infinite;
+}
+
+.vx .pos-printer-label {
+  color: #9a9aa6;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+/* A boca da impressora, de onde o papel sai. */
+.vx .pos-printer-slot {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 7px;
+  height: 5px;
+  border-radius: 3px;
+  background: #050507;
+  box-shadow: inset 0 2px 3px #000, 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+@keyframes nx-led {
+  50% { opacity: 0.35; }
+}
+
+/* O papel térmico: branco, fonte de cupom, borda serrilhada. */
+.vx .pos-paper {
+  position: relative;
+  margin: -6px 26px 0;
+  padding: 14px 14px 18px;
+  border-radius: 0 0 4px 4px;
+  background: linear-gradient(180deg, #d9d9d4 0, #f6f5f0 18px, #fbfaf6 100%);
+  box-shadow: 0 18px 24px -18px #000;
+  color: #1d1d22;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  -webkit-mask: radial-gradient(circle at 5px 100%, transparent 4px, #000 4.5px) 0 0 / 10px 100% repeat-x;
+  mask: radial-gradient(circle at 5px 100%, transparent 4px, #000 4.5px) 0 0 / 10px 100% repeat-x;
+}
+
+.vx .pos-paper li {
+  border-bottom: 1px dashed #c7c6bf;
+}
+
+.vx .pos-paper li small {
+  color: #6d6d73;
+}
+
+.vx .pos-paper .pos-paper-head {
+  display: grid;
+  grid-template-columns: 1fr;
+  justify-items: center;
+  gap: 0;
+  padding: 2px 0 8px;
+  border-bottom: 1px dashed #9f9e97;
+  text-align: center;
+}
+
+.vx .pos-paper .pos-paper-head span {
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.vx .pos-paper .pos-empty {
+  display: block;
+  color: #8a8a90;
+  text-align: center;
+  border-bottom: 0;
+}
+
+/* Cada item novo sai da impressora: desce de dentro da boca. */
+.vx .pos-paper-line {
+  animation: nx-cospe 0.45s cubic-bezier(0.2, 0.85, 0.25, 1) both;
+}
+
+@keyframes nx-cospe {
+  from { opacity: 0; transform: translateY(-22px); clip-path: inset(100% 0 0 0); }
+  to { opacity: 1; transform: none; clip-path: inset(0 0 0 0); }
+}
+
+.vx .pos-paper .pos-qty button {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #c9c8c1;
+  border-radius: 8px;
+  background: #fff;
+  color: #1d1d22;
+  font-weight: 900;
+}
+
+.vx .pos-paper li b {
+  color: #111;
+}
+
+/* ---------- Mesas 3D: tampo redondo em perspectiva com cadeiras em volta ---------- */
+.vx .tables-grid {
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 14px;
+  perspective: 900px;
+}
+
+.vx .table-island {
+  position: relative;
+  aspect-ratio: auto;
+  min-height: 132px;
+  padding: 86px 6px 10px;
+  border: 0;
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.vx .table-island:hover {
+  transform: translateY(-3px);
+  box-shadow: inset 0 0 0 1px rgba(255, 143, 77, 0.35);
+}
+
+.vx .table-island.is-selected {
+  box-shadow: inset 0 0 0 1.5px var(--nx-orange), 0 0 26px -8px rgba(255, 106, 26, 0.7);
+}
+
+.vx .table-3d {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  width: 104px;
+  height: 84px;
+  margin-left: -52px;
+  transform: rotateX(34deg);
+  transform-style: preserve-3d;
+  pointer-events: none;
+}
+
+/* Quatro cadeiras: pontos com relevo em cruz em volta do tampo. */
+.vx .table-chairs {
+  position: absolute;
+  inset: -6px;
+  background:
+    radial-gradient(circle at 50% 4px, #3b3b47 9px, transparent 10px),
+    radial-gradient(circle at 50% calc(100% - 4px), #3b3b47 9px, transparent 10px),
+    radial-gradient(circle at 4px 50%, #3b3b47 9px, transparent 10px),
+    radial-gradient(circle at calc(100% - 4px) 50%, #3b3b47 9px, transparent 10px);
+  filter: drop-shadow(0 6px 4px rgba(0, 0, 0, 0.7));
+}
+
+.vx .table-top {
+  position: absolute;
+  z-index: 1;
+  inset: 8px 10px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 30%, #4a4a58, #23232c 70%);
+  box-shadow: 0 16px 12px -8px rgba(0, 0, 0, 0.9), inset 0 -5px 6px rgba(0, 0, 0, 0.5), inset 0 2px 2px rgba(255, 255, 255, 0.14);
+}
+
+.vx .table-island > strong {
+  position: absolute;
+  top: 34px;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  color: #e9e9ef;
+  font-size: 1.15rem;
+  font-weight: 900;
+  font-style: italic;
+  text-align: center;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+/* Ocupada: tampo prata aceso. Tudo servido: verde. Selecionada: laranja. */
+.vx .table-island.is-busy {
+  background: rgba(255, 180, 58, 0.06);
+  border: 0;
+}
+
+.vx .table-island.is-busy .table-top {
+  background: radial-gradient(circle at 38% 30%, #ffe2a6, #ffb43a 55%, #a86a06);
+  box-shadow: 0 0 24px -2px rgba(255, 180, 58, 0.8), 0 16px 12px -8px #000, inset 0 2px 2px rgba(255, 255, 255, 0.4);
+}
+
+.vx .table-island.is-busy .table-chairs {
+  background:
+    radial-gradient(circle at 50% 4px, #6a5530 9px, transparent 10px),
+    radial-gradient(circle at 50% calc(100% - 4px), #6a5530 9px, transparent 10px),
+    radial-gradient(circle at 4px 50%, #6a5530 9px, transparent 10px),
+    radial-gradient(circle at calc(100% - 4px) 50%, #6a5530 9px, transparent 10px);
+}
+
+.vx .table-island.is-busy > strong {
+  color: #2a1a00;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.vx .table-island.is-served .table-top {
+  background: radial-gradient(circle at 38% 30%, #c8ffdc, #4ee08a 55%, #1d8a4c);
+  box-shadow: 0 0 24px -2px rgba(78, 224, 138, 0.75), 0 16px 12px -8px #000, inset 0 2px 2px rgba(255, 255, 255, 0.4);
+}
+
+.vx .table-island.is-served > strong {
+  color: #062a14;
+  text-shadow: none;
+}
+
+.vx .table-island.is-selected .table-top {
+  outline: 2px solid var(--nx-orange);
+  outline-offset: 3px;
+}
+
+.vx .table-island > span {
+  font-weight: 900;
+}
+
+.vx .tables-legend i {
+  border-radius: 50%;
+}
+
+@media (max-width: 620px) {
+  .vx .cash-money {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .vx .tables-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
