@@ -303,6 +303,7 @@ export function OrdersBoard({
                         </div>
                       ) : null}
                       {order.courierName && order.fulfillmentType === "Delivery" ? <small className="ticket-courier">🛵 {order.courierName}</small> : null}
+                      {order.deliveryIssue ? <small className="ticket-issue">⚠ {order.deliveryIssue}</small> : null}
                       {next ? (
                         <button
                           className="ticket-action"
@@ -346,6 +347,7 @@ export function OrdersBoard({
               <div><dt>Pagamento</dt><dd>{paymentLabels[selected.paymentMethod]} · {selected.paymentStatus === "Paid" ? "pago" : selected.paymentStatus === "Refunded" ? "estornado" : "a receber"}</dd></div>
               {selected.scheduledFor ? <div><dt>Agendado</dt><dd>{formatDateTime(selected.scheduledFor)}</dd></div> : null}
               {selected.courierName ? <div><dt>Entregador</dt><dd>{selected.courierName}</dd></div> : null}
+              {selected.deliveryIssue ? <div><dt>Problema na entrega</dt><dd className="issue-text">{selected.deliveryIssue}{selected.deliveryIssueAt ? ` · ${formatDateTime(selected.deliveryIssueAt)}` : ""}</dd></div> : null}
             </dl>
 
             {selected.deliveryAddress ? (

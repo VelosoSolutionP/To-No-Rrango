@@ -19,12 +19,17 @@ const gpsOptions: PositionOptions = { enableHighAccuracy: true, maximumAge: 5_00
 const confirmGpsOptions: PositionOptions = { enableHighAccuracy: true, maximumAge: 10_000, timeout: 12_000 };
 // Sem leitura nova o último ponto ainda vale por este tempo; depois disso o "sem sinal" passa a ser verdade.
 const keepLastFixMs = 120_000;
+const issueReasons = ["Cliente não atende", "Endereço não encontrado", "Cliente recusou o pedido", "Pedido danificado", "Problema com a moto"];
 
 export function CourierClient({ token }: { token: string }) {
   const [session, setSession] = useState<CourierSession | null>(null);
   const [phase, setPhase] = useState<Phase>("loading");
   const [problem, setProblem] = useState<string | null>(null);
   const [sentAt, setSentAt] = useState<Date | null>(null);
+  const [issueOpen, setIssueOpen] = useState(false);
+  const [issueOther, setIssueOther] = useState("");
+  const [issueSent, setIssueSent] = useState<string | null>(null);
+  const [issueBusy, setIssueBusy] = useState(false);
   const watch = useRef<number | null>(null);
   const confirmTimer = useRef<number | null>(null);
   const lastFix = useRef<{ latitude: number; longitude: number; at: number } | null>(null);
@@ -150,6 +155,39 @@ export function CourierClient({ token }: { token: string }) {
     void keepScreenOn();
   }
 
+  async function reportIssue(reason: string) {
+    const text = reason.trim();
+
+    if (!text) {
+      return;
+    }
+
+    setIssueBusy(true);
+
+    try {
+      const response = await fetch(`${base}/issue`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: text }),
+      });
+
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { detail?: string; title?: string } | null;
+        setProblem(body?.detail ?? body?.title ?? "Não foi possível avisar a loja. Ligue para ela.");
+        return;
+      }
+
+      setIssueSent(text);
+      setIssueOpen(false);
+      setIssueOther("");
+      setProblem(null);
+    } catch {
+      setProblem("Sem internet agora. Tente de novo ou ligue para a loja.");
+    } finally {
+      setIssueBusy(false);
+    }
+  }
+
   async function finish() {
     stopSensors();
     setPhase("ended");
@@ -183,6 +221,26 @@ export function CourierClient({ token }: { token: string }) {
             ) : null}
           </>
         )}
+        {phase === "ready" || phase === "tracking" ? (
+          <div className="courier-issue">
+            {issueSent ? <p className="courier-issue-sent">Loja avisada: {issueSent}</p> : null}
+            {issueOpen ? (
+              <>
+                <p><strong>O que aconteceu?</strong></p>
+                {issueReasons.map((reason) => (
+                  <button className="secondary-button" disabled={issueBusy} key={reason} onClick={() => void reportIssue(reason)} type="button">{reason}</button>
+                ))}
+                <form onSubmit={(event) => { event.preventDefault(); void reportIssue(issueOther); }}>
+                  <input maxLength={300} onChange={(event) => setIssueOther(event.target.value)} placeholder="Outro motivo" value={issueOther} />
+                  <button className="secondary-button" disabled={issueBusy || !issueOther.trim()} type="submit">Enviar</button>
+                </form>
+                <button className="link-button" onClick={() => setIssueOpen(false)} type="button">Voltar</button>
+              </>
+            ) : (
+              <button className="link-button courier-issue-open" onClick={() => setIssueOpen(true)} type="button">Problema na entrega</button>
+            )}
+          </div>
+        ) : null}
         {problem ? <p className="form-error">{problem}</p> : null}
       </section>
     </main>

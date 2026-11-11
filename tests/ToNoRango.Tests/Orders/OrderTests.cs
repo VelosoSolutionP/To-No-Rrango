@@ -195,6 +195,44 @@ public class OrderTests
     }
 
     [Fact]
+    public void ProblemaNaEntrega_FicaRegistradoAteResolverOuEntregar()
+    {
+        var order = CriarPedido(FulfillmentType.Delivery, 500);
+
+        Assert.Throws<InvalidOperationException>(() => order.ReportDeliveryIssue("Cliente não atende", "Zé", Agora));
+
+        order.ChangeStatus(OrderStatus.Confirmed, "operador", null, Agora);
+        order.ChangeStatus(OrderStatus.Preparing, "operador", null, Agora);
+        order.ChangeStatus(OrderStatus.Ready, "operador", null, Agora);
+        order.ChangeStatus(OrderStatus.OutForDelivery, "operador", null, Agora);
+        Assert.Throws<ArgumentException>(() => order.ReportDeliveryIssue(" ", "Zé", Agora));
+
+        order.ReportDeliveryIssue("Cliente não atende", "Zé", Agora);
+
+        Assert.Equal("Cliente não atende", order.DeliveryIssue);
+        Assert.Equal(OrderStatus.OutForDelivery, order.Status);
+        Assert.Contains(order.StatusHistory, entry => entry.Reason == "Problema na entrega: Cliente não atende");
+
+        order.ResolveDeliveryIssue("gerente", Agora);
+        Assert.Null(order.DeliveryIssue);
+
+        order.ReportDeliveryIssue("Endereço não encontrado", "Zé", Agora);
+        order.ChangeStatus(OrderStatus.Delivered, "operador", null, Agora);
+        Assert.Null(order.DeliveryIssue);
+    }
+
+    [Fact]
+    public void ProblemaNaEntrega_NaoValeParaRetirada()
+    {
+        var order = CriarPedido();
+        order.ChangeStatus(OrderStatus.Confirmed, "operador", null, Agora);
+        order.ChangeStatus(OrderStatus.Preparing, "operador", null, Agora);
+        order.ChangeStatus(OrderStatus.Ready, "operador", null, Agora);
+
+        Assert.Throws<InvalidOperationException>(() => order.ReportDeliveryIssue("x", "Zé", Agora));
+    }
+
+    [Fact]
     public void TransicaoInvalida_Falha()
     {
         var order = CriarPedido();

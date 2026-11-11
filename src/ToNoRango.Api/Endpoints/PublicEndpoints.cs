@@ -141,6 +141,11 @@ internal static class PublicEndpoints
         .RequireRateLimiting("public")
         .AllowAnonymous();
 
+        group.MapPost("/tracking/{token}/issue", async (string token, DeliveryIssueRequest request, DeliveryTrackingService tracking, CancellationToken cancellationToken) =>
+            (await tracking.ReportIssueAsync(token, request, cancellationToken)).ToHttpResult())
+        .RequireRateLimiting("public")
+        .AllowAnonymous();
+
         group.MapPost("/tracking/{token}/finish", async (string token, DeliveryTrackingService tracking) =>
         {
             await tracking.FinishAsync(token);

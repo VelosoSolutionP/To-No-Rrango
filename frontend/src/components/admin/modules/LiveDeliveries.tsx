@@ -21,6 +21,7 @@ interface LiveDelivery {
   updatedAt: string | null;
   distanceKm: number | null;
   etaMinutes: number | null;
+  deliveryIssue?: string | null;
 }
 
 const refreshMs = 10_000;
@@ -32,6 +33,10 @@ function ageOf(delivery: LiveDelivery, now: number) {
 
 function statusOf(delivery: LiveDelivery, now: number) {
   const age = ageOf(delivery, now);
+
+  if (delivery.deliveryIssue) {
+    return { headline: "Problema na entrega", detail: delivery.deliveryIssue };
+  }
 
   if (age === null) {
     return { headline: "Aguardando", detail: "Entregador ainda não iniciou" };

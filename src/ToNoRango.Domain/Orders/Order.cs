@@ -58,6 +58,10 @@ public sealed class Order : AggregateRoot
     public Guid? CourierId { get; private set; }
     public string? CourierName { get; private set; }
     public DateTimeOffset? CourierAssignedAt { get; private set; }
+
+    /// <summary>What the courier reported went wrong on the way. Null when the delivery has no open problem.</summary>
+    public string? DeliveryIssue { get; private set; }
+    public DateTimeOffset? DeliveryIssueAt { get; private set; }
     public IReadOnlyList<OrderItem> Items => _items;
     public IReadOnlyList<OrderStatusHistory> StatusHistory => _statusHistory;
 
@@ -249,6 +253,8 @@ public sealed class Order : AggregateRoot
                 break;
             case OrderStatus.Delivered:
                 DeliveredAt = now;
+                DeliveryIssue = null;
+                DeliveryIssueAt = null;
                 RaiseItems(ItemPrepStatus.Delivered, now);
                 break;
             case OrderStatus.Cancelled:
@@ -324,6 +330,36 @@ public sealed class Order : AggregateRoot
         CourierName = Ensure.MaxLength(Ensure.NotNullOrWhiteSpace(courierName, nameof(CourierName)), 120, nameof(CourierName));
         CourierAssignedAt = now;
         UpdatedAt = now;
+    }
+
+    /// <summary>
+    /// The courier could not finish the delivery as planned (customer not answering, address not found, etc.).
+    /// The order keeps its status; the problem stays open until the store resolves it or the order ends.
+    /// </summary>
+    public void ReportDeliveryIssue(string reason, string? reportedBy, DateTimeOffset now)
+    {
+        if (FulfillmentType != FulfillmentType.Delivery || Status is not (OrderStatus.Ready or OrderStatus.OutForDelivery))
+        {
+            throw new InvalidOperationException("Só dá para informar problema de um pedido saindo ou a caminho.");
+        }
+
+        DeliveryIssue = Ensure.MaxLength(Ensure.NotNullOrWhiteSpace(reason, "motivo").Trim(), 300, "motivo");
+        DeliveryIssueAt = now;
+        UpdatedAt = now;
+        _statusHistory.Add(new OrderStatusHistory(TenantId, EstablishmentId, Id, Status, Status, now, reportedBy, $"Problema na entrega: {DeliveryIssue}"));
+    }
+
+    public void ResolveDeliveryIssue(string? resolvedBy, DateTimeOffset now)
+    {
+        if (DeliveryIssue is null)
+        {
+            return;
+        }
+
+        DeliveryIssue = null;
+        DeliveryIssueAt = null;
+        UpdatedAt = now;
+        _statusHistory.Add(new OrderStatusHistory(TenantId, EstablishmentId, Id, Status, Status, now, resolvedBy, "Problema na entrega resolvido"));
     }
 
     public void SetWaiter(string? waiterName) =>

@@ -4799,6 +4799,22 @@ body {
 }
 
 
+/* ---- Problema na entrega ---- */
+.courier-issue { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border); display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.5rem; }
+.courier-issue .secondary-button { margin-top: 0; min-height: 48px; width: 100%; box-sizing: border-box; }
+.courier-issue input, .courier-issue button { box-sizing: border-box; }
+.courier-issue form { display: flex; gap: 0.5rem; }
+.courier-issue input { flex: 1; min-width: 0; min-height: 48px; padding: 0 0.8rem; border-radius: 10px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--foreground); font: inherit; font-size: 16px; }
+.courier-issue form .secondary-button { width: auto; flex: none; padding: 0 1rem; }
+.courier-issue-open { color: var(--danger); font-weight: 700; justify-self: center; }
+.courier-issue-sent { color: var(--warning); font-weight: 700; }
+.ticket-issue { display: block; margin-top: 4px; color: var(--danger); font-weight: 700; }
+.issue-text { color: var(--danger); font-weight: 700; }
+.dispatch-card.has-issue { border-color: var(--danger); }
+.dispatch-issue { display: grid; gap: 4px; margin: 8px 0; padding: 8px 10px; border-radius: 10px; background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); font-size: 13px; }
+.dispatch-issue span { color: var(--foreground); }
+.dispatch-issue .link-button { justify-self: start; }
+
 /* ---- Cardápio: busca, filtros, horário, promoção e combo ---- */
 button.store-status { background: none; border: 0; color: inherit; font: inherit; cursor: pointer; padding: 0; }
 .store-status.is-closed .status-dot { background: var(--warning); box-shadow: none; }

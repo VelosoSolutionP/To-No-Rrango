@@ -175,6 +175,7 @@ export interface OrderTracking {
   discountInCents?: number;
   tableLabel?: string | null;
   courierName?: string | null;
+  hasDeliveryIssue?: boolean;
   customerName: string;
   customerPhoneMasked: string;
   subtotalInCents: number;
@@ -200,6 +201,8 @@ export interface AdminOrder extends OrderTracking {
   discountReason?: string | null;
   deliveryReference?: string | null;
   waiterName?: string | null;
+  deliveryIssue?: string | null;
+  deliveryIssueAt?: string | null;
 }
 
 export type UserRole = "Owner" | "Manager" | "Attendant" | "Kitchen";

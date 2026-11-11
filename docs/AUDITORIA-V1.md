@@ -103,3 +103,16 @@ Menu do painel: Operação (Visão geral, Pedidos, Cozinha, Entregas, PDV), Gest
 
 ### 7. Ainda depende de homologação
 NFC-e/NF-e na SEFAZ, SINTEGRA e SPED no PVA, rastreio em celular na rua, Mercado Pago e Evolution reais.
+
+## Registro de execução — 2026-11-11
+
+Escopo da Missão 0007 conferido de novo contra o código. A lacuna que restava no código era o status **Problema na entrega** (seção 10).
+
+| Funcionalidade | Onde | Validação |
+|---|---|---|
+| Entregador informa problema pelo link (motivos prontos ou texto livre) | `Order.ReportDeliveryIssue`, `POST /api/public/tracking/{token}/issue`, `CourierClient.tsx` | 2 testes de domínio, E2E da API, navegador a 390px |
+| Loja vê o alerta no Kanban, no despacho e no mapa ao vivo, e marca como resolvido | `POST /api/admin/orders/{id}/delivery-issue/resolve`, `OrdersBoard`, `Distribution`, `LiveDeliveries` | E2E da API |
+| Cliente vê o aviso na página do pedido e recebe mensagem pelo WhatsApp da loja | `OrderTrackingDto.HasDeliveryIssue`, `OrderNotifier.NotifyAsync` | E2E da API e navegador |
+| Histórico do pedido registra o problema e a resolução; entregar o pedido limpa o alerta | `OrderStatusHistory` | teste de domínio e E2E |
+
+Migração `ProblemaEntrega`: só acrescenta duas colunas em `orders.orders`. Testes: 233 automatizados, E2E da API com 20 de 20 checagens, navegador com 2 de 2, tudo em cópia descartável. A tela do painel (despacho e Kanban) foi validada pela API e pela checagem de tipos, não no navegador.

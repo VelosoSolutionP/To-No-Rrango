@@ -55,6 +55,8 @@ public sealed record TrackingLinkDto(string Token, bool SentToCourier = false);
 
 public sealed record CourierPositionRequest(double Latitude, double Longitude);
 
+public sealed record DeliveryIssueRequest(string Reason);
+
 public sealed record CourierSessionDto(bool IsActive, string? OrderCode, string? StoreName, string? Destination);
 
 public sealed record PublicTrackingDto(
@@ -75,7 +77,8 @@ public sealed record LiveDeliveryDto(
     GeoPoint? DestinationPoint,
     DateTimeOffset? UpdatedAt,
     double? DistanceKm,
-    int? EtaMinutes);
+    int? EtaMinutes,
+    string? DeliveryIssue = null);
 
 /// <summary>Rough arrival estimate from the straight-line distance. It does not know streets or traffic.</summary>
 public static class TrackingEstimate
@@ -164,6 +167,7 @@ public sealed class DeliveryTrackingService(
     IRepository<ToNoRango.Domain.Messaging.OutboundMessage> outbox,
     IWhatsAppSender sender,
     IAppUrls urls,
+    ToNoRango.Application.Orders.OrderNotifier notifier,
     ToNoRango.SharedKernel.Abstractions.IUnitOfWork unitOfWork,
     TimeProvider clock)
 {
@@ -310,6 +314,53 @@ public sealed class DeliveryTrackingService(
         return new CourierSessionDto(true, session.OrderCode, session.StoreName, session.Destination);
     }
 
+    /// <summary>
+    /// The courier tells the store something went wrong. The store sees it on the order and on the map;
+    /// the customer is told the store will get in touch.
+    /// </summary>
+    public Task<Result<CourierSessionDto>> ReportIssueAsync(string token, DeliveryIssueRequest request, CancellationToken cancellationToken) =>
+        Guarded.RunAsync<CourierSessionDto>(async () =>
+        {
+            var session = await store.FindByTokenAsync(token);
+
+            if (session is null || await CloseIfFinishedAsync(session, cancellationToken))
+            {
+                return Finished;
+            }
+
+            var order = await orders.GetByIdAsync(session.OrderId, cancellationToken);
+
+            if (order is null)
+            {
+                return Finished;
+            }
+
+            order.ReportDeliveryIssue(request.Reason, order.CourierName ?? "Entregador", clock.GetUtcNow());
+            await notifier.NotifyAsync(
+                order,
+                $"Pedido {order.Code}: o entregador teve um imprevisto ({order.DeliveryIssue}). A loja já foi avisada e vai falar com você.\nAcompanhe: {notifier.TrackingUrl(order)}",
+                cancellationToken);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+
+            return new CourierSessionDto(true, session.OrderCode, session.StoreName, session.Destination);
+        });
+
+    public Task<Result<ToNoRango.Application.Orders.OrderDto>> ResolveIssueAsync(Guid orderId, string? actor, CancellationToken cancellationToken) =>
+        Guarded.RunAsync<ToNoRango.Application.Orders.OrderDto>(async () =>
+        {
+            var order = await orders.GetByIdAsync(orderId, cancellationToken);
+
+            if (order is null)
+            {
+                return Result<ToNoRango.Application.Orders.OrderDto>.Failure(AppErrors.NotFound("tracking.order_not_found", "Pedido não encontrado."));
+            }
+
+            order.ResolveDeliveryIssue(actor, clock.GetUtcNow());
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+
+            return ToNoRango.Application.Orders.OrderDto.From(order);
+        });
+
     public async Task FinishAsync(string token)
     {
         var session = await store.FindByTokenAsync(token);
@@ -356,7 +407,8 @@ public sealed class DeliveryTrackingService(
                 tracking.Destination,
                 tracking.UpdatedAt,
                 tracking.DistanceKm,
-                tracking.EtaMinutes));
+                tracking.EtaMinutes,
+                order.DeliveryIssue));
         }
 
         return live;

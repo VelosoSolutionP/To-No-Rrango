@@ -189,7 +189,7 @@ export function Distribution({
             <h3>Em rota <b>{onRoute.length}</b></h3>
             {onRoute.length === 0 ? <p className="board-empty">Ninguém na rua agora.</p> : null}
             {onRoute.map((order) => (
-              <article className="dispatch-card is-route" key={order.id}>
+              <article className={`dispatch-card is-route ${order.deliveryIssue ? "has-issue" : ""}`} key={order.id}>
                 <header>
                   <strong>#{order.code.slice(-6)} · {order.customerName}</strong>
                   <span className="muted">{minutesBetween(order.updatedAt, new Date().toISOString())} min</span>
@@ -199,6 +199,13 @@ export function Distribution({
                   <span>🛵 {order.courierName ?? "sem entregador"}</span>
                   <span>{formatBRL(order.totalInCents)}</span>
                 </div>
+                {order.deliveryIssue ? (
+                  <div className="dispatch-issue">
+                    <strong>⚠ Problema na entrega</strong>
+                    <span>{order.deliveryIssue}</span>
+                    <button className="link-button" disabled={action.busy} onClick={() => void action.run(() => http.post(`/orders/${order.id}/delivery-issue/resolve`, {}))} type="button">Marcar resolvido</button>
+                  </div>
+                ) : null}
                 <button className="ticket-action" disabled={action.busy} onClick={() => void action.run(() => http.patch(`/orders/${order.id}/status`, { status: "Delivered", reason: null, changedBy: null }))} type="button">
                   Marcar entregue
                 </button>

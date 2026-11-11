@@ -179,7 +179,11 @@ public sealed class OrderNotifier(
     IAppUrls urls,
     IClock clock)
 {
-    public async Task NotifyStatusAsync(Order order, CancellationToken cancellationToken)
+    public Task NotifyStatusAsync(Order order, CancellationToken cancellationToken) =>
+        NotifyAsync(order, OrderMessages.For(order, urls.TrackingUrl(order.Code)), cancellationToken);
+
+    /// <summary>Queues a message to the customer through the store's WhatsApp, when it is connected and allowed to notify.</summary>
+    public async Task NotifyAsync(Order order, string text, CancellationToken cancellationToken)
     {
         // Counter sales without a phone have nobody to tell.
         if (!sender.IsConfigured || Domain.Common.PhoneNumber.Digits(order.CustomerPhone).Length < 10)
@@ -195,13 +199,10 @@ public sealed class OrderNotifier(
             return;
         }
 
-        outbox.Add(new OutboundMessage(
-            order.TenantId,
-            order.EstablishmentId,
-            order.CustomerPhone,
-            OrderMessages.For(order, urls.TrackingUrl(order.Code)),
-            clock.UtcNow));
+        outbox.Add(new OutboundMessage(order.TenantId, order.EstablishmentId, order.CustomerPhone, text, clock.UtcNow));
     }
+
+    public string TrackingUrl(Order order) => urls.TrackingUrl(order.Code);
 }
 
 public static class OrderMessages

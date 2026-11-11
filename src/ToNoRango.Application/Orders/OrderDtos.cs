@@ -66,7 +66,9 @@ public sealed record OrderDto(
     string? DeliveryReference = null,
     bool IsRated = false,
     string? CourierName = null,
-    string? WaiterName = null)
+    string? WaiterName = null,
+    string? DeliveryIssue = null,
+    DateTimeOffset? DeliveryIssueAt = null)
 {
     public static OrderDto From(Order order) => new(
         order.Id,
@@ -109,7 +111,9 @@ public sealed record OrderDto(
         order.DeliveryReference,
         false,
         order.CourierName,
-        order.WaiterName);
+        order.WaiterName,
+        order.DeliveryIssue,
+        order.DeliveryIssueAt);
 }
 
 public sealed record OrderTrackingDto(
@@ -135,7 +139,8 @@ public sealed record OrderTrackingDto(
     DateTimeOffset? ScheduledFor = null,
     long DiscountInCents = 0,
     string? TableLabel = null,
-    string? CourierName = null)
+    string? CourierName = null,
+    bool HasDeliveryIssue = false)
 {
     public static OrderTrackingDto From(Order order) => new(
         order.Code,
@@ -160,7 +165,8 @@ public sealed record OrderTrackingDto(
         order.ScheduledFor,
         order.DiscountInCents,
         order.TableLabel,
-        order.CourierName);
+        order.CourierName,
+        order.DeliveryIssue is not null);
 
     private static string MaskPhone(string phone)
     {

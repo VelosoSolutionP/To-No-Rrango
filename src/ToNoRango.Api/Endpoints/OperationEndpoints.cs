@@ -34,6 +34,13 @@ internal static class OperationEndpoints
                 (await service.StartAsync(orderId, request.CourierId, ct)).ToHttpResult())
             .WithName("AtribuirEntregador");
 
+        operations.MapGroup(string.Empty)
+            .RequireRoles(UserRole.Owner, UserRole.Manager, UserRole.Attendant)
+            .MapPost("/orders/{orderId:guid}/delivery-issue/resolve", async (
+                Guid orderId, HttpContext http, DeliveryTrackingService service, CancellationToken ct) =>
+                (await service.ResolveIssueAsync(orderId, http.Actor(), ct)).ToHttpResult())
+            .WithName("ResolverProblemaEntrega");
+
         var cashiers = operations.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager, UserRole.Attendant);
 
         cashiers.MapGet($"{Establishment}/pdv", async (Guid establishmentId, PdvService service, CancellationToken ct) =>

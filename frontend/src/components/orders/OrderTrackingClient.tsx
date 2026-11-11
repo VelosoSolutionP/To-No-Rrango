@@ -141,6 +141,9 @@ export function OrderTrackingClient({ code }: OrderTrackingClientProps) {
         {order.courierName && order.fulfillmentType === "Delivery" && order.status !== "Delivered" && order.status !== "Cancelled" ? (
           <p className="tracking-courier">Entregador: {order.courierName}</p>
         ) : null}
+        {order.hasDeliveryIssue && order.status !== "Delivered" && order.status !== "Cancelled" ? (
+          <p className="tracking-scheduled">O entregador teve um imprevisto. A loja já foi avisada e vai falar com você.</p>
+        ) : null}
       </section>
 
       <OrderRating code={order.code} delivered={order.status === "Delivered"} />

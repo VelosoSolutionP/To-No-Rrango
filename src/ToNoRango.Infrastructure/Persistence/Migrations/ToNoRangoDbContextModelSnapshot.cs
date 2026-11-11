@@ -1609,6 +1609,13 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                     b.Property<long>("DeliveryFeeInCents")
                         .HasColumnType("bigint");
 
+                    b.Property<string>("DeliveryIssue")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<DateTimeOffset?>("DeliveryIssueAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("DeliveryNumber")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
