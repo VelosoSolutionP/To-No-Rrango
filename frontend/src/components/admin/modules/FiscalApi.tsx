@@ -89,6 +89,9 @@ const routes = [
   ["GET", "/service-notes", "Lista NFS-e; /service-notes/{id}, /xml e /cancel como nas notas"],
   ["GET", "/books/assessment", "Apuração do mês (?year, ?month); só chave de produção"],
   ["GET", "/books/register", "Livro de entradas e saídas; só chave de produção"],
+  ["GET", "/books/periods", "Competências: notas e arquivos gerados por mês; só chave de produção"],
+  ["GET", "/review", "Conferência fiscal (pendências e o que fazer); só chave de produção"],
+  ["GET", "/tables", "Tabelas oficiais de CFOP e CST"],
 ];
 
 export function FiscalApiView({ http, establishmentId }: { http: AdminHttp; establishmentId: string }) {

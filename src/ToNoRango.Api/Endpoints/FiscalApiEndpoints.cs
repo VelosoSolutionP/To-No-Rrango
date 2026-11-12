@@ -67,6 +67,19 @@ internal static class FiscalApiEndpoints
 
         NfseEndpoints.MapApi(api);
 
+        // For the ZEST fiscal AI (and any partner): what is pending, how the months stand, and the official tables.
+        api.MapGet("/review", async (HttpContext http, FiscalReviewService service, CancellationToken ct) =>
+            http.FiscalCaller()!.IsTest
+                ? TestKeyRefused()
+                : (await service.ReviewAsync(http.FiscalCaller()!.EstablishmentId, ct)).ToHttpResult());
+
+        api.MapGet("/books/periods", async (HttpContext http, int? months, FiscalBooksService service, TimeProvider clock, CancellationToken ct) =>
+            http.FiscalCaller()!.IsTest
+                ? TestKeyRefused()
+                : Results.Ok(await service.GetPeriodsAsync(http.FiscalCaller()!.EstablishmentId, months ?? 12, DateOnly.FromDateTime(clock.GetLocalNow().DateTime), ct)));
+
+        api.MapGet("/tables", () => Results.Ok(FiscalTables.All()));
+
         // Books are the store's real data: only a live key reads them.
         api.MapGet("/books/assessment", async (HttpContext http, int year, int month, long? previousIcmsCredit, FiscalBooksService service, CancellationToken ct) =>
             http.FiscalCaller()!.IsTest
