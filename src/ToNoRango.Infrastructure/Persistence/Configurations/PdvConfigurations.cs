@@ -108,3 +108,22 @@ public sealed class ZestConnectionConfiguration : IEntityTypeConfiguration<ToNoR
         builder.HasIndex(connection => connection.TenantId);
     }
 }
+
+public sealed class ReceivedNoteConfiguration : IEntityTypeConfiguration<ToNoRango.Domain.Fiscal.ReceivedNote>
+{
+    public void Configure(EntityTypeBuilder<ToNoRango.Domain.Fiscal.ReceivedNote> builder)
+    {
+        builder.ToTable("received_notes", "fiscal");
+        builder.HasKey(note => note.Id);
+        builder.Property(note => note.Id).ValueGeneratedNever();
+        builder.Property(note => note.AccessKey).HasMaxLength(44).IsRequired();
+        builder.Property(note => note.IssuerDocument).HasMaxLength(14);
+        builder.Property(note => note.IssuerName).HasMaxLength(120);
+        builder.Property(note => note.Status).HasConversion<int>();
+        builder.Property(note => note.Xml).HasColumnType("text");
+        builder.Property(note => note.LastEvent).HasMaxLength(120);
+        builder.Property<uint>("xmin").IsRowVersion();
+        builder.HasIndex(note => new { note.EstablishmentId, note.AccessKey }).IsUnique();
+        builder.HasIndex(note => note.TenantId);
+    }
+}

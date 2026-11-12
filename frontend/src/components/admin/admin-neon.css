@@ -1536,3 +1536,59 @@
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
 }
+
+/* ───────── Central Fiscal: banner de consultoria, notas recebidas, nota avulsa e tabelas ───────── */
+.fx-banner { position: relative; overflow: hidden; isolation: isolate; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 22px; align-items: center;
+  margin: 4px 0 18px; padding: 24px 26px; border-radius: 22px; background: var(--nx-glass); border: 1px solid transparent;
+  background-image: linear-gradient(var(--nx-glass-2), var(--nx-glass-2)), var(--nx-neon); background-origin: border-box; background-clip: padding-box, border-box;
+  box-shadow: var(--nx-raise), 0 30px 60px -40px rgba(255, 106, 26, 0.75); transform: perspective(1200px) rotateX(1.2deg); }
+.fx-banner-glow { position: absolute; inset: -40% -10% auto auto; width: 340px; height: 340px; border-radius: 50%; z-index: -1; filter: blur(50px);
+  background: radial-gradient(circle, rgba(169, 139, 255, 0.55), rgba(255, 106, 26, 0.25) 55%, transparent 70%); animation: fxFloat 10s ease-in-out infinite alternate; }
+@keyframes fxFloat { to { transform: translate(-60px, 40px) scale(1.12); } }
+.fx-banner-tag { margin: 0 0 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--nx-lilac-2); }
+.fx-banner h3 { margin: 0 0 8px; font-size: clamp(18px, 2.2vw, 24px); line-height: 1.2; }
+.fx-banner h3 em { font-style: normal; background: var(--nx-neon); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.fx-banner p { margin: 0 0 6px; color: var(--muted, #b7b7c2); max-width: 70ch; }
+.fx-banner-more { font-weight: 600; color: var(--nx-orange-2) !important; }
+.fx-banner-offer { display: grid; justify-items: center; gap: 10px; padding: 18px 20px; border-radius: 18px; text-align: center; min-width: 210px;
+  background: var(--nx-well); border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 18px 30px -22px rgba(0, 0, 0, 0.9); }
+.fx-banner-offer strong { font-size: 17px; line-height: 1.25; max-width: 16ch; }
+.fx-offer-chip { padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--accent-ink); background: var(--nx-orb); box-shadow: var(--nx-orb-shadow); }
+.fx-card { position: relative; }
+.fx-card .vx-panel-title em { font-style: normal; font-weight: 500; color: var(--nx-lilac-2); margin-left: 6px; font-size: 0.8em; }
+.fx-sync { padding: 10px 14px; border-radius: 12px; background: rgba(169, 139, 255, 0.1); border: 1px solid rgba(169, 139, 255, 0.28); }
+.fx-warn { padding: 12px 14px; border-radius: 14px; background: rgba(255, 106, 26, 0.1); border: 1px solid rgba(255, 106, 26, 0.38); box-shadow: 0 0 24px -14px var(--nx-orange); }
+.fx-warn-actions { margin-top: 10px; }
+.fx-received { display: grid; gap: 10px; perspective: 1000px; }
+.fx-note { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 14px; align-items: center; padding: 14px 16px; border-radius: 16px;
+  background: var(--nx-glass); border: 1px solid rgba(255, 255, 255, 0.07); box-shadow: var(--nx-raise); transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease; }
+.fx-note:hover { transform: translateY(-2px) rotateX(3deg); border-color: rgba(255, 106, 26, 0.45); box-shadow: var(--nx-raise), 0 18px 34px -24px var(--nx-orange); }
+.fx-note.is-off { opacity: 0.6; }
+.fx-note-main { display: grid; gap: 4px; min-width: 0; }
+.fx-note-main small { color: var(--muted, #9a9aa6); font-family: ui-monospace, monospace; font-size: 11px; overflow-wrap: anywhere; }
+.fx-note-total { font-size: 17px; font-variant-numeric: tabular-nums; }
+.fx-note-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.fx-note-actions { display: flex; gap: 8px; align-items: center; }
+.fx-tag { padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.1); }
+.fx-tag.ok { color: #6ee7a6; border-color: rgba(110, 231, 166, 0.35); background: rgba(110, 231, 166, 0.1); }
+.fx-tag.warn { color: #fbbf24; border-color: rgba(251, 191, 36, 0.35); background: rgba(251, 191, 36, 0.1); }
+.fx-tag.bad { color: #f87171; border-color: rgba(248, 113, 113, 0.35); background: rgba(248, 113, 113, 0.1); }
+.fx-wide { grid-column: 1 / -1; }
+.fx-lines { display: grid; gap: 10px; }
+.fx-line { display: grid; grid-template-columns: minmax(160px, 2fr) repeat(7, minmax(64px, 1fr)) auto; gap: 6px; align-items: center; padding: 10px; border-radius: 14px;
+  background: var(--nx-well); border: 1px solid rgba(255, 255, 255, 0.06); }
+.fx-line input { min-width: 0; }
+.fx-cfop-name { grid-column: 1 / -1; color: var(--nx-lilac-2); font-size: 12px; }
+.fx-cfop-name.is-bad { color: #f87171; }
+.fx-search { width: 100%; margin: 8px 0 12px; }
+.fx-table { display: grid; gap: 4px; max-height: 520px; overflow: auto; padding-right: 4px; }
+.fx-table > div { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 12px; padding: 8px 10px; border-radius: 10px; background: var(--nx-well); }
+.fx-table b { font-variant-numeric: tabular-nums; color: var(--nx-orange-2); }
+@media (max-width: 860px) {
+  .fx-banner { grid-template-columns: 1fr; transform: none; }
+  .fx-note { grid-template-columns: 1fr; }
+  .fx-line { grid-template-columns: 1fr 1fr; }
+  .fx-line input:first-child { grid-column: 1 / -1; }
+}
+@media (prefers-reduced-motion: reduce) { .fx-banner-glow { animation: none; } .fx-note, .fx-note:hover { transition: none; transform: none; } }

@@ -75,7 +75,12 @@ public sealed record DfeIssue(
     DfeCredentials Credentials,
     bool OfflineContingency = false,
     DateTimeOffset? ContingencyAt = null,
-    string? ContingencyReason = null);
+    string? ContingencyReason = null,
+    int Purpose = 1,
+    string? Nature = null,
+    IReadOnlyList<string>? ReferencedKeys = null,
+    bool IsEntry = false,
+    bool FinalConsumer = true);
 
 public enum DfeOutcome
 {
@@ -93,6 +98,15 @@ public sealed record DfeResult(DfeOutcome Outcome, string Message, string? Acces
 
 public sealed record DfeCancel(int Model, int Environment, string State, string Cnpj, string AccessKey, string Protocol, string Reason, DfeCredentials Credentials);
 
+/// <summary>Correction letter (CC-e, event 110110): fixes text fields of an authorized NF-e, never values or parties.</summary>
+public sealed record DfeCorrection(int Environment, string State, string Cnpj, string AccessKey, int Sequence, string Text, DfeCredentials Credentials);
+
+/// <summary>One document from the distribution: the XML already unzipped and its schema name (resNFe, procNFe, resEvento, procEventoNFe).</summary>
+public sealed record DfeDistributedDocument(long Nsu, string Schema, string Xml);
+
+/// <summary>Status 137 = nothing new (wait an hour); 138 = documents found; 656 = asked too often (blocked for an hour).</summary>
+public sealed record DfeDistribution(int Status, string Message, long LastNsu, long MaxNsu, IReadOnlyList<DfeDistributedDocument> Documents);
+
 public sealed record DfeNumberGap(int Model, int Environment, string State, string Cnpj, int Series, int FromNumber, int ToNumber, int Year, string Reason, DfeCredentials Credentials);
 
 public sealed record DfeEventResult(bool Accepted, string Message, string? Protocol = null, string? Xml = null);
@@ -109,6 +123,14 @@ public interface IDfeEmitter
     Task<DfeResult> SendSignedAsync(int model, int environment, string state, string signedXml, DfeCredentials credentials, CancellationToken cancellationToken);
 
     Task<DfeEventResult> CancelAsync(DfeCancel request, CancellationToken cancellationToken);
+
+    /// <summary>Downloads documents addressed to the CNPJ after <paramref name="lastNsu"/> (up to 50 per call).</summary>
+    Task<DfeDistribution> DistributeAsync(int environment, string state, string cnpj, long lastNsu, DfeCredentials credentials, CancellationToken cancellationToken);
+
+    /// <summary>Ciência da operação (210210): lets the SEFAZ release the full XML of a note addressed to the store.</summary>
+    Task<DfeEventResult> AcknowledgeAsync(int environment, string state, string cnpj, string accessKey, DfeCredentials credentials, CancellationToken cancellationToken);
+
+    Task<DfeEventResult> CorrectAsync(DfeCorrection request, CancellationToken cancellationToken);
 
     Task<DfeEventResult> GiveUpNumbersAsync(DfeNumberGap request, CancellationToken cancellationToken);
 

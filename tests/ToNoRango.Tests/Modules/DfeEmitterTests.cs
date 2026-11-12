@@ -110,6 +110,32 @@ public class DfeEmitterTests
     }
 
     [Fact]
+    public void Devolucao_ReferenciaANotaDeOrigemEValidaNoEsquema()
+    {
+        var supplier = new NfeRecipientRequest("11444777000161", "FORNECEDOR LTDA", "0623079040081", "Rua B", "20", "Centro", "3550308", "Sao Paulo", "SP", "01001000", null);
+        const string origin = "35261111444777000161550010000012341000012345";
+        var issue = Issue(55, supplier) with
+        {
+            Purpose = 4,
+            Nature = "DEVOLUCAO DE COMPRA PARA COMERCIALIZACAO",
+            ReferencedKeys = [origin],
+            FinalConsumer = false,
+            Payments = [],
+            Lines = [new DfeLine("A1", "Acai 10L", 2, 18000, 0, 0, "21069090", "6202", null, "00", 12m, "01", 1.65m, 7.6m, true)],
+        };
+
+        var result = Emitter().Sign(issue);
+
+        Assert.Contains("<finNFe>4</finNFe>", result.Xml);
+        Assert.Contains($"<refNFe>{origin}</refNFe>", result.Xml);
+        Assert.Contains("<natOp>DEVOLUCAO DE COMPRA PARA COMERCIALIZACAO</natOp>", result.Xml);
+        Assert.Contains("<indFinal>0</indFinal>", result.Xml);
+        Assert.Contains("<idDest>2</idDest>", result.Xml);
+        Assert.Contains("<CFOP>6202</CFOP>", result.Xml);
+        AssertSignatureValid(result.Xml!);
+    }
+
+    [Fact]
     public void ContingenciaOffline_TemOutraChaveEJustificativa()
     {
         var issue = Issue(65);

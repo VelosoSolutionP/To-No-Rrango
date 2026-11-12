@@ -33,6 +33,8 @@ import "./admin-neon.css";
 import { Distribution } from "./modules/Distribution";
 import { Finance } from "./modules/Finance";
 import { Inventory } from "./modules/Inventory";
+import { Fiscal } from "./modules/Fiscal";
+import type { ManualDraft } from "./modules/FiscalExtras";
 import { Kitchen } from "./modules/Kitchen";
 import { Overview } from "./modules/Overview";
 import { Pdv } from "./modules/Pdv";
@@ -61,7 +63,7 @@ const tabs: Array<{ id: Tab; group: string; label: string; roles: UserRole[]; mo
   { id: "suppliers", group: "Cadastros", label: "Fornecedores", roles: management, modules: ["estoque"] },
   { id: "inventory", group: "Gestão", label: "Estoque", roles: management, modules: ["estoque"] },
   { id: "finance", group: "Gestão", label: "Financeiro", roles: management, modules: ["financeiro"] },
-  { id: "fiscal", group: "Gestão", label: "Fiscal", roles: management, modules: ["fiscal", "fiscal_nfce"], locked: true },
+  { id: "fiscal", group: "Gestão", label: "Fiscal", roles: management, modules: ["fiscal", "fiscal_nfce"] },
   { id: "reports", group: "Gestão", label: "Relatórios", roles: management, modules: ["pedidos"], locked: true },
   { id: "zest", group: "Inteligência", label: "ZEST IA", roles: management, modules: ["ia"] },
   { id: "settings", group: "Ajustes", label: "Configurações", roles: management },
@@ -101,6 +103,9 @@ export function AdminClient() {
   const [establishments, setEstablishments] = useState<Establishment[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [tab, setTab] = useState<Tab>("overview");
+  /* Ida e volta entre Compras e a Central Fiscal: a nota baixada vira entrada, a compra vira devolução/ajuste. */
+  const [fiscalXml, setFiscalXml] = useState<string | null>(null);
+  const [fiscalDraft, setFiscalDraft] = useState<ManualDraft | null>(null);
   const [menu, setMenu] = useState<PublicMenu | null>(null);
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
@@ -603,16 +608,22 @@ export function AdminClient() {
 
             {tab === "kitchen" && hasEstablishment ? <Kitchen error={mutationError ?? dataError} onAdvance={updateOrderStatus} onAdvanceItem={http ? advanceItem : undefined} orders={orders} /> : null}
             {tab === "pdv" && hasEstablishment && http ? <Pdv canManage={canManage} establishmentId={selectedId} http={http} menu={menu} onChanged={refreshOrders} orders={orders} /> : null}
-            {(tab === "reports" || tab === "fiscal") && hasEstablishment ? (
+            {tab === "fiscal" && hasEstablishment && http ? (
+              <Fiscal
+                draft={fiscalDraft}
+                establishmentId={selectedId}
+                http={http}
+                key={fiscalDraft?.referencedKey ?? "fiscal"}
+                modules={session.modules}
+                onOpenInventory={(xml) => { setFiscalXml(xml ?? null); setTab("inventory"); }}
+              />
+            ) : null}
+            {tab === "reports" && hasEstablishment ? (
               <section className="locked-module">
                 <span className="locked-icon"><Icon name="lock" size={34} /></span>
-                <p className="eyebrow">{tab === "fiscal" ? "Fiscal" : "Relatórios"}</p>
+                <p className="eyebrow">Relatórios</p>
                 <h2>Em levantamento de requisitos</h2>
-                <p className="muted">
-                  {tab === "fiscal"
-                    ? "A emissão de NFC-e e NF-e, SINTEGRA e SPED estão sendo redefinidas. A tributação de cada produto continua no cadastro de Produtos."
-                    : "Os relatórios estão sendo redefinidos. Enquanto isso, os números do dia estão na Visão geral, no Financeiro e no Estoque."}
-                </p>
+                <p className="muted">Os relatórios estão sendo redefinidos. Enquanto isso, os números do dia estão na Visão geral, no Financeiro e no Estoque.</p>
               </section>
             ) : null}
             {tab === "zest" && hasEstablishment && http ? <ZestIa establishmentId={selectedId} http={http} /> : null}
@@ -632,7 +643,17 @@ export function AdminClient() {
               />
             ) : null}
 
-            {tab === "inventory" && hasEstablishment && http ? <Inventory canImportNfe={session.modules.includes("fiscal")} establishmentId={selectedId} http={http} menu={menu} /> : null}
+            {tab === "inventory" && hasEstablishment && http ? (
+              <Inventory
+                canImportNfe={session.modules.includes("fiscal")}
+                establishmentId={selectedId}
+                http={http}
+                initialXml={fiscalXml}
+                key={fiscalXml ? "from-fiscal" : "inventory"}
+                menu={menu}
+                onOpenFiscal={session.modules.some((item) => item === "fiscal" || item === "fiscal_nfce") ? (draft) => { setFiscalDraft(draft ?? null); setFiscalXml(null); setTab("fiscal"); } : undefined}
+              />
+            ) : null}
             {tab === "products" && hasEstablishment && http ? <Products establishmentId={selectedId} http={http} menu={menu} modules={session.modules} onMenuChanged={refreshMenu} /> : null}
             {tab === "suppliers" && hasEstablishment && http ? <Suppliers establishmentId={selectedId} http={http} /> : null}
             {tab === "customers" && hasEstablishment && http ? <Customers establishmentId={selectedId} http={http} /> : null}

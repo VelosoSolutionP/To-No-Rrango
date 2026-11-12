@@ -78,7 +78,10 @@ public sealed record FiscalDocumentDto(
     int Model = FiscalDocument.NfceModel,
     string? RecipientName = null,
     string? CancelReason = null,
-    DateTimeOffset? ContingencyAt = null);
+    DateTimeOffset? ContingencyAt = null,
+    int CorrectionSequence = 0,
+    string? CorrectionText = null,
+    int Purpose = 1);
 
 public sealed record FiscalOverviewDto(
     bool IsMonitorConfigured,
@@ -471,5 +474,8 @@ public sealed class FiscalService(
         document.Model,
         document.RecipientName,
         document.CancelReason,
-        document.ContingencyAt);
+        document.ContingencyAt,
+        document.CorrectionSequence,
+        document.CorrectionText,
+        document.Purpose);
 }

@@ -34,7 +34,10 @@ public sealed record NfePreview(
     string? RecipientDocument,
     decimal Total,
     bool AlreadyImported,
-    IReadOnlyList<NfeItem> Items);
+    IReadOnlyList<NfeItem> Items,
+    string? SupplierState = null,
+    string? RecipientState = null,
+    bool IsInterstate = false);
 
 public sealed record ParsedNfe(
     string AccessKey,
@@ -45,7 +48,9 @@ public sealed record ParsedNfe(
     string? SupplierTradeName,
     string? RecipientDocument,
     decimal Total,
-    IReadOnlyList<NfeItem> Items);
+    IReadOnlyList<NfeItem> Items,
+    string? SupplierState = null,
+    string? RecipientState = null);
 
 public static class NfeXmlParser
 {
@@ -126,7 +131,9 @@ public static class NfeXmlParser
             issuer.Element(Ns + "xFant")?.Value,
             recipient?.Element(Ns + "CNPJ")?.Value ?? recipient?.Element(Ns + "CPF")?.Value,
             Number(Required(Required(info, "total"), "ICMSTot"), "vNF"),
-            items);
+            items,
+            issuer.Element(Ns + "enderEmit")?.Element(Ns + "UF")?.Value,
+            recipient?.Element(Ns + "enderDest")?.Element(Ns + "UF")?.Value);
     }
 
     private static XElement Required(XElement parent, string name) =>
@@ -190,6 +197,10 @@ public sealed class NfeImportService(
                 parsed.RecipientDocument,
                 parsed.Total,
                 imported,
-                items);
+                items,
+                parsed.SupplierState,
+                parsed.RecipientState,
+                // Compra de outro estado: pede conferência de DIFAL/crédito e, se for o caso, nota de ajuste.
+                parsed.SupplierState is { } from && parsed.RecipientState is { } to && !string.Equals(from, to, StringComparison.OrdinalIgnoreCase));
         });
 }

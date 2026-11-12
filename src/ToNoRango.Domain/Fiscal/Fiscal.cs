@@ -63,6 +63,16 @@ public sealed class FiscalProfile : AggregateRoot
     public int NfeSeries { get; private set; } = 1;
     public int NfeNextNumber { get; private set; } = 1;
 
+    /// <summary>Último NSU baixado da distribuição DF-e e quando a SEFAZ pode ser consultada de novo.</summary>
+    public long LastNsu { get; private set; }
+    public DateTimeOffset? NextDistributionAt { get; private set; }
+
+    public void SetDistribution(long lastNsu, DateTimeOffset? nextAt)
+    {
+        LastNsu = Math.Max(LastNsu, lastNsu);
+        NextDistributionAt = nextAt;
+    }
+
     public bool HasCertificate => EncryptedCertificate is not null && EncryptedCertificatePassword is not null;
 
     private FiscalProfile() { }
@@ -362,6 +372,19 @@ public sealed class FiscalDocument : AggregateRoot
     /// <summary>When the note was signed offline (NFC-e contingency); the SEFAZ counts the 24 hours from here.</summary>
     public DateTimeOffset? ContingencyAt { get; private set; }
 
+    /// <summary>How many correction letters (CC-e) the SEFAZ registered; each one replaces the previous.</summary>
+    public int CorrectionSequence { get; private set; }
+
+    /// <summary>finNFe: 1 normal, 2 complementar, 3 ajuste, 4 devolução.</summary>
+    public int Purpose { get; private set; } = 1;
+    public string? ReferencedKey { get; private set; }
+    public string? CorrectionText { get; private set; }
+    public string? CorrectionProtocol { get; private set; }
+    public DateTimeOffset? CorrectedAt { get; private set; }
+
+    /// <summary>The SEFAZ accepts at most 20 correction letters per note.</summary>
+    public const int MaxCorrections = 20;
+
     private FiscalDocument() { }
 
     public FiscalDocument(
@@ -376,8 +399,17 @@ public sealed class FiscalDocument : AggregateRoot
         DateTimeOffset now,
         int model = NfceModel,
         string? recipientDocument = null,
-        string? recipientName = null)
+        string? recipientName = null,
+        int purpose = 1,
+        string? referencedKey = null)
     {
+        if (purpose is < 1 or > 4)
+        {
+            throw new ArgumentException("Finalidade da nota inválida.", nameof(purpose));
+        }
+
+        Purpose = purpose;
+        ReferencedKey = referencedKey;
         if (model is not (NfceModel or NfeModel))
         {
             throw new ArgumentException("Modelo fiscal inválido.", nameof(model));
@@ -461,6 +493,27 @@ public sealed class FiscalDocument : AggregateRoot
         UpdatedAt = now;
     }
 
+    /// <summary>A correction letter registered at the SEFAZ (NF-e only). The newest text is the one that counts.</summary>
+    public void Correct(int sequence, string text, string protocol, string? eventXml, DateTimeOffset now)
+    {
+        if (Model != NfeModel || Status != FiscalDocumentStatus.Authorized)
+        {
+            throw new InvalidOperationException("Carta de correção só vale para NF-e autorizada.");
+        }
+
+        if (sequence != CorrectionSequence + 1 || sequence > MaxCorrections)
+        {
+            throw new InvalidOperationException("Sequência da carta de correção fora de ordem.");
+        }
+
+        CorrectionSequence = sequence;
+        CorrectionText = text;
+        CorrectionProtocol = protocol;
+        CorrectedAt = now;
+        Xml = eventXml is null ? Xml : $"{Xml}\n<!-- carta de correcao {sequence} -->\n{eventXml}";
+        UpdatedAt = now;
+    }
+
     public void MarkUnanswered(string message, DateTimeOffset now)
     {
         Status = FiscalDocumentStatus.Processing;
@@ -536,5 +589,100 @@ public sealed class FiscalNumberGap : AggregateRoot
         Protocol = protocol;
         Message = message;
         Xml = xml;
+    }
+}
+
+public enum ReceivedNoteStatus
+{
+    /// <summary>Só o resumo chegou; a SEFAZ libera o XML completo depois da ciência da operação.</summary>
+    Summary = 1,
+    Full = 2,
+    Imported = 3
+}
+
+/// <summary>
+/// NF-e emitida contra o CNPJ da loja, baixada da SEFAZ (distribuição DF-e) só com o certificado.
+/// A loja confere e leva para Compras; nada entra no estoque sozinho.
+/// </summary>
+public sealed class ReceivedNote : AggregateRoot
+{
+    public Guid TenantId { get; private set; }
+    public Guid EstablishmentId { get; private set; }
+    public long Nsu { get; private set; }
+    public string AccessKey { get; private set; } = string.Empty;
+    public string IssuerDocument { get; private set; } = string.Empty;
+    public string IssuerName { get; private set; } = string.Empty;
+    public DateTimeOffset IssuedAt { get; private set; }
+    public long TotalInCents { get; private set; }
+
+    /// <summary>cSitNFe do resumo: 1 autorizada, 2 denegada, 3 cancelada.</summary>
+    public int Situation { get; private set; } = 1;
+    public ReceivedNoteStatus Status { get; private set; }
+    public string? Xml { get; private set; }
+    public DateTimeOffset? AcknowledgedAt { get; private set; }
+    public string? LastEvent { get; private set; }
+    public DateTimeOffset CreatedAt { get; private set; }
+    public DateTimeOffset UpdatedAt { get; private set; }
+
+    private ReceivedNote() { }
+
+    public ReceivedNote(Guid tenantId, Guid establishmentId, long nsu, string accessKey, string issuerDocument, string issuerName, DateTimeOffset issuedAt, long totalInCents, int situation, string? fullXml, DateTimeOffset now)
+    {
+        if (accessKey.Length != 44)
+        {
+            throw new ArgumentException("Chave de acesso inválida.", nameof(accessKey));
+        }
+
+        Id = GuidV7.New();
+        TenantId = Ensure.NotEmpty(tenantId, nameof(TenantId));
+        EstablishmentId = Ensure.NotEmpty(establishmentId, nameof(EstablishmentId));
+        Nsu = nsu;
+        AccessKey = accessKey;
+        IssuerDocument = issuerDocument;
+        IssuerName = issuerName.Length > 120 ? issuerName[..120] : issuerName;
+        IssuedAt = issuedAt;
+        TotalInCents = totalInCents;
+        Situation = situation;
+        Xml = fullXml;
+        Status = fullXml is null ? ReceivedNoteStatus.Summary : ReceivedNoteStatus.Full;
+        CreatedAt = now;
+        UpdatedAt = now;
+    }
+
+    public void AttachXml(long nsu, string xml, DateTimeOffset now)
+    {
+        Nsu = Math.Max(Nsu, nsu);
+        Xml = xml;
+
+        if (Status == ReceivedNoteStatus.Summary)
+        {
+            Status = ReceivedNoteStatus.Full;
+        }
+
+        UpdatedAt = now;
+    }
+
+    public void Acknowledge(DateTimeOffset now)
+    {
+        AcknowledgedAt = now;
+        UpdatedAt = now;
+    }
+
+    public void RecordEvent(string description, bool cancelled, DateTimeOffset now)
+    {
+        LastEvent = description.Length > 120 ? description[..120] : description;
+
+        if (cancelled)
+        {
+            Situation = 3;
+        }
+
+        UpdatedAt = now;
+    }
+
+    public void MarkImported(DateTimeOffset now)
+    {
+        Status = ReceivedNoteStatus.Imported;
+        UpdatedAt = now;
     }
 }

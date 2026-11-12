@@ -454,7 +454,14 @@ public sealed class PublicLookupClient(HttpClient http) : ILookupClient
             Text(root, "ddd_telefone_1"),
             Text(root, "email"),
             address.Length == 0 ? null : address,
-            Text(root, "descricao_situacao_cadastral"));
+            Text(root, "descricao_situacao_cadastral"),
+            Text(root, "logradouro"),
+            Text(root, "numero"),
+            Text(root, "bairro"),
+            Text(root, "municipio"),
+            Text(root, "uf"),
+            Text(root, "cep"),
+            Code(root, "codigo_municipio_ibge"));
     }
 
     public async Task<CepData?> FindCepAsync(string cep, CancellationToken cancellationToken)
@@ -478,6 +485,10 @@ public sealed class PublicLookupClient(HttpClient http) : ILookupClient
 
         return new CepData(cep, Text(root, "logradouro"), Text(root, "bairro"), Text(root, "localidade") ?? string.Empty, Text(root, "uf") ?? string.Empty);
     }
+
+    /// <summary>BrasilAPI sends some codes as numbers (IBGE city code); accepts both.</summary>
+    private static string? Code(JsonElement element, string name) =>
+        element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number ? value.GetRawText() : Text(element, name);
 
     private static string? Text(JsonElement element, string name) =>
         element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(value.GetString())

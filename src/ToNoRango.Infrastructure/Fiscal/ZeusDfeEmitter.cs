@@ -107,6 +107,95 @@ public sealed partial class ZeusDfeEmitter(ILogger<ZeusDfeEmitter> logger) : IDf
         }
     }, cancellationToken);
 
+    public Task<DfeDistribution> DistributeAsync(int environment, string state, string cnpj, long lastNsu, DfeCredentials credentials, CancellationToken cancellationToken) => Task.Run(() =>
+    {
+        var config = Configure(55, environment, state, TipoEmissao.teNormal, credentials);
+        using var certificate = Load(credentials);
+
+        try
+        {
+            using var service = new ServicosNFe(config, certificate);
+            var answer = service.NfeDistDFeInteresse(((int)State(state)).ToString("00"), cnpj, lastNsu.ToString("000000000000000"));
+            var result = answer.Retorno;
+            var documents = (result.loteDistDFeInt ?? [])
+                .Select(item => new DfeDistributedDocument(item.NSU, item.schema ?? string.Empty, Unzip(item.XmlNfe)))
+                .ToList();
+            return new DfeDistribution(result.cStat, result.xMotivo, result.ultNSU, result.maxNSU, documents);
+        }
+        catch (Exception exception) when (IsCommunication(exception))
+        {
+            logger.LogWarning(exception, "SEFAZ did not answer the DF-e distribution");
+            return new DfeDistribution(0, $"A SEFAZ não respondeu: {exception.Message}", lastNsu, lastNsu, []);
+        }
+    }, cancellationToken);
+
+    public Task<DfeEventResult> AcknowledgeAsync(int environment, string state, string cnpj, string accessKey, DfeCredentials credentials, CancellationToken cancellationToken) => Task.Run(() =>
+    {
+        var config = Configure(55, environment, state, TipoEmissao.teNormal, credentials);
+        using var certificate = Load(credentials);
+
+        try
+        {
+            using var service = new ServicosNFe(config, certificate);
+            var answer = service.RecepcaoEventoManifestacaoDestinatario(1, 1, accessKey, NFeTipoEvento.TeMdCienciaDaOperacao, cnpj);
+            var item = answer.Retorno.retEvento?.FirstOrDefault()?.infEvento;
+            var status = item?.cStat ?? answer.Retorno.cStat;
+
+            // 135 registrado; 573 = já havia ciência para esta nota.
+            return status is 135 or 573
+                ? new DfeEventResult(true, item?.xMotivo ?? "Ciência registrada.", item?.nProt, answer.RetornoCompletoStr)
+                : new DfeEventResult(false, $"{status} - {item?.xMotivo ?? answer.Retorno.xMotivo}");
+        }
+        catch (Exception exception) when (IsCommunication(exception))
+        {
+            logger.LogWarning(exception, "SEFAZ did not answer an acknowledgement");
+            return new DfeEventResult(false, $"A SEFAZ não respondeu: {exception.Message}");
+        }
+    }, cancellationToken);
+
+    /// <summary>Each distributed document comes gzipped; tolerates plain bytes too.</summary>
+    private static string Unzip(byte[]? bytes)
+    {
+        if (bytes is null || bytes.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        if (bytes.Length > 2 && bytes[0] == 0x1f && bytes[1] == 0x8b)
+        {
+            using var input = new MemoryStream(bytes);
+            using var gzip = new System.IO.Compression.GZipStream(input, System.IO.Compression.CompressionMode.Decompress);
+            using var reader = new StreamReader(gzip, System.Text.Encoding.UTF8);
+            return reader.ReadToEnd();
+        }
+
+        return System.Text.Encoding.UTF8.GetString(bytes);
+    }
+
+    public Task<DfeEventResult> CorrectAsync(DfeCorrection request, CancellationToken cancellationToken) => Task.Run(() =>
+    {
+        var config = Configure(55, request.Environment, request.State, TipoEmissao.teNormal, request.Credentials);
+        using var certificate = Load(request.Credentials);
+
+        try
+        {
+            using var service = new ServicosNFe(config, certificate);
+            var answer = service.RecepcaoEventoCartaCorrecao(1, request.Sequence, request.AccessKey, request.Text, request.Cnpj, DateTimeOffset.Now);
+            var item = answer.Retorno.retEvento?.FirstOrDefault()?.infEvento;
+            var status = item?.cStat ?? answer.Retorno.cStat;
+
+            // 135 = event registered and linked to the note.
+            return status == 135
+                ? new DfeEventResult(true, item?.xMotivo ?? "Carta de correção registrada.", item?.nProt, answer.RetornoCompletoStr)
+                : new DfeEventResult(false, $"{status} - {item?.xMotivo ?? answer.Retorno.xMotivo}");
+        }
+        catch (Exception exception) when (IsCommunication(exception))
+        {
+            logger.LogWarning(exception, "SEFAZ did not answer a correction letter");
+            return new DfeEventResult(false, $"A SEFAZ não respondeu: {exception.Message}");
+        }
+    }, cancellationToken);
+
     public Task<DfeEventResult> GiveUpNumbersAsync(DfeNumberGap request, CancellationToken cancellationToken) => Task.Run(() =>
     {
         var config = Configure(request.Model, request.Environment, request.State, TipoEmissao.teNormal, request.Credentials);
@@ -205,30 +294,35 @@ public sealed partial class ZeusDfeEmitter(ILogger<ZeusDfeEmitter> logger) : IDf
         var ide = new ide
         {
             cUF = state,
-            natOp = "VENDA",
+            natOp = Truncate(issue.Nature ?? "VENDA", 60),
             mod = Model(issue.Model),
             serie = issue.Series,
             nNF = issue.Number,
-            tpNF = TipoNFe.tnSaida,
+            tpNF = issue.IsEntry ? TipoNFe.tnEntrada : TipoNFe.tnSaida,
             cMunFG = long.Parse(issue.Issuer.CityIbgeCode),
             tpEmis = config.tpEmis,
             tpImp = nfce ? TipoImpressao.tiNFCe : TipoImpressao.tiRetrato,
             cNF = issue.NumericCode.ToString("00000000"),
             tpAmb = config.tpAmb,
-            finNFe = FinalidadeNFe.fnNormal,
+            finNFe = issue.Purpose switch { 2 => FinalidadeNFe.fnComplementar, 3 => FinalidadeNFe.fnAjuste, 4 => FinalidadeNFe.fnDevolucao, _ => FinalidadeNFe.fnNormal },
             verProc = "To-No-Rango 1.0",
             idDest = issue.Recipient?.State is { } destination && !nfce && !string.Equals(destination, issue.Issuer.State, StringComparison.OrdinalIgnoreCase)
                 ? DestinoOperacao.doInterestadual
                 : DestinoOperacao.doInterna,
             dhEmi = issued,
             procEmi = ProcessoEmissao.peAplicativoContribuinte,
-            indFinal = ConsumidorFinal.cfConsumidorFinal,
-            indPres = issue.IsDelivery ? PresencaComprador.pcEntregaDomicilio : PresencaComprador.pcPresencial,
+            indFinal = issue.FinalConsumer ? ConsumidorFinal.cfConsumidorFinal : ConsumidorFinal.cfNao,
+            indPres = issue.Purpose != 1 ? PresencaComprador.pcNao : issue.IsDelivery ? PresencaComprador.pcEntregaDomicilio : PresencaComprador.pcPresencial,
         };
 
         if (!nfce)
         {
             ide.dhSaiEnt = issued;
+        }
+
+        if (issue.ReferencedKeys is { Count: > 0 } keys)
+        {
+            ide.NFref = keys.Select(key => new NFref { refNFe = key }).ToList();
         }
 
         if (issue.OfflineContingency)

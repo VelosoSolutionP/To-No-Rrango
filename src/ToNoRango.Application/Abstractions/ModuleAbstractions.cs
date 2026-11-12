@@ -183,7 +183,14 @@ public sealed record CnpjData(
     string? Phone,
     string? Email,
     string? Address,
-    string? Status);
+    string? Status,
+    string? Street = null,
+    string? Number = null,
+    string? District = null,
+    string? City = null,
+    string? State = null,
+    string? PostalCode = null,
+    string? CityIbgeCode = null);
 
 public sealed record CepData(string PostalCode, string? Street, string? District, string City, string State);
 

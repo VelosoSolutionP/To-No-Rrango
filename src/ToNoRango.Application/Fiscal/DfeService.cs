@@ -27,6 +27,31 @@ public sealed record NfeRecipientRequest(
 
 public sealed record CancelNoteRequest(string Reason);
 
+public sealed record CorrectionRequest(string Text);
+
+public sealed record ManualNoteLine(
+    string Code,
+    string Description,
+    decimal Quantity,
+    long TotalInCents,
+    string Ncm,
+    string Cfop,
+    string IcmsCst,
+    decimal IcmsRate,
+    string PisCofinsCst,
+    decimal PisRate,
+    decimal CofinsRate);
+
+/// <summary>NF-e sem pedido: 2 complementar, 3 ajuste, 4 devolução. A tributação vem da tela, conferida por quem emite.</summary>
+public sealed record ManualNoteRequest(
+    int Purpose,
+    string Nature,
+    bool IsEntry,
+    string? ReferencedKey,
+    NfeRecipientRequest Recipient,
+    IReadOnlyList<ManualNoteLine> Lines,
+    string? AdditionalInfo);
+
 public sealed record NumberGapRequest(int Model, int Series, int FromNumber, int ToNumber, string Reason);
 
 public sealed record NumberGapDto(Guid Id, int Model, int Series, int FromNumber, int ToNumber, int Environment, string Reason, NumberGapStatus Status, string? Protocol, string? Message, DateTimeOffset CreatedAt)
@@ -297,6 +322,151 @@ public sealed class DfeService(
             }
 
             document.Cancel(answer.Protocol ?? string.Empty, reason, answer.Xml, clock.GetUtcNow());
+            await unitOfWork.SaveChangesAsync(CancellationToken.None);
+            return FiscalService.ToDto(document);
+        });
+
+    public Task<Result<FiscalDocumentDto>> IssueManualAsync(Guid establishmentId, ManualNoteRequest request, CancellationToken cancellationToken) =>
+        Guarded.RunAsync<FiscalDocumentDto>(async () =>
+        {
+            var error = ValidateManual(request);
+
+            if (error is not null)
+            {
+                return Result<FiscalDocumentDto>.Failure(AppErrors.Validation(error));
+            }
+
+            var profile = await RequireProfileAsync(establishmentId, cancellationToken);
+            var key = request.ReferencedKey is null ? null : new string(request.ReferencedKey.Where(char.IsAsciiDigit).ToArray());
+            var total = request.Lines.Sum(line => line.TotalInCents);
+            var now = clock.GetUtcNow();
+            var label = request.Purpose switch { 2 => "COMPL", 3 => "AJUSTE", _ => "DEVOL" };
+
+            // Nota sem pedido: o "pedido" é um identificador próprio, para caber no mesmo registro das notas de venda.
+            var document = new FiscalDocument(
+                profile.TenantId, establishmentId, Guid.NewGuid(), $"{label}-{now:yyMMddHHmm}", profile.NfeSeries, profile.TakeNfeNumber(),
+                profile.Environment, total, now, FiscalDocument.NfeModel, request.Recipient.Document, request.Recipient.Name, request.Purpose, key);
+            documents.Add(document);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+
+            var recipient = request.Recipient;
+            var issue = new DfeIssue(
+                FiscalDocument.NfeModel, document.Environment, document.Series, document.Number, document.NumericCode, now,
+                new DfeIssuer(profile.Cnpj, profile.LegalName, profile.TradeName, profile.StateRegistration, profile.Street, profile.Number, profile.District, profile.CityIbgeCode, profile.City, profile.State, profile.PostalCode),
+                new DfeRecipient(recipient.Document, recipient.Name, recipient.StateRegistration, recipient.Street, recipient.Number, recipient.District, recipient.CityIbgeCode, recipient.City, recipient.State, recipient.PostalCode, recipient.Email),
+                request.Lines.Select(line => new DfeLine(line.Code, line.Description, line.Quantity, line.TotalInCents, 0, 0, line.Ncm, line.Cfop, null, line.IcmsCst, line.IcmsRate, line.PisCofinsCst, line.PisRate, line.CofinsRate, true)).ToList(),
+                [],
+                false,
+                request.AdditionalInfo,
+                Credentials(profile),
+                Purpose: request.Purpose,
+                Nature: request.Nature.Trim(),
+                ReferencedKeys: key is null ? null : [key],
+                IsEntry: request.IsEntry,
+                FinalConsumer: false);
+
+            Apply(document, await emitter.AuthorizeAsync(issue, CancellationToken.None));
+            await unitOfWork.SaveChangesAsync(CancellationToken.None);
+            return FiscalService.ToDto(document);
+        });
+
+    public static string? ValidateManual(ManualNoteRequest request)
+    {
+        if (request.Purpose is < 2 or > 4)
+        {
+            return "Escolha a finalidade: complementar, ajuste ou devolução.";
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Nature) || request.Nature.Trim().Length > 60)
+        {
+            return "Informe a natureza da operação (até 60 caracteres).";
+        }
+
+        var key = new string((request.ReferencedKey ?? string.Empty).Where(char.IsAsciiDigit).ToArray());
+
+        if (request.Purpose is 2 or 4 && key.Length != 44)
+        {
+            return "Devolução e nota complementar precisam da chave (44 dígitos) da nota de origem.";
+        }
+
+        if (key.Length is not (0 or 44))
+        {
+            return "A chave da nota de origem tem 44 dígitos.";
+        }
+
+        if (request.Recipient is null || !IsValidDocument(request.Recipient.Document))
+        {
+            return "CPF ou CNPJ do destinatário inválido.";
+        }
+
+        if (request.Lines is not { Count: > 0 } || request.Lines.Count > 990)
+        {
+            return "A nota precisa de pelo menos um item.";
+        }
+
+        foreach (var line in request.Lines)
+        {
+            if (string.IsNullOrWhiteSpace(line.Description) || line.Quantity <= 0 || line.TotalInCents < 0)
+            {
+                return "Cada item precisa de descrição, quantidade e valor.";
+            }
+
+            if (line.Ncm.Length != 8 || !line.Ncm.All(char.IsAsciiDigit))
+            {
+                return $"NCM inválido em {line.Description}: são 8 dígitos.";
+            }
+
+            if (!FiscalTables.IsCfop(line.Cfop))
+            {
+                return $"CFOP {line.Cfop} não existe na tabela ({line.Description}).";
+            }
+
+            var firstDigit = line.Cfop[0];
+
+            if (request.IsEntry != firstDigit is '1' or '2' or '3')
+            {
+                return $"CFOP {line.Cfop} não combina com nota de {(request.IsEntry ? "entrada" : "saída")} ({line.Description}).";
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Carta de correção (CC-e) de uma NF-e autorizada. Não corrige valores, impostos, partes nem datas.</summary>
+    public Task<Result<FiscalDocumentDto>> CorrectAsync(Guid establishmentId, Guid documentId, CorrectionRequest request, CancellationToken cancellationToken) =>
+        Guarded.RunAsync<FiscalDocumentDto>(async () =>
+        {
+            var text = string.Join(' ', (request.Text ?? string.Empty).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+
+            if (text.Length is < 15 or > 1000)
+            {
+                return Result<FiscalDocumentDto>.Failure(AppErrors.Validation("O texto da carta de correção precisa ter de 15 a 1000 caracteres."));
+            }
+
+            var profile = await RequireProfileAsync(establishmentId, cancellationToken);
+            var document = await documents.FirstOrDefaultAsync(item => item.Id == documentId && item.EstablishmentId == establishmentId, cancellationToken);
+
+            if (document is not { Model: FiscalDocument.NfeModel, Status: FiscalDocumentStatus.Authorized, AccessKey: not null })
+            {
+                return Result<FiscalDocumentDto>.Failure(AppErrors.Conflict("fiscal.not_correctable", "Carta de correção só vale para NF-e (modelo 55) autorizada."));
+            }
+
+            if (document.CorrectionSequence >= FiscalDocument.MaxCorrections)
+            {
+                return Result<FiscalDocumentDto>.Failure(AppErrors.Conflict("fiscal.too_many_corrections", "Esta NF-e já tem 20 cartas de correção, o máximo da SEFAZ."));
+            }
+
+            var sequence = document.CorrectionSequence + 1;
+            var answer = await emitter.CorrectAsync(
+                new DfeCorrection(document.Environment, profile.State, profile.Cnpj, document.AccessKey, sequence, text, Credentials(profile)),
+                CancellationToken.None);
+
+            if (!answer.Accepted)
+            {
+                return Result<FiscalDocumentDto>.Failure(AppErrors.Conflict("fiscal.correction_refused", $"A SEFAZ não aceitou a carta de correção: {answer.Message}"));
+            }
+
+            document.Correct(sequence, text, answer.Protocol ?? string.Empty, answer.Xml, clock.GetUtcNow());
             await unitOfWork.SaveChangesAsync(CancellationToken.None);
             return FiscalService.ToDto(document);
         });

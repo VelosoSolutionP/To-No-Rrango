@@ -328,6 +328,19 @@ internal static class ModuleEndpoints
             (await service.IssueAsync(establishmentId, orderId, ToNoRango.Domain.Fiscal.FiscalDocument.NfeModel, request, ct)).ToHttpResult());
         group.MapPost($"{Establishment}/fiscal/documents/{{documentId:guid}}/cancel", async (Guid establishmentId, Guid documentId, CancelNoteRequest request, DfeService service, CancellationToken ct) =>
             (await service.CancelAsync(establishmentId, documentId, request, ct)).ToHttpResult());
+        group.MapPost($"{Establishment}/fiscal/documents/{{documentId:guid}}/correction", async (Guid establishmentId, Guid documentId, CorrectionRequest request, DfeService service, CancellationToken ct) =>
+            (await service.CorrectAsync(establishmentId, documentId, request, ct)).ToHttpResult());
+        group.MapGet($"{Establishment}/fiscal/received", async (Guid establishmentId, ReceivedNotesService service, CancellationToken ct) =>
+            (await service.ListAsync(establishmentId, ct)).ToHttpResult());
+        group.MapPost($"{Establishment}/fiscal/received/sync", async (Guid establishmentId, ReceivedNotesService service, CancellationToken ct) =>
+            (await service.SyncAsync(establishmentId, ct)).ToHttpResult());
+        group.MapGet($"{Establishment}/fiscal/received/{{noteId:guid}}/xml", async (Guid establishmentId, Guid noteId, ReceivedNotesService service, CancellationToken ct) =>
+            (await service.GetXmlAsync(establishmentId, noteId, ct)).ToHttpResult());
+        group.MapPost($"{Establishment}/fiscal/received/{{noteId:guid}}/imported", async (Guid establishmentId, Guid noteId, ReceivedNotesService service, CancellationToken ct) =>
+            (await service.MarkImportedAsync(establishmentId, noteId, ct)).ToHttpResult());
+        group.MapGet($"{Establishment}/fiscal/tables", (Guid establishmentId) => Results.Ok(FiscalTables.All()));
+        group.MapPost($"{Establishment}/fiscal/manual-notes", async (Guid establishmentId, ManualNoteRequest request, DfeService service, CancellationToken ct) =>
+            (await service.IssueManualAsync(establishmentId, request, ct)).ToHttpResult());
         group.MapPost($"{Establishment}/fiscal/contingency/send", async (Guid establishmentId, DfeService service, CancellationToken ct) =>
             (await service.SendContingencyAsync(establishmentId, ct)).ToHttpResult());
         group.MapPost($"{Establishment}/fiscal/number-gaps", async (Guid establishmentId, NumberGapRequest request, DfeService service, CancellationToken ct) =>

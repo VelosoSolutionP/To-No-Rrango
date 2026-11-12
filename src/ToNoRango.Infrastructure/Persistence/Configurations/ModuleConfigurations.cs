@@ -399,6 +399,10 @@ public sealed class FiscalDocumentConfiguration : IEntityTypeConfiguration<ToNoR
         builder.Property(document => document.RecipientName).HasMaxLength(60);
         builder.Property(document => document.CancelProtocol).HasMaxLength(20);
         builder.Property(document => document.CancelReason).HasMaxLength(255);
+        builder.Property(document => document.CorrectionText).HasMaxLength(1000);
+        builder.Property(document => document.CorrectionProtocol).HasMaxLength(20);
+        builder.Property(document => document.Purpose).HasDefaultValue(1);
+        builder.Property(document => document.ReferencedKey).HasMaxLength(44);
         builder.Ignore(document => document.NumericCode);
         builder.Property<uint>("xmin").IsRowVersion();
         // One note of each model per order: an NFC-e and, if asked, an NF-e.

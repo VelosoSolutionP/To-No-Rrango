@@ -655,6 +655,20 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("ContingencyAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTimeOffset?>("CorrectedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CorrectionProtocol")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("CorrectionSequence")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("CorrectionText")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -686,6 +700,11 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<int>("Purpose")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
                     b.Property<string>("RecipientDocument")
                         .HasMaxLength(14)
                         .HasColumnType("character varying(14)");
@@ -693,6 +712,10 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                     b.Property<string>("RecipientName")
                         .HasMaxLength(60)
                         .HasColumnType("character varying(60)");
+
+                    b.Property<string>("ReferencedKey")
+                        .HasMaxLength(44)
+                        .HasColumnType("character varying(44)");
 
                     b.Property<int>("Series")
                         .HasColumnType("integer");
@@ -862,10 +885,16 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("EstablishmentId")
                         .HasColumnType("uuid");
 
+                    b.Property<long>("LastNsu")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("LegalName")
                         .IsRequired()
                         .HasMaxLength(60)
                         .HasColumnType("character varying(60)");
+
+                    b.Property<DateTimeOffset?>("NextDistributionAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("NextNumber")
                         .HasColumnType("integer");
@@ -996,6 +1025,80 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId");
 
                     b.ToTable("product_data", "fiscal");
+                });
+
+            modelBuilder.Entity("ToNoRango.Domain.Fiscal.ReceivedNote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AccessKey")
+                        .IsRequired()
+                        .HasMaxLength(44)
+                        .HasColumnType("character varying(44)");
+
+                    b.Property<DateTimeOffset?>("AcknowledgedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EstablishmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("IssuedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("IssuerDocument")
+                        .IsRequired()
+                        .HasMaxLength(14)
+                        .HasColumnType("character varying(14)");
+
+                    b.Property<string>("IssuerName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("LastEvent")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<long>("Nsu")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Situation")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("TotalInCents")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Xml")
+                        .HasMaxLength(512)
+                        .HasColumnType("text");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("EstablishmentId", "AccessKey")
+                        .IsUnique();
+
+                    b.ToTable("received_notes", "fiscal");
                 });
 
             modelBuilder.Entity("ToNoRango.Domain.Identity.User", b =>

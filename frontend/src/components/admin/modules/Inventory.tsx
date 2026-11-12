@@ -3,6 +3,7 @@
 import { type ChangeEvent, type FormEvent, useEffect, useState } from "react";
 import { formatBRL, formatDateTime, type AdminHttp } from "@/lib/admin-api";
 import type { PublicMenu } from "@/lib/types";
+import type { ManualDraft } from "./FiscalExtras";
 import { Empty, ErrorMessage as ErrorText, Input, ModuleHeading, SubTabs, messageOf, quantity, text, toCents, toDecimal, useAction, useLoad } from "./shared";
 
 interface StockItem {
@@ -27,6 +28,9 @@ interface Movement {
 }
 
 interface NfeItem {
+  code: string;
+  ncm: string | null;
+  total: number;
   description: string;
   unit: string;
   quantity: number;
@@ -45,6 +49,9 @@ interface NfePreview {
   total: number;
   alreadyImported: boolean;
   items: NfeItem[];
+  supplierState?: string | null;
+  recipientState?: string | null;
+  isInterstate?: boolean;
 }
 
 interface Line {
@@ -60,6 +67,9 @@ interface Props {
   establishmentId: string;
   menu: PublicMenu | null;
   canImportNfe: boolean;
+  /** XML vindo da Central Fiscal (nota baixada pelo CNPJ): já abre a entrada conferindo. */
+  initialXml?: string | null;
+  onOpenFiscal?: (draft?: ManualDraft) => void;
 }
 
 const movementLabels: Record<Movement["type"], string> = {
@@ -270,7 +280,7 @@ function Stock({ http, establishmentId, items, reload, onImport, canImportNfe }:
   );
 }
 
-function Purchase({ http, establishmentId, items, reload, canImportNfe }: Props & { items: StockItem[]; reload: () => Promise<void> }) {
+function Purchase({ http, establishmentId, items, reload, canImportNfe, initialXml, onOpenFiscal }: Props & { items: StockItem[]; reload: () => Promise<void> }) {
   const suppliers = useLoad(() => http.get<Array<{ id: string; name: string; tradeName: string | null }>>(`/establishments/${establishmentId}/suppliers`).catch(() => []), [establishmentId]);
   const today = new Date().toISOString().slice(0, 10);
   const [lines, setLines] = useState<Line[]>([{ stockItemId: "", description: "", quantity: "", unitCost: "" }]);
@@ -292,8 +302,32 @@ function Purchase({ http, establishmentId, items, reload, canImportNfe }: Props 
       return;
     }
 
+    await previewXml(await file.text());
+  }
+
+  useEffect(() => {
+    if (initialXml) {
+      void previewXml(initialXml);
+    }
+    // Só a nota que chegou da Central Fiscal; trocar de nota é pelo botão de importar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialXml]);
+
+  function draftFrom(purpose: 3 | 4): ManualDraft | undefined {
+    return preview
+      ? {
+          purpose,
+          referencedKey: preview.accessKey,
+          supplierCnpj: preview.supplierCnpj,
+          interstate: Boolean(preview.isInterstate),
+          items: preview.items.map((item) => ({ code: item.code, description: item.description, ncm: item.ncm, quantity: item.quantity, total: item.total })),
+        }
+      : undefined;
+  }
+
+  async function previewXml(xml: string) {
+    setMessage(null);
     try {
-      const xml = await file.text();
       setNfeXml(xml);
       const result = await http.post<NfePreview>(`/establishments/${establishmentId}/nfe/preview`, { xml });
       setPreview(result);
@@ -359,6 +393,7 @@ function Purchase({ http, establishmentId, items, reload, canImportNfe }: Props 
           <input accept=".xml,text/xml" onChange={readNfe} type="file" />
         </label>
       ) : null}
+      {onOpenFiscal ? <button className="link-button" onClick={() => onOpenFiscal()} type="button">Abrir Central Fiscal (notas recebidas pelo CNPJ, devolução e ajuste) →</button> : null}
       {preview ? (
         <p className="muted">
           NF {preview.number} · {preview.supplierTradeName ?? preview.supplierName} · total R$ {preview.total.toFixed(2).replace(".", ",")}.
@@ -366,6 +401,14 @@ function Purchase({ http, establishmentId, items, reload, canImportNfe }: Props 
         </p>
       ) : null}
       {preview?.alreadyImported ? <p className="form-error">Esta nota já foi lançada.</p> : null}
+      {preview?.isInterstate ? (
+        <div className="fx-warn">
+          <strong>Compra de outro estado ({preview.supplierState} → {preview.recipientState}).</strong> Confira com o contador o DIFAL e o
+          crédito de ICMS. Se a escrituração pedir, emita a nota de ajuste referenciando esta nota.
+          {onOpenFiscal ? <div className="fx-warn-actions"><button className="secondary-button" onClick={() => onOpenFiscal(draftFrom(3))} type="button">Emitir nota de ajuste</button></div> : null}
+        </div>
+      ) : null}
+      {preview && onOpenFiscal ? <button className="link-button" onClick={() => onOpenFiscal(draftFrom(4))} type="button">Devolver esta compra (NF-e de devolução)</button> : null}
       <div className="module-form module-form-flat">
         <label className="field">
           <span>Fornecedor</span>
@@ -431,7 +474,7 @@ function Movements({ http, establishmentId, items }: Props & { items: StockItem[
 
 export function Inventory(props: Props) {
   type View = "stock" | "purchase" | "movements";
-  const [view, setView] = useState<View>("stock");
+  const [view, setView] = useState<View>(props.initialXml ? "purchase" : "stock");
   const stock = useLoad(() => props.http.get<StockItem[]>(`/establishments/${props.establishmentId}/stock-items`), [props.establishmentId]);
   const items = stock.data ?? [];
   

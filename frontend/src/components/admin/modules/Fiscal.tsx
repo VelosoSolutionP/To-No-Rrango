@@ -3,6 +3,7 @@
 import { type FormEvent, useState } from "react";
 import { formatBRL, type AdminHttp } from "@/lib/admin-api";
 import { Empty, ErrorMessage, Input, ModuleHeading, SubTabs, text, toCents, toDecimal, useAction, useLoad } from "./shared";
+import { ConsultingBanner, FiscalDatalists, FiscalTablesView, ManualNoteForm, type ManualDraft, ReceivedNotesView, useFiscalTables } from "./FiscalExtras";
 
 interface Purchase {
   id: string;
@@ -70,6 +71,8 @@ interface FiscalDocument {
   model?: number;
   recipientName?: string | null;
   cancelReason?: string | null;
+  correctionSequence?: number;
+  purpose?: number;
 }
 
 interface NumberGap {
@@ -143,7 +146,7 @@ function ProductRow({ product, onSave, busy }: { product: FiscalProduct; onSave:
     <tr>
       <td>{product.name}</td>
       <td><input aria-label={`NCM de ${product.name}`} className="fiscal-input" inputMode="numeric" onChange={(event) => edit("ncm", event.target.value)} value={draft.ncm ?? ""} /></td>
-      <td><input aria-label={`CFOP de ${product.name}`} className="fiscal-input" inputMode="numeric" onChange={(event) => edit("cfop", event.target.value)} value={draft.cfop ?? ""} /></td>
+      <td><input aria-label={`CFOP de ${product.name}`} className="fiscal-input" inputMode="numeric" list="fx-cfop" onChange={(event) => edit("cfop", event.target.value)} value={draft.cfop ?? ""} /></td>
       <td><input aria-label={`CEST de ${product.name}`} className="fiscal-input" inputMode="numeric" onChange={(event) => edit("cest", event.target.value)} value={draft.cest ?? ""} /></td>
       {code("icmsCst", "CST de ICMS", ["00", "40", "41", "60"])}
       {rate("icmsRate", "Alíquota de ICMS")}
@@ -155,13 +158,14 @@ function ProductRow({ product, onSave, busy }: { product: FiscalProduct; onSave:
   );
 }
 
-export function Fiscal({ http, establishmentId, modules, onOpenInventory }: { http: AdminHttp; establishmentId: string; modules: string[]; onOpenInventory: () => void }) {
+export function Fiscal({ http, establishmentId, modules, onOpenInventory, draft = null }: { http: AdminHttp; establishmentId: string; modules: string[]; onOpenInventory: (xml?: string) => void; draft?: ManualDraft | null }) {
   const hasNfce = modules.includes("fiscal_nfce");
   const hasEntry = modules.includes("fiscal");
   const hasSintegra = hasNfce && modules.includes("fiscal_sintegra");
   const hasSped = hasNfce && modules.includes("fiscal_sped");
   const [warnings, setWarnings] = useState<string[]>([]);
-  const [view, setView] = useState<"issue" | "config" | "products" | "duties" | "entries">(hasNfce ? "issue" : "entries");
+  const [view, setView] = useState<"issue" | "received" | "manual" | "config" | "products" | "duties" | "entries" | "tables">(draft && hasNfce ? "manual" : hasNfce ? "issue" : "entries");
+  const tables = useFiscalTables(http, establishmentId);
   const base = `/establishments/${establishmentId}`;
   const purchases = useLoad(() => http.get<Purchase[]>(`${base}/purchases`).catch(() => []), [establishmentId]);
   const overview = useLoad<FiscalOverview | null>(() => (hasNfce ? http.get<FiscalOverview>(`${base}/fiscal`) : Promise.resolve(null)), [establishmentId, hasNfce]);
@@ -234,6 +238,14 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory }: { ht
         }),
       )
       .then((done) => done && setNfeFor(null));
+  }
+
+  function correctNote(note: FiscalDocument) {
+    const text = window.prompt(`Carta de correção da NF-e ${note.number} (15 a 1000 caracteres).\nNão corrige valores, impostos, destinatário nem datas.`);
+    if (!text) {
+      return;
+    }
+    void dfeAction.run(() => http.post(`${base}/fiscal/documents/${note.id}/correction`, { text }));
   }
 
   function cancelNote(note: FiscalDocument) {
@@ -349,7 +361,9 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory }: { ht
 
   return (
     <section className="admin-section">
-      <ModuleHeading eyebrow="Fiscal" title="Fiscal" hint={hasNfce ? "NFC-e e NF-e de venda para Lucro Presumido e Lucro Real." : "Notas de entrada importadas por XML."} />
+      <ModuleHeading eyebrow="Central Fiscal" title="Fiscal" hint={hasNfce ? "Notas de venda, notas recebidas pelo CNPJ, devolução, ajuste, SINTEGRA e SPED." : "Notas de entrada importadas por XML."} />
+      <ConsultingBanner />
+      <FiscalDatalists tables={tables.data ?? null} />
       <ErrorMessage message={action.error ?? overview.error} />
       {hasNfce && data ? (
         <div className="kpi-strip">
@@ -364,12 +378,17 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory }: { ht
       <SubTabs
         onChange={setView}
         options={[
-          ...(hasNfce ? [{ value: "issue" as const, label: "Emitir" }, { value: "config" as const, label: "Configuração" }, { value: "products" as const, label: "Tributação dos produtos" }] : []),
+          ...(hasNfce ? [{ value: "issue" as const, label: "Emitir" }, { value: "received" as const, label: "Notas recebidas" }, { value: "manual" as const, label: "Devolução e ajuste" }, { value: "config" as const, label: "Configuração" }, { value: "products" as const, label: "Tributação dos produtos" }] : []),
           ...(hasNfce ? [{ value: "duties" as const, label: "Obrigações e inutilização" }] : []),
           ...(hasEntry ? [{ value: "entries" as const, label: "Notas de entrada" }] : []),
+          { value: "tables" as const, label: "Tabelas CFOP e CST" },
         ]}
         value={view}
       />
+
+      {view === "received" && hasNfce ? <ReceivedNotesView establishmentId={establishmentId} http={http} onOpenInventory={(xml) => onOpenInventory(xml)} /> : null}
+      {view === "manual" && hasNfce ? <ManualNoteForm draft={draft} establishmentId={establishmentId} http={http} onIssued={() => void overview.reload()} tables={tables.data ?? null} /> : null}
+      {view === "tables" ? <FiscalTablesView tables={tables.data ?? null} /> : null}
 
       {view === "config" && data ? (
         <article className="card vx-box">
@@ -557,6 +576,7 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory }: { ht
                     <td className="num">{formatBRL(note.totalInCents)}</td>
                     <td className="table-actions">
                       {note.hasXml ? <button className="link-button" disabled={action.busy} onClick={() => downloadXml(note)} type="button">Baixar XML</button> : null}
+                      {direct && note.status === "Authorized" && note.model === 55 ? <button className="link-button" disabled={dfeAction.busy} onClick={() => correctNote(note)} type="button">Carta de correção{note.correctionSequence ? ` (${note.correctionSequence})` : ""}</button> : null}
                       {direct && note.status === "Authorized" ? <button className="link-button" disabled={dfeAction.busy} onClick={() => cancelNote(note)} type="button">Cancelar</button> : null}
                     </td>
                   </tr>
@@ -581,7 +601,7 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory }: { ht
       {view === "duties" && warnings.length > 0 ? <ul className="vx-unavailable">{warnings.map((warning) => <li key={warning}><span>{warning}</span></li>)}</ul> : null}
 
       {view === "entries" && hasEntry ? <div className="vx-panel-title"><h3>Notas de entrada</h3></div> : null}
-      {view === "entries" && hasEntry ? <div><button className="primary-button" onClick={onOpenInventory} type="button">Importar XML de NF-e</button></div> : null}
+      {view === "entries" && hasEntry ? <div><button className="primary-button" onClick={() => onOpenInventory()} type="button">Importar XML de NF-e</button></div> : null}
       {view === "entries" ? <ErrorMessage message={purchases.error} /> : null}
       {view === "entries" && hasEntry && purchases.data && notes.length === 0 ? <Empty>Nenhuma NF-e de entrada importada.</Empty> : null}
       {view === "entries" && hasEntry && notes.length > 0 ? (
