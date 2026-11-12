@@ -24,6 +24,9 @@ public sealed class FiscalApiKey : AggregateRoot
 
     /// <summary>False: the key only reads (notes, XML, books). True: it also issues, cancels and corrects.</summary>
     public bool CanIssue { get; private set; }
+
+    /// <summary>Software house that created the key in the partner portal; null when the store created it.</summary>
+    public Guid? PartnerFirmId { get; private set; }
     public string CreatedBy { get; private set; } = string.Empty;
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? LastUsedAt { get; private set; }
@@ -31,9 +34,10 @@ public sealed class FiscalApiKey : AggregateRoot
 
     private FiscalApiKey() { }
 
-    public FiscalApiKey(Guid tenantId, Guid establishmentId, string name, string prefix, string hash, bool isTest, bool canIssue, string createdBy, DateTimeOffset now)
+    public FiscalApiKey(Guid tenantId, Guid establishmentId, string name, string prefix, string hash, bool isTest, bool canIssue, string createdBy, DateTimeOffset now, Guid? partnerFirmId = null)
     {
         Id = GuidV7.New();
+        PartnerFirmId = partnerFirmId;
         TenantId = Ensure.NotEmpty(tenantId, nameof(TenantId));
         EstablishmentId = Ensure.NotEmpty(establishmentId, nameof(EstablishmentId));
         Name = Ensure.MaxLength(Ensure.NotNullOrWhiteSpace(name, nameof(name)).Trim(), 60, nameof(name));
@@ -80,15 +84,19 @@ public sealed class FiscalWebhook : AggregateRoot
     public string Subscribed { get; private set; } = string.Empty;
     public bool IsActive { get; private set; }
 
+    /// <summary>Software house that registered it in the partner portal; null when the store did.</summary>
+    public Guid? PartnerFirmId { get; private set; }
+
     /// <summary>Notes changed after this moment have not been turned into events yet.</summary>
     public DateTimeOffset ScannedUntil { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
 
     private FiscalWebhook() { }
 
-    public FiscalWebhook(Guid tenantId, Guid establishmentId, string url, string encryptedSecret, IEnumerable<string> events, DateTimeOffset now)
+    public FiscalWebhook(Guid tenantId, Guid establishmentId, string url, string encryptedSecret, IEnumerable<string> events, DateTimeOffset now, Guid? partnerFirmId = null)
     {
         Id = GuidV7.New();
+        PartnerFirmId = partnerFirmId;
         TenantId = Ensure.NotEmpty(tenantId, nameof(TenantId));
         EstablishmentId = Ensure.NotEmpty(establishmentId, nameof(EstablishmentId));
         Url = Ensure.MaxLength(Ensure.NotNullOrWhiteSpace(url, nameof(url)).Trim(), 500, nameof(url));

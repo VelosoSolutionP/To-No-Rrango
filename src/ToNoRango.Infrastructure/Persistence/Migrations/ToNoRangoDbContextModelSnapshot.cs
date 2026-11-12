@@ -658,6 +658,9 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsPartner")
                         .HasColumnType("boolean");
 
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(120)
@@ -718,6 +721,9 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
 
                     b.Property<DateTimeOffset?>("RevokedAt")
                         .HasColumnType("timestamp with time zone");
@@ -879,6 +885,9 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(60)
                         .HasColumnType("character varying(60)");
+
+                    b.Property<Guid?>("PartnerFirmId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Prefix")
                         .IsRequired()
@@ -1317,6 +1326,9 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
+
+                    b.Property<Guid?>("PartnerFirmId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("ScannedUntil")
                         .HasColumnType("timestamp with time zone");

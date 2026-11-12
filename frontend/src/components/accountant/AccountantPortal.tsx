@@ -8,6 +8,7 @@ import { API_BASE_URL, ApiError, problemDetail } from "@/lib/api";
 import { createAdminHttp, formatDateTime, UNAUTHORIZED_EVENT } from "@/lib/admin-api";
 import { StatusChip } from "../admin/DataTable";
 import { AccountantChat } from "../admin/modules/FiscalAccountant";
+import { FiscalApiView } from "../admin/modules/FiscalApi";
 import { FiscalBooksView, FiscalHistoryView } from "../admin/modules/FiscalBooks";
 import { AccountantPackageView, FiscalReviewView } from "../admin/modules/FiscalExtras";
 import { Empty, ErrorMessage, messageOf, SubTabs, useAction, useLoad } from "../admin/modules/shared";
@@ -22,6 +23,7 @@ interface Firm {
   isPartner: boolean;
   partnerSince: string | null;
   partnerRequestedAt: string | null;
+  kind: "Accounting" | "SoftwareHouse";
 }
 
 interface PortalSession {
@@ -39,6 +41,7 @@ interface Company {
   since: string | null;
   openRequests: number;
   unread: number;
+  kind: "Accounting" | "SoftwareHouse";
 }
 
 const storageKey = "tonorango.accountant.session";
@@ -128,8 +131,11 @@ function Gate({ onSignIn }: { onSignIn: (session: PortalSession) => void }) {
       <main className="vx-main fx-portal-login">
         <header>
           <p className="muted">TO-NO-RANGO · Veloso Solution</p>
-          <h1>Portal do contador</h1>
-          <p className="muted">Os dados fiscais das empresas que você atende, num lugar só: pendências, apuração, livros, auditoria e o fechamento do mês.</p>
+          <h1>Portal de parceiros</h1>
+          <p className="muted">
+            Para contadores: pendências, apuração, livros, auditoria e o fechamento do mês das empresas que você atende.
+            Para software houses: chaves da API fiscal e webhooks das empresas que usam o seu sistema.
+          </p>
         </header>
         <SubTabs
           onChange={(value) => { setMode(value); setError(null); }}
@@ -140,11 +146,11 @@ function Gate({ onSignIn }: { onSignIn: (session: PortalSession) => void }) {
           <form className="module-form" key={mode} onSubmit={submit}>
             {mode === "signup" ? (
               <>
-                <p className="muted field-wide">A empresa que você atende gera o convite no painel dela (Fiscal → Contador) para o seu e-mail.</p>
+                <p className="muted field-wide">A empresa gera o convite no painel dela (Fiscal → Contador e parceiros) para o seu e-mail.</p>
                 <label className="field field-wide"><span>Código do convite</span><input autoComplete="off" name="inviteCode" placeholder="ABCDE-FGHJK" required /></label>
-                <label className="field field-wide"><span>Nome do escritório</span><input maxLength={120} name="firmName" required /></label>
-                <label className="field"><span>CNPJ do escritório ou seu CPF</span><input inputMode="numeric" name="document" required /></label>
-                <label className="field"><span>CRC</span><input name="crc" placeholder="MG-123456/O" required /></label>
+                <label className="field field-wide"><span>Nome do escritório ou da empresa</span><input maxLength={120} name="firmName" required /></label>
+                <label className="field"><span>CNPJ (ou CPF do contador)</span><input inputMode="numeric" name="document" required /></label>
+                <label className="field"><span>CRC (só contador)</span><input name="crc" placeholder="MG-123456/O" /></label>
                 <label className="field"><span>Seu nome</span><input maxLength={120} name="name" required /></label>
                 <label className="field"><span>Telefone (opcional)</span><input name="phone" /></label>
               </>
@@ -160,7 +166,7 @@ function Gate({ onSignIn }: { onSignIn: (session: PortalSession) => void }) {
   );
 }
 
-type CompanyView = "review" | "books" | "history" | "closing" | "chat";
+type CompanyView = "review" | "books" | "history" | "closing" | "integration" | "chat";
 
 function Desk({ session, onSignOut, onFirm }: { session: PortalSession; onSignOut: () => void; onFirm: (firm: Firm) => void }) {
   const http = useMemo(() => createAdminHttp({ token: session.token }, prefix), [session.token]);
@@ -170,9 +176,11 @@ function Desk({ session, onSignOut, onFirm }: { session: PortalSession; onSignOu
   const [navOpen, setNavOpen] = useState(false);
   const company = (companies.data ?? []).find((item) => item.establishmentId === selected) ?? null;
 
+  const software = session.firm.kind === "SoftwareHouse";
+
   function open(establishmentId: string | null) {
     setSelected(establishmentId);
-    setView("review");
+    setView(software ? "integration" : "review");
     setNavOpen(false);
     void companies.reload();
   }
@@ -183,7 +191,7 @@ function Desk({ session, onSignOut, onFirm }: { session: PortalSession; onSignOu
         <button className="vx-brand link-button" onClick={() => open(null)} type="button">
           <span className="vx-mark">TR</span>
           <div>
-            <strong>Portal do <em>Contador</em></strong>
+            <strong>Portal de <em>Parceiros</em></strong>
             <small>{session.firm.name}</small>
           </div>
         </button>
@@ -201,7 +209,7 @@ function Desk({ session, onSignOut, onFirm }: { session: PortalSession; onSignOu
         </nav>
         <div className="vx-foot">
           <span className="vx-avatar">{session.name.slice(0, 1).toUpperCase()}</span>
-          <span className="vx-user"><strong>{session.name}</strong><small>{session.firm.isPartner ? "Escritório parceiro" : "Contador"}</small></span>
+          <span className="vx-user"><strong>{session.name}</strong><small>{software ? "Software house" : "Contador"}{session.firm.isPartner ? " parceiro" : ""}</small></span>
           <button className="link-button" onClick={onSignOut} type="button">Sair</button>
         </div>
       </aside>
@@ -210,7 +218,7 @@ function Desk({ session, onSignOut, onFirm }: { session: PortalSession; onSignOu
         <header className="vx-top">
           <button aria-label="Abrir menu" className="vx-menu-button" onClick={() => setNavOpen(true)} type="button">☰</button>
           <h1>{company?.name ?? "Visão geral"}</h1>
-          <div className="vx-top-right"><span className="vx-top-store">{session.firm.name} · CRC {session.firm.crc}</span></div>
+          <div className="vx-top-right"><span className="vx-top-store">{session.firm.name}{session.firm.crc ? ` · CRC ${session.firm.crc}` : ""}</span></div>
         </header>
         <main className="vx-main">
           <ErrorMessage message={companies.error} />
@@ -219,10 +227,14 @@ function Desk({ session, onSignOut, onFirm }: { session: PortalSession; onSignOu
               <SubTabs
                 onChange={setView}
                 options={[
-                  { value: "review", label: "Pendências" },
-                  { value: "books", label: "Apuração e livros" },
-                  { value: "history", label: "Competências e auditoria" },
-                  { value: "closing", label: "Fechamento do mês" },
+                  ...(software
+                    ? [{ value: "integration" as const, label: "API e webhooks" }]
+                    : [
+                        { value: "review" as const, label: "Pendências" },
+                        { value: "books" as const, label: "Apuração e livros" },
+                        { value: "history" as const, label: "Competências e auditoria" },
+                        { value: "closing" as const, label: "Fechamento do mês" },
+                      ]),
                   { value: "chat", label: company.openRequests + company.unread > 0 ? `Conversa (${company.openRequests + company.unread})` : "Conversa" },
                 ]}
                 value={view}
@@ -238,6 +250,7 @@ function Desk({ session, onSignOut, onFirm }: { session: PortalSession; onSignOu
               {view === "books" ? <FiscalBooksView establishmentId={company.establishmentId} http={http} /> : null}
               {view === "history" ? <FiscalHistoryView establishmentId={company.establishmentId} http={http} /> : null}
               {view === "closing" ? <AccountantPackageView establishmentId={company.establishmentId} http={http} /> : null}
+              {view === "integration" ? <FiscalApiView establishmentId={company.establishmentId} http={http} /> : null}
               {view === "chat" ? <AccountantChat establishmentId={company.establishmentId} http={http} side="accountant" /> : null}
             </>
           ) : (
@@ -302,14 +315,14 @@ function Overview({ session, companies, http, onOpen, onAdded, onFirm }: {
       </article>
 
       <article className="card vx-box">
-        <div className="vx-panel-title"><h3>Programa de parceiros contábeis</h3></div>
+        <div className="vx-panel-title"><h3>{firm.kind === "SoftwareHouse" ? "Programa de software houses parceiras" : "Programa de parceiros contábeis"}</h3></div>
         {firm.isPartner ? (
-          <p><StatusChip tone="accent">Parceiro</StatusChip> Seu escritório é parceiro da Veloso Solution{firm.partnerSince ? ` desde ${formatDateTime(firm.partnerSince)}` : ""}. As empresas veem o selo de parceiro ao lado do seu nome.</p>
+          <p><StatusChip tone="accent">Parceiro</StatusChip> Sua empresa é parceira da Veloso Solution{firm.partnerSince ? ` desde ${formatDateTime(firm.partnerSince)}` : ""}. As empresas veem o selo de parceiro ao lado do seu nome.</p>
         ) : firm.partnerRequestedAt ? (
           <p className="muted">Pedido enviado em {formatDateTime(firm.partnerRequestedAt)}. A Veloso Solution analisa e aprova os escritórios parceiros.</p>
         ) : (
           <>
-            <p className="muted">Escritórios parceiros aparecem com selo para as empresas e são indicados pela Veloso Solution. A aprovação é feita pela equipe da Veloso Solution.</p>
+            <p className="muted">Parceiros aparecem com selo para as empresas. A aprovação é feita pela equipe da Veloso Solution.</p>
             <div>
               <button className="primary-button" disabled={action.busy} onClick={() => void action.run(async () => onFirm(await http.post<Firm>("/partnership")))} type="button">Quero ser parceiro</button>
             </div>

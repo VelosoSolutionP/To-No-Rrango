@@ -35,8 +35,8 @@ internal static class FiscalAudit
         ("/fiscal/api/keys/{keyId:guid}", "DELETE", "integracao", "Revogou chave da API fiscal"),
         ("/fiscal/api/webhooks", "POST", "integracao", "Cadastrou webhook"),
         ("/fiscal/api/webhooks/{webhookId:guid}", "DELETE", "integracao", "Removeu webhook"),
-        ("/fiscal/accountant/invites", "POST", "contador", "Convidou contador"),
-        ("/fiscal/accountant/links/{linkId:guid}", "DELETE", "contador", "Tirou o acesso do contador"),
+        ("/fiscal/accountant/invites", "POST", "contador", "Convidou contador ou parceiro"),
+        ("/fiscal/accountant/links/{linkId:guid}", "DELETE", "contador", "Tirou o acesso do parceiro"),
     ];
 
     public static async ValueTask<object?> Filter(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
@@ -151,7 +151,7 @@ internal static class FiscalAudit
                 case ApiNoteRequest note:
                     return $"Modelo {note.Model}, finalidade {note.Purpose}, id externo {note.ExternalId}";
                 case InviteAccountantRequest invite:
-                    return $"E-mail {invite.Email}";
+                    return $"{(invite.Kind == ToNoRango.Domain.Fiscal.PartnerKind.SoftwareHouse ? "Software house" : "Contador")}: {invite.Email}";
                 case CreateApiKeyRequest key:
                     return $"{key.Name}: {(key.IsTest ? "teste" : "produção")}, {(key.CanIssue ? "emite" : "só consulta")}";
                 case CreateWebhookRequest webhook:

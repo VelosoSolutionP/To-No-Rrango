@@ -16,6 +16,7 @@ interface ApiKey {
   createdAt: string;
   lastUsedAt: string | null;
   revokedAt: string | null;
+  partner?: string | null;
 }
 
 interface Webhook {
@@ -24,6 +25,7 @@ interface Webhook {
   events: string[];
   isActive: boolean;
   createdAt: string;
+  partner?: string | null;
 }
 
 interface Delivery {
@@ -179,7 +181,7 @@ export function FiscalApiView({ http, establishmentId }: { http: AdminHttp; esta
               <tbody>
                 {activeKeys.map((key) => (
                   <tr key={key.id}>
-                    <td><strong>{key.name}</strong><small className="muted"> criada por {key.createdBy} em {formatDateTime(key.createdAt)}</small></td>
+                    <td><strong>{key.name}</strong>{key.partner ? <> <StatusChip tone="info">{key.partner}</StatusChip></> : null}<small className="muted"> criada por {key.createdBy} em {formatDateTime(key.createdAt)}</small></td>
                     <td><code>{key.prefix}…</code></td>
                     <td>{key.isTest ? <StatusChip tone="info">Teste</StatusChip> : <StatusChip tone="accent">Produção</StatusChip>}</td>
                     <td>{key.canIssue ? "Emite e consulta" : "Só consulta"}</td>
@@ -219,7 +221,7 @@ export function FiscalApiView({ http, establishmentId }: { http: AdminHttp; esta
               <tbody>
                 {data.webhooks.map((webhook) => (
                   <tr key={webhook.id}>
-                    <td><code>{webhook.url}</code></td>
+                    <td><code>{webhook.url}</code>{webhook.partner ? <> <StatusChip tone="info">{webhook.partner}</StatusChip></> : null}</td>
                     <td>{webhook.events.map((name) => eventLabel[name] ?? name).join(", ")}</td>
                     <td>{formatDateTime(webhook.createdAt)}</td>
                     <td className="fx-actions">

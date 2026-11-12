@@ -391,7 +391,7 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory, draft 
         options={[
           ...(hasNfce ? [{ value: "issue" as const, label: "Emitir" }, { value: "review" as const, label: "Conferência IA" }, { value: "received" as const, label: "Notas recebidas" }, { value: "manual" as const, label: "Devolução e ajuste" }, { value: "closing" as const, label: "Fechamento do contador" }, { value: "config" as const, label: "Configuração" }, { value: "products" as const, label: "Tributação dos produtos" }] : []),
           ...(hasNfce ? [{ value: "duties" as const, label: "Obrigações e inutilização" }] : []),
-          ...(hasEntry ? [{ value: "entries" as const, label: "Notas de entrada" }, { value: "books" as const, label: "Apuração e livros" }, { value: "history" as const, label: "Histórico e auditoria" }, { value: "accountant" as const, label: "Contador" }, { value: "api" as const, label: "API e integrações" }] : []),
+          ...(hasEntry ? [{ value: "entries" as const, label: "Notas de entrada" }, { value: "books" as const, label: "Apuração e livros" }, { value: "history" as const, label: "Histórico e auditoria" }, { value: "accountant" as const, label: "Contador e parceiros" }, { value: "api" as const, label: "API e integrações" }] : []),
           { value: "tables" as const, label: "Tabelas CFOP e CST" },
         ]}
         value={view}

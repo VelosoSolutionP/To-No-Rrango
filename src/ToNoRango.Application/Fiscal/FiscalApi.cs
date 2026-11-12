@@ -119,14 +119,14 @@ public sealed record FiscalApiCaller(Guid KeyId, Guid TenantId, Guid Establishme
 
 public sealed record CreateApiKeyRequest(string Name, bool IsTest, bool CanIssue);
 
-public sealed record FiscalApiKeyDto(Guid Id, string Name, string Prefix, bool IsTest, bool CanIssue, string CreatedBy, DateTimeOffset CreatedAt, DateTimeOffset? LastUsedAt, DateTimeOffset? RevokedAt);
+public sealed record FiscalApiKeyDto(Guid Id, string Name, string Prefix, bool IsTest, bool CanIssue, string CreatedBy, DateTimeOffset CreatedAt, DateTimeOffset? LastUsedAt, DateTimeOffset? RevokedAt, Guid? PartnerFirmId = null, string? Partner = null);
 
 /// <summary>The only moment the full key exists outside the caller's hands.</summary>
 public sealed record CreatedApiKeyDto(FiscalApiKeyDto Key, string Secret);
 
 public sealed record CreateWebhookRequest(string Url, IReadOnlyList<string> Events);
 
-public sealed record FiscalWebhookDto(Guid Id, string Url, IReadOnlyList<string> Events, bool IsActive, DateTimeOffset CreatedAt);
+public sealed record FiscalWebhookDto(Guid Id, string Url, IReadOnlyList<string> Events, bool IsActive, DateTimeOffset CreatedAt, Guid? PartnerFirmId = null, string? Partner = null);
 
 public sealed record CreatedWebhookDto(FiscalWebhookDto Webhook, string Secret);
 
@@ -379,7 +379,8 @@ public sealed class FiscalApiKeyService(IRepository<FiscalApiKey> keys, IUnitOfW
 {
     private const int MaxActiveKeys = 20;
 
-    public Task<Result<CreatedApiKeyDto>> CreateAsync(Guid tenantId, Guid establishmentId, CreateApiKeyRequest request, string actor, CancellationToken cancellationToken) =>
+    /// <param name="partnerFirmId">The software house creating it in the partner portal; null for the store itself.</param>
+    public Task<Result<CreatedApiKeyDto>> CreateAsync(Guid tenantId, Guid establishmentId, CreateApiKeyRequest request, string actor, CancellationToken cancellationToken, Guid? partnerFirmId = null) =>
         Guarded.RunAsync<CreatedApiKeyDto>(async () =>
         {
             var name = (request.Name ?? string.Empty).Trim();
@@ -395,16 +396,17 @@ public sealed class FiscalApiKeyService(IRepository<FiscalApiKey> keys, IUnitOfW
             }
 
             var secret = FiscalApiRules.NewSecret(request.IsTest ? FiscalApiKey.TestPrefix : FiscalApiKey.LivePrefix);
-            var key = new FiscalApiKey(tenantId, establishmentId, name, secret[..16], FiscalApiRules.HashKey(secret), request.IsTest, request.CanIssue, actor, clock.GetUtcNow());
+            var key = new FiscalApiKey(tenantId, establishmentId, name, secret[..16], FiscalApiRules.HashKey(secret), request.IsTest, request.CanIssue, actor, clock.GetUtcNow(), partnerFirmId);
             keys.Add(key);
             await unitOfWork.SaveChangesAsync(cancellationToken);
             return new CreatedApiKeyDto(ToDto(key), secret);
         });
 
-    public Task<Result<FiscalApiKeyDto>> RevokeAsync(Guid establishmentId, Guid keyId, CancellationToken cancellationToken) =>
+    public Task<Result<FiscalApiKeyDto>> RevokeAsync(Guid establishmentId, Guid keyId, CancellationToken cancellationToken, Guid? partnerFirmId = null) =>
         Guarded.RunAsync<FiscalApiKeyDto>(async () =>
         {
-            var key = await keys.FirstOrDefaultAsync(item => item.Id == keyId && item.EstablishmentId == establishmentId, cancellationToken);
+            // A partner touches only its own keys; the store touches all of them.
+            var key = await keys.FirstOrDefaultAsync(item => item.Id == keyId && item.EstablishmentId == establishmentId && (partnerFirmId == null || item.PartnerFirmId == partnerFirmId), cancellationToken);
 
             if (key is null)
             {
@@ -446,13 +448,13 @@ public sealed class FiscalApiKeyService(IRepository<FiscalApiKey> keys, IUnitOfW
         return new FiscalApiCaller(key.Id, key.TenantId, key.EstablishmentId, key.Name, key.Prefix, key.IsTest, key.CanIssue);
     }
 
-    public async Task<IReadOnlyList<FiscalApiKeyDto>> ListAsync(Guid establishmentId, CancellationToken cancellationToken) =>
-        (await keys.ListAsync(key => key.EstablishmentId == establishmentId, key => key.CreatedAt, cancellationToken, descending: true, take: 100))
+    public async Task<IReadOnlyList<FiscalApiKeyDto>> ListAsync(Guid establishmentId, CancellationToken cancellationToken, Guid? partnerFirmId = null) =>
+        (await keys.ListAsync(key => key.EstablishmentId == establishmentId && (partnerFirmId == null || key.PartnerFirmId == partnerFirmId), key => key.CreatedAt, cancellationToken, descending: true, take: 100))
             .Select(ToDto)
             .ToList();
 
     private static FiscalApiKeyDto ToDto(FiscalApiKey key) =>
-        new(key.Id, key.Name, key.Prefix, key.IsTest, key.CanIssue, key.CreatedBy, key.CreatedAt, key.LastUsedAt, key.RevokedAt);
+        new(key.Id, key.Name, key.Prefix, key.IsTest, key.CanIssue, key.CreatedBy, key.CreatedAt, key.LastUsedAt, key.RevokedAt, key.PartnerFirmId);
 }
 
 // ---------- Notes through the API ----------
@@ -534,6 +536,7 @@ public sealed class FiscalWebhookService(
     IRepository<FiscalWebhook> webhooks,
     IRepository<FiscalWebhookDelivery> deliveries,
     IRepository<FiscalDocument> documents,
+    IRepository<AccountantFirm> partners,
     FiscalApiKeyService keys,
     IWebhookSender sender,
     ISecretProtector protector,
@@ -543,19 +546,33 @@ public sealed class FiscalWebhookService(
     private const int MaxWebhooks = 5;
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
-    public async Task<FiscalApiOverviewDto> GetOverviewAsync(Guid establishmentId, CancellationToken cancellationToken)
+    /// <param name="partnerFirmId">A software house sees only what it created; null shows the store everything.</param>
+    public async Task<FiscalApiOverviewDto> GetOverviewAsync(Guid establishmentId, CancellationToken cancellationToken, Guid? partnerFirmId = null)
     {
-        var hooks = await webhooks.ListAsync(item => item.EstablishmentId == establishmentId && item.IsActive, item => item.CreatedAt, cancellationToken, take: MaxWebhooks * 4);
-        var recent = await deliveries.ListAsync(item => item.EstablishmentId == establishmentId, item => item.CreatedAt, cancellationToken, descending: true, take: 50);
+        var hooks = await webhooks.ListAsync(
+            item => item.EstablishmentId == establishmentId && item.IsActive && (partnerFirmId == null || item.PartnerFirmId == partnerFirmId),
+            item => item.CreatedAt,
+            cancellationToken,
+            take: 100);
+        var hookIds = hooks.Select(item => item.Id).ToList();
+        var recent = await deliveries.ListAsync(
+            item => item.EstablishmentId == establishmentId && (partnerFirmId == null || hookIds.Contains(item.WebhookId)),
+            item => item.CreatedAt,
+            cancellationToken,
+            descending: true,
+            take: 50);
+        var keyList = await keys.ListAsync(establishmentId, cancellationToken, partnerFirmId);
+        var firmIds = keyList.Select(item => item.PartnerFirmId).Concat(hooks.Select(item => item.PartnerFirmId)).OfType<Guid>().Distinct().ToList();
+        var names = (await partners.ListAsync(firm => firmIds.Contains(firm.Id), firm => firm.Name, cancellationToken)).ToDictionary(firm => firm.Id, firm => firm.Name);
 
         return new FiscalApiOverviewDto(
-            await keys.ListAsync(establishmentId, cancellationToken),
-            hooks.Select(ToDto).ToList(),
+            keyList.Select(item => item.PartnerFirmId is { } id ? item with { Partner = names.GetValueOrDefault(id) } : item).ToList(),
+            hooks.Select(item => ToDto(item) with { Partner = item.PartnerFirmId is { } id ? names.GetValueOrDefault(id) : null }).ToList(),
             recent.Select(ToDto).ToList(),
             FiscalWebhook.Events);
     }
 
-    public Task<Result<CreatedWebhookDto>> CreateAsync(Guid tenantId, Guid establishmentId, CreateWebhookRequest request, CancellationToken cancellationToken) =>
+    public Task<Result<CreatedWebhookDto>> CreateAsync(Guid tenantId, Guid establishmentId, CreateWebhookRequest request, CancellationToken cancellationToken, Guid? partnerFirmId = null) =>
         Guarded.RunAsync<CreatedWebhookDto>(async () =>
         {
             var url = (request.Url ?? string.Empty).Trim();
@@ -576,16 +593,16 @@ public sealed class FiscalWebhookService(
             }
 
             var secret = FiscalApiRules.NewSecret("whsec_");
-            var webhook = new FiscalWebhook(tenantId, establishmentId, url, protector.Protect(secret), request.Events, clock.GetUtcNow());
+            var webhook = new FiscalWebhook(tenantId, establishmentId, url, protector.Protect(secret), request.Events, clock.GetUtcNow(), partnerFirmId);
             webhooks.Add(webhook);
             await unitOfWork.SaveChangesAsync(cancellationToken);
             return new CreatedWebhookDto(ToDto(webhook), secret);
         });
 
-    public Task<Result<FiscalWebhookDto>> RemoveAsync(Guid establishmentId, Guid webhookId, CancellationToken cancellationToken) =>
+    public Task<Result<FiscalWebhookDto>> RemoveAsync(Guid establishmentId, Guid webhookId, CancellationToken cancellationToken, Guid? partnerFirmId = null) =>
         Guarded.RunAsync<FiscalWebhookDto>(async () =>
         {
-            var webhook = await webhooks.FirstOrDefaultAsync(item => item.Id == webhookId && item.EstablishmentId == establishmentId, cancellationToken);
+            var webhook = await webhooks.FirstOrDefaultAsync(item => item.Id == webhookId && item.EstablishmentId == establishmentId && (partnerFirmId == null || item.PartnerFirmId == partnerFirmId), cancellationToken);
 
             if (webhook is null)
             {
@@ -598,10 +615,10 @@ public sealed class FiscalWebhookService(
         });
 
     /// <summary>Queues a "ping" so the partner can check the address and the signature.</summary>
-    public Task<Result<WebhookDeliveryDto>> TestAsync(Guid establishmentId, Guid webhookId, CancellationToken cancellationToken) =>
+    public Task<Result<WebhookDeliveryDto>> TestAsync(Guid establishmentId, Guid webhookId, CancellationToken cancellationToken, Guid? partnerFirmId = null) =>
         Guarded.RunAsync<WebhookDeliveryDto>(async () =>
         {
-            var webhook = await webhooks.FirstOrDefaultAsync(item => item.Id == webhookId && item.EstablishmentId == establishmentId && item.IsActive, cancellationToken);
+            var webhook = await webhooks.FirstOrDefaultAsync(item => item.Id == webhookId && item.EstablishmentId == establishmentId && item.IsActive && (partnerFirmId == null || item.PartnerFirmId == partnerFirmId), cancellationToken);
 
             if (webhook is null)
             {
@@ -616,10 +633,16 @@ public sealed class FiscalWebhookService(
             return ToDto(delivery);
         });
 
-    public Task<Result<WebhookDeliveryDto>> RetryAsync(Guid establishmentId, Guid deliveryId, CancellationToken cancellationToken) =>
+    public Task<Result<WebhookDeliveryDto>> RetryAsync(Guid establishmentId, Guid deliveryId, CancellationToken cancellationToken, Guid? partnerFirmId = null) =>
         Guarded.RunAsync<WebhookDeliveryDto>(async () =>
         {
             var delivery = await deliveries.FirstOrDefaultAsync(item => item.Id == deliveryId && item.EstablishmentId == establishmentId, cancellationToken);
+
+            if (delivery is not null && partnerFirmId is not null
+                && !await webhooks.AnyAsync(item => item.Id == delivery.WebhookId && item.PartnerFirmId == partnerFirmId, cancellationToken))
+            {
+                delivery = null;
+            }
 
             if (delivery is null)
             {
@@ -786,7 +809,7 @@ public sealed class FiscalWebhookService(
     private static string Payload(Guid deliveryId, string eventName, DateTimeOffset now, FiscalDocument? document) =>
         JsonSerializer.Serialize(new { id = deliveryId, @event = eventName, createdAt = now, note = document is null ? null : ApiNoteDto.From(document) }, Json);
 
-    private static FiscalWebhookDto ToDto(FiscalWebhook webhook) => new(webhook.Id, webhook.Url, webhook.SubscribedEvents, webhook.IsActive, webhook.CreatedAt);
+    private static FiscalWebhookDto ToDto(FiscalWebhook webhook) => new(webhook.Id, webhook.Url, webhook.SubscribedEvents, webhook.IsActive, webhook.CreatedAt, webhook.PartnerFirmId);
 
     private static WebhookDeliveryDto ToDto(FiscalWebhookDelivery delivery) =>
         new(delivery.Id, delivery.WebhookId, delivery.Event, delivery.DocumentId, delivery.Status, delivery.Attempts, delivery.NextAttemptAt, delivery.LastStatusCode, delivery.LastError, delivery.CreatedAt, delivery.DeliveredAt);

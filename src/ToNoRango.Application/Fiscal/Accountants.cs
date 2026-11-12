@@ -11,11 +11,11 @@ namespace ToNoRango.Application.Fiscal;
 
 // ---------- Contract ----------
 
-public sealed record AccountantSignUpRequest(string FirmName, string Document, string Crc, string? Phone, string Name, string Email, string Password, string InviteCode);
+public sealed record AccountantSignUpRequest(string FirmName, string Document, string? Crc, string? Phone, string Name, string Email, string Password, string InviteCode);
 
 public sealed record AccountantLoginRequest(string Email, string Password);
 
-public sealed record AccountantFirmDto(Guid Id, string Name, string Document, string Crc, string Email, string? Phone, bool IsPartner, DateTimeOffset? PartnerSince, DateTimeOffset? PartnerRequestedAt);
+public sealed record AccountantFirmDto(Guid Id, string Name, string Document, string Crc, string Email, string? Phone, bool IsPartner, DateTimeOffset? PartnerSince, DateTimeOffset? PartnerRequestedAt, PartnerKind Kind = PartnerKind.Accounting);
 
 public sealed record AccountantSessionDto(string Token, DateTimeOffset ExpiresAt, string Name, string Email, AccountantFirmDto Firm);
 
@@ -24,14 +24,15 @@ public sealed record AccountantMeDto(string Name, string Email, AccountantFirmDt
 public sealed record AcceptInviteRequest(string Code);
 
 /// <summary>One company in the office's list, with what needs attention.</summary>
-public sealed record AccountantCompanyDto(Guid LinkId, Guid EstablishmentId, string Name, DateTimeOffset? Since, int OpenRequests, int Unread);
+public sealed record AccountantCompanyDto(Guid LinkId, Guid EstablishmentId, string Name, DateTimeOffset? Since, int OpenRequests, int Unread, PartnerKind Kind = PartnerKind.Accounting);
 
-public sealed record InviteAccountantRequest(string Email);
+public sealed record InviteAccountantRequest(string Email, PartnerKind Kind = PartnerKind.Accounting);
 
 public sealed record AccountantInviteDto(AccountantLinkDto Link, string Code);
 
 public sealed record AccountantLinkDto(
     Guid Id,
+    PartnerKind Kind,
     string InvitedEmail,
     AccountantLinkStatus Status,
     string? FirmName,
@@ -97,11 +98,6 @@ public sealed class AccountantPortalService(
                 return Result<AccountantSessionDto>.Failure(AppErrors.Validation("CNPJ do escritório ou CPF do contador inválido."));
             }
 
-            if (string.IsNullOrWhiteSpace(request.Crc) || request.Crc.Trim().Length is < 4 or > 20)
-            {
-                return Result<AccountantSessionDto>.Failure(AppErrors.Validation("Informe o CRC (ex.: MG-123456/O)."));
-            }
-
             if (string.IsNullOrWhiteSpace(request.Email) || !request.Email.Contains('@'))
             {
                 return Result<AccountantSessionDto>.Failure(AppErrors.Validation("E-mail inválido."));
@@ -127,7 +123,13 @@ public sealed class AccountantPortalService(
                 return Result<AccountantSessionDto>.Failure(AppErrors.Validation("Código de convite inválido, vencido ou feito para outro e-mail."));
             }
 
-            var firm = new AccountantFirm(request.FirmName, document, request.Crc, email, request.Phone, now);
+            // The invitation says what the partner is: an accounting office needs its CRC.
+            if (link.Kind == PartnerKind.Accounting && (string.IsNullOrWhiteSpace(request.Crc) || request.Crc.Trim().Length is < 4 or > 20))
+            {
+                return Result<AccountantSessionDto>.Failure(AppErrors.Validation("Informe o CRC (ex.: MG-123456/O)."));
+            }
+
+            var firm = new AccountantFirm(request.FirmName, document, request.Crc, email, request.Phone, now, link.Kind);
             var user = new AccountantUser(firm.Id, request.Name, email, hasher.Hash(request.Password), now);
             user.RegisterSuccessfulLogin(now);
             firms.Add(firm);
@@ -210,7 +212,8 @@ public sealed class AccountantPortalService(
                 link.EstablishmentName,
                 link.AcceptedAt,
                 waiting.Count(message => message.LinkId == link.Id && message.IsRequest && message.ResolvedAt == null),
-                waiting.Count(message => message.LinkId == link.Id && !message.FromAccountant && message.ReadAt == null)))
+                waiting.Count(message => message.LinkId == link.Id && !message.FromAccountant && message.ReadAt == null),
+                link.Kind))
             .ToList();
     }
 
@@ -226,6 +229,15 @@ public sealed class AccountantPortalService(
                 return Result<AccountantCompanyDto>.Failure(AppErrors.Validation("Código de convite inválido, vencido ou feito para outro e-mail."));
             }
 
+            var firm = await firms.FirstOrDefaultAsync(item => item.Id == firmId, cancellationToken);
+
+            if (firm is null || firm.Kind != link.Kind)
+            {
+                return Result<AccountantCompanyDto>.Failure(AppErrors.Validation(link.Kind == PartnerKind.SoftwareHouse
+                    ? "Este convite é para uma software house, e sua conta é de escritório contábil."
+                    : "Este convite é para escritório contábil, e sua conta é de software house."));
+            }
+
             if (await links.AnyAsync(item => item.FirmId == firmId && item.EstablishmentId == link.EstablishmentId && item.Status == AccountantLinkStatus.Active, cancellationToken))
             {
                 link.Revoke(now);
@@ -235,7 +247,7 @@ public sealed class AccountantPortalService(
 
             link.Accept(firmId, now);
             await unitOfWork.SaveChangesAsync(cancellationToken);
-            return new AccountantCompanyDto(link.Id, link.EstablishmentId, link.EstablishmentName, link.AcceptedAt, 0, 0);
+            return new AccountantCompanyDto(link.Id, link.EstablishmentId, link.EstablishmentName, link.AcceptedAt, 0, 0, link.Kind);
         });
 
     /// <summary>The active link of this office to this store, or null: every company route goes through here.</summary>
@@ -303,12 +315,12 @@ public sealed class AccountantPortalService(
 
     private AccountantSessionDto Session(AccountantUser user, AccountantFirm firm)
     {
-        var (token, expiresAt) = tokens.IssueAccountant(user.Id, firm.Id, user.Name, user.Email);
+        var (token, expiresAt) = tokens.IssueAccountant(user.Id, firm.Id, user.Name, user.Email, firm.Kind.ToString());
         return new AccountantSessionDto(token, expiresAt, user.Name, user.Email, ToDto(firm));
     }
 
     public static AccountantFirmDto ToDto(AccountantFirm firm) =>
-        new(firm.Id, firm.Name, firm.Document, firm.Crc, firm.Email, firm.Phone, firm.IsPartner, firm.PartnerSince, firm.PartnerRequestedAt);
+        new(firm.Id, firm.Name, firm.Document, firm.Crc, firm.Email, firm.Phone, firm.IsPartner, firm.PartnerSince, firm.PartnerRequestedAt, firm.Kind);
 }
 
 // ---------- Store and office together: invitations and the conversation ----------
@@ -318,6 +330,8 @@ public sealed class AccountantDeskService(
     IRepository<AccountantMessage> messages,
     IRepository<AccountantFirm> firms,
     IRepository<Establishment> establishments,
+    IRepository<FiscalApiKey> apiKeys,
+    IRepository<FiscalWebhook> webhooks,
     IUnitOfWork unitOfWork,
     TimeProvider clock)
 {
@@ -348,6 +362,11 @@ public sealed class AccountantDeskService(
             var email = AccountantUser.NormalizeEmail(request.Email);
 
             // A new invitation to the same e-mail replaces the pending one: only the newest code works.
+            if (!Enum.IsDefined(request.Kind))
+            {
+                return Result<AccountantInviteDto>.Failure(AppErrors.Validation("Escolha contador ou software house."));
+            }
+
             foreach (var pending in await links.ListAsync(link => link.EstablishmentId == establishmentId && link.InvitedEmail == email && link.Status == AccountantLinkStatus.Invited, link => link.CreatedAt, cancellationToken))
             {
                 (await links.FirstOrDefaultAsync(link => link.Id == pending.Id, cancellationToken))?.Revoke(now);
@@ -360,7 +379,7 @@ public sealed class AccountantDeskService(
                     span[index] = Alphabet[RandomNumberGenerator.GetInt32(Alphabet.Length)];
                 }
             });
-            var link = new AccountantLink(tenantId, establishmentId, establishment.Name, email, FiscalApiRules.HashKey(code), actor, now);
+            var link = new AccountantLink(tenantId, establishmentId, establishment.Name, email, FiscalApiRules.HashKey(code), actor, now, request.Kind);
             links.Add(link);
             await unitOfWork.SaveChangesAsync(cancellationToken);
             return new AccountantInviteDto(ToDto(link, null), $"{code[..5]}-{code[5..]}");
@@ -376,7 +395,23 @@ public sealed class AccountantDeskService(
                 return Result<AccountantLinkDto>.Failure(AppErrors.NotFound("accountant.link_not_found", "Acesso não encontrado."));
             }
 
-            link.Revoke(clock.GetUtcNow());
+            var now = clock.GetUtcNow();
+            link.Revoke(now);
+
+            // A software house leaves with everything it plugged in: its keys stop and its webhooks go quiet.
+            if (link.FirmId is { } partner)
+            {
+                foreach (var listed in await apiKeys.ListAsync(key => key.EstablishmentId == establishmentId && key.PartnerFirmId == partner && key.RevokedAt == null, key => key.CreatedAt, cancellationToken))
+                {
+                    (await apiKeys.FirstOrDefaultAsync(key => key.Id == listed.Id, cancellationToken))?.Revoke(now);
+                }
+
+                foreach (var listed in await webhooks.ListAsync(hook => hook.EstablishmentId == establishmentId && hook.PartnerFirmId == partner && hook.IsActive, hook => hook.CreatedAt, cancellationToken))
+                {
+                    (await webhooks.FirstOrDefaultAsync(hook => hook.Id == listed.Id, cancellationToken))?.Deactivate();
+                }
+            }
+
             await unitOfWork.SaveChangesAsync(cancellationToken);
             return ToDto(link, link.FirmId is { } id ? await firms.FirstOrDefaultAsync(firm => firm.Id == id, cancellationToken) : null);
         });
@@ -465,7 +500,7 @@ public sealed class AccountantDeskService(
         });
 
     private static AccountantLinkDto ToDto(AccountantLink link, AccountantFirm? firm) =>
-        new(link.Id, link.InvitedEmail, link.Status, firm?.Name, firm?.Crc, firm?.IsPartner ?? false, link.InvitedBy, link.CreatedAt, link.CodeExpiresAt, link.AcceptedAt, link.RevokedAt);
+        new(link.Id, link.Kind, link.InvitedEmail, link.Status, firm?.Name, firm?.Crc, firm?.IsPartner ?? false, link.InvitedBy, link.CreatedAt, link.CodeExpiresAt, link.AcceptedAt, link.RevokedAt);
 
     private static AccountantMessageDto ToDto(AccountantMessage message, AccountantSide side) =>
         new(message.Id, message.FromAccountant, message.FromAccountant == side.IsAccountant, message.Author, message.Text, message.IsRequest, message.ResolvedAt, message.ResolvedBy, message.ReadAt, message.CreatedAt);

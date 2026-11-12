@@ -3,13 +3,21 @@ using ToNoRango.SharedKernel.Primitives;
 
 namespace ToNoRango.Domain.Fiscal;
 
+/// <summary>What a partner does for the stores: reads the books (accounting) or integrates systems (software house).</summary>
+public enum PartnerKind
+{
+    Accounting = 1,
+    SoftwareHouse = 2
+}
+
 /// <summary>
-/// An accounting office. It is not a tenant: one office serves many stores of many tenants, and sees
+/// An accounting office or a software house. It is not a tenant: one office serves many stores of many tenants, and sees
 /// only the stores that invited it. The Veloso Solution approves the partner offices.
 /// </summary>
 public sealed class AccountantFirm : AggregateRoot
 {
     public string Name { get; private set; } = string.Empty;
+    public PartnerKind Kind { get; private set; } = PartnerKind.Accounting;
 
     /// <summary>CNPJ of the office or CPF of the accountant, digits only.</summary>
     public string Document { get; private set; } = string.Empty;
@@ -23,12 +31,16 @@ public sealed class AccountantFirm : AggregateRoot
 
     private AccountantFirm() { }
 
-    public AccountantFirm(string name, string document, string crc, string email, string? phone, DateTimeOffset now)
+    public AccountantFirm(string name, string document, string? crc, string email, string? phone, DateTimeOffset now, PartnerKind kind = PartnerKind.Accounting)
     {
         Id = GuidV7.New();
+        Kind = kind;
         Name = Ensure.MaxLength(Ensure.NotNullOrWhiteSpace(name, nameof(name)).Trim(), 120, nameof(name));
         Document = Ensure.MaxLength(Ensure.NotNullOrWhiteSpace(document, nameof(document)), 14, nameof(document));
-        Crc = Ensure.MaxLength(Ensure.NotNullOrWhiteSpace(crc, nameof(crc)).Trim().ToUpperInvariant(), 20, nameof(crc));
+        // Only an accounting office has a CRC; a software house leaves it empty.
+        Crc = kind == PartnerKind.Accounting
+            ? Ensure.MaxLength(Ensure.NotNullOrWhiteSpace(crc, nameof(crc)).Trim().ToUpperInvariant(), 20, nameof(crc))
+            : (crc ?? string.Empty).Trim().ToUpperInvariant()[..Math.Min((crc ?? string.Empty).Trim().Length, 20)];
         Email = AccountantUser.NormalizeEmail(email);
         Phone = string.IsNullOrWhiteSpace(phone) ? null : phone.Trim()[..Math.Min(phone.Trim().Length, 20)];
         CreatedAt = now;
@@ -115,6 +127,7 @@ public sealed class AccountantLink : AggregateRoot
 
     /// <summary>Kept here so the office lists its companies without opening every tenant.</summary>
     public string EstablishmentName { get; private set; } = string.Empty;
+    public PartnerKind Kind { get; private set; } = PartnerKind.Accounting;
     public string InvitedEmail { get; private set; } = string.Empty;
     public string? CodeHash { get; private set; }
     public DateTimeOffset? CodeExpiresAt { get; private set; }
@@ -127,9 +140,10 @@ public sealed class AccountantLink : AggregateRoot
 
     private AccountantLink() { }
 
-    public AccountantLink(Guid tenantId, Guid establishmentId, string establishmentName, string email, string codeHash, string invitedBy, DateTimeOffset now)
+    public AccountantLink(Guid tenantId, Guid establishmentId, string establishmentName, string email, string codeHash, string invitedBy, DateTimeOffset now, PartnerKind kind = PartnerKind.Accounting)
     {
         Id = GuidV7.New();
+        Kind = kind;
         TenantId = Ensure.NotEmpty(tenantId, nameof(tenantId));
         EstablishmentId = Ensure.NotEmpty(establishmentId, nameof(establishmentId));
         EstablishmentName = Ensure.NotNullOrWhiteSpace(establishmentName, nameof(establishmentName)).Trim()[..Math.Min(establishmentName.Trim().Length, 120)];

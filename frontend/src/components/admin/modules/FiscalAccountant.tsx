@@ -20,6 +20,7 @@ export interface AccountantMessage {
 
 interface AccountantLink {
   id: string;
+  kind: "Accounting" | "SoftwareHouse";
   invitedEmail: string;
   status: "Invited" | "Active" | "Revoked";
   firmName: string | null;
@@ -110,9 +111,11 @@ export function FiscalAccountantView({ http, establishmentId }: { http: AdminHtt
   async function sendInvite(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
-    const email = String(new FormData(form).get("email") ?? "");
+    const values = new FormData(form);
+    const email = String(values.get("email") ?? "");
+    const kind = String(values.get("kind") ?? "Accounting");
     await action.run(async () => {
-      const created = await http.post<{ code: string }>(`${base}/invites`, { email });
+      const created = await http.post<{ code: string }>(`${base}/invites`, { email, kind });
       setInvite({ email, code: created.code });
       form.reset();
     });
@@ -121,7 +124,7 @@ export function FiscalAccountantView({ http, establishmentId }: { http: AdminHtt
   function revoke(link: AccountantLink) {
     const who = link.firmName ?? link.invitedEmail;
 
-    if (window.confirm(`Tirar o acesso de ${who}? O escritório deixa de ver os dados fiscais desta loja na hora.`)) {
+    if (window.confirm(`Tirar o acesso de ${who}? Ele deixa de ver esta loja na hora e as chaves de API que ele criou param de funcionar.`)) {
       void action.run(() => http.del(`${base}/links/${link.id}`));
     }
   }
@@ -129,10 +132,11 @@ export function FiscalAccountantView({ http, establishmentId }: { http: AdminHtt
   return (
     <>
       <article className="card vx-box">
-        <div className="vx-panel-title"><h3>Contador <em>portal do escritório</em></h3></div>
+        <div className="vx-panel-title"><h3>Contador e parceiros <em>portal de parceiros</em></h3></div>
         <p className="muted">
-          Convide seu contador pelo e-mail. Ele entra no portal do contador, vê só esta loja (pendências, apuração, livros, auditoria e o fechamento do mês)
-          e conversa com você por aqui. Você tira o acesso quando quiser.
+          Convide pelo e-mail. O <strong>contador</strong> vê só esta loja (pendências, apuração, livros, auditoria e o fechamento do mês).
+          A <strong>software house</strong> (quem faz seu ERP, PDV ou loja virtual) cria as próprias chaves de API e webhooks, sem ver os livros.
+          Os dois conversam com você por aqui e você tira o acesso quando quiser: as chaves do parceiro param na hora.
         </p>
         <ErrorMessage message={desk.error ?? action.error} />
         {invite ? (
@@ -147,19 +151,21 @@ export function FiscalAccountantView({ http, establishmentId }: { http: AdminHtt
           </div>
         ) : null}
         <form className="module-form module-form-flat" onSubmit={sendInvite}>
-          <label className="field field-wide"><span>E-mail do contador</span><input maxLength={200} name="email" placeholder="contador@escritorio.com.br" required type="email" /></label>
+          <label className="field"><span>Quem</span><select defaultValue="Accounting" name="kind"><option value="Accounting">Contador / escritório contábil</option><option value="SoftwareHouse">Software house (sistema integrado)</option></select></label>
+          <label className="field"><span>E-mail</span><input maxLength={200} name="email" placeholder="contato@parceiro.com.br" required type="email" /></label>
           <div><button className="primary-button" disabled={action.busy} type="submit">Gerar convite</button></div>
         </form>
 
-        {desk.data && desk.data.links.length === 0 ? <Empty>Nenhum contador convidado.</Empty> : null}
+        {desk.data && desk.data.links.length === 0 ? <Empty>Nenhum parceiro convidado.</Empty> : null}
         {desk.data?.links.length ? (
           <div className="admin-table-wrap">
             <table className="admin-table">
-              <thead><tr><th>Escritório</th><th>E-mail</th><th>Situação</th><th>Desde</th><th /></tr></thead>
+              <thead><tr><th>Parceiro</th><th>Tipo</th><th>E-mail</th><th>Situação</th><th>Desde</th><th /></tr></thead>
               <tbody>
                 {desk.data.links.map((link) => (
                   <tr key={link.id}>
-                    <td>{link.firmName ? <><strong>{link.firmName}</strong><small className="muted"> CRC {link.firmCrc}</small>{link.firmIsPartner ? <> <StatusChip tone="accent">Parceiro</StatusChip></> : null}</> : <span className="muted">aguardando aceite</span>}</td>
+                    <td>{link.firmName ? <><strong>{link.firmName}</strong>{link.firmCrc ? <small className="muted"> CRC {link.firmCrc}</small> : null}{link.firmIsPartner ? <> <StatusChip tone="accent">Parceiro</StatusChip></> : null}</> : <span className="muted">aguardando aceite</span>}</td>
+                    <td>{link.kind === "SoftwareHouse" ? "Software house" : "Contador"}</td>
                     <td>{link.invitedEmail}</td>
                     <td>
                       <StatusChip tone={link.status === "Active" ? "ok" : link.status === "Invited" ? "warn" : "muted"}>{statusLabel[link.status]}</StatusChip>

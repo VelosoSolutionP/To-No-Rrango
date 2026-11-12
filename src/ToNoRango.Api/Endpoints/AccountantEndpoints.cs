@@ -46,22 +46,29 @@ internal static class AccountantEndpoints
         company.AddEndpointFilter(RequireLinkAsync);
         company.AddEndpointFilter(FiscalAudit.Filter);
 
-        company.MapGet("/fiscal/review", async (Guid establishmentId, FiscalReviewService service, CancellationToken ct) =>
+        // Accounting offices read the books; software houses plug systems in. Each sees only its part.
+        var books = company.MapGroup(string.Empty);
+        books.AddEndpointFilter(RequireKind(PartnerKind.Accounting));
+        var integration = company.MapGroup(string.Empty);
+        integration.AddEndpointFilter(RequireKind(PartnerKind.SoftwareHouse));
+        MapSoftwareHouse(integration);
+
+        books.MapGet("/fiscal/review", async (Guid establishmentId, FiscalReviewService service, CancellationToken ct) =>
             (await service.ReviewAsync(establishmentId, ct)).ToHttpResult());
 
-        company.MapGet("/fiscal/book", async (Guid establishmentId, int year, int month, FiscalBooksService service, CancellationToken ct) =>
+        books.MapGet("/fiscal/book", async (Guid establishmentId, int year, int month, FiscalBooksService service, CancellationToken ct) =>
             (await service.GetBookAsync(establishmentId, new FiscalPeriodRequest(year, month), ct)).ToHttpResult());
 
-        company.MapGet("/fiscal/assessment", async (Guid establishmentId, int year, int month, long? previousIcmsCredit, FiscalBooksService service, CancellationToken ct) =>
+        books.MapGet("/fiscal/assessment", async (Guid establishmentId, int year, int month, long? previousIcmsCredit, FiscalBooksService service, CancellationToken ct) =>
             (await service.GetAssessmentAsync(establishmentId, new FiscalPeriodRequest(year, month, previousIcmsCredit ?? 0), ct)).ToHttpResult());
 
-        company.MapGet("/fiscal/periods", async (Guid establishmentId, int? months, FiscalBooksService service, TimeProvider clock, CancellationToken ct) =>
+        books.MapGet("/fiscal/periods", async (Guid establishmentId, int? months, FiscalBooksService service, TimeProvider clock, CancellationToken ct) =>
             Results.Ok(await service.GetPeriodsAsync(establishmentId, months ?? 12, DateOnly.FromDateTime(clock.GetLocalNow().DateTime), ct)));
 
-        company.MapGet("/fiscal/audit", async (Guid establishmentId, int? take, FiscalBooksService service, CancellationToken ct) =>
+        books.MapGet("/fiscal/audit", async (Guid establishmentId, int? take, FiscalBooksService service, CancellationToken ct) =>
             Results.Ok(await service.GetAuditAsync(establishmentId, take ?? 200, ct)));
 
-        company.MapPost("/fiscal/accountant-package", async (Guid establishmentId, AccountantPackageRequest request, AccountantPackageService service, HttpContext http, IModuleAccess access, CancellationToken ct) =>
+        books.MapPost("/fiscal/accountant-package", async (Guid establishmentId, AccountantPackageRequest request, AccountantPackageService service, HttpContext http, IModuleAccess access, CancellationToken ct) =>
         {
             var tenant = Link(http).TenantId;
             var allowed = new List<string>();
@@ -120,6 +127,38 @@ internal static class AccountantEndpoints
         group.MapPost($"{Establishment}/fiscal/accountant/messages/{{messageId:guid}}/resolve", async (Guid establishmentId, Guid messageId, HttpContext http, AccountantDeskService service, CancellationToken ct) =>
             (await service.ResolveAsync(establishmentId, null, messageId, StoreSide(http), ct)).ToHttpResult());
     }
+
+    private static void MapSoftwareHouse(RouteGroupBuilder group)
+    {
+        group.MapGet("/fiscal/api", async (Guid establishmentId, HttpContext http, FiscalWebhookService service, CancellationToken ct) =>
+            Results.Ok(await service.GetOverviewAsync(establishmentId, ct, Firm(http))));
+
+        group.MapPost("/fiscal/api/keys", async (Guid establishmentId, CreateApiKeyRequest request, HttpContext http, FiscalApiKeyService service, CancellationToken ct) =>
+            (await service.CreateAsync(Link(http).TenantId, establishmentId, request, http.Actor(), ct, Firm(http))).ToHttpResult());
+
+        group.MapDelete("/fiscal/api/keys/{keyId:guid}", async (Guid establishmentId, Guid keyId, HttpContext http, FiscalApiKeyService service, CancellationToken ct) =>
+            (await service.RevokeAsync(establishmentId, keyId, ct, Firm(http))).ToHttpResult());
+
+        group.MapPost("/fiscal/api/webhooks", async (Guid establishmentId, CreateWebhookRequest request, HttpContext http, FiscalWebhookService service, CancellationToken ct) =>
+            (await service.CreateAsync(Link(http).TenantId, establishmentId, request, ct, Firm(http))).ToHttpResult());
+
+        group.MapDelete("/fiscal/api/webhooks/{webhookId:guid}", async (Guid establishmentId, Guid webhookId, HttpContext http, FiscalWebhookService service, CancellationToken ct) =>
+            (await service.RemoveAsync(establishmentId, webhookId, ct, Firm(http))).ToHttpResult());
+
+        group.MapPost("/fiscal/api/webhooks/{webhookId:guid}/test", async (Guid establishmentId, Guid webhookId, HttpContext http, FiscalWebhookService service, CancellationToken ct) =>
+            (await service.TestAsync(establishmentId, webhookId, ct, Firm(http))).ToHttpResult());
+
+        group.MapPost("/fiscal/api/deliveries/{deliveryId:guid}/retry", async (Guid establishmentId, Guid deliveryId, HttpContext http, FiscalWebhookService service, CancellationToken ct) =>
+            (await service.RetryAsync(establishmentId, deliveryId, ct, Firm(http))).ToHttpResult());
+    }
+
+    private static Func<EndpointFilterInvocationContext, EndpointFilterDelegate, ValueTask<object?>> RequireKind(PartnerKind kind) =>
+        async (context, next) => Link(context.HttpContext).Kind == kind
+            ? await next(context)
+            : Results.Problem(
+                title: "partner.wrong_kind",
+                detail: kind == PartnerKind.Accounting ? "Esta área é do escritório contábil da empresa." : "Esta área é da software house da empresa.",
+                statusCode: StatusCodes.Status403Forbidden);
 
     public static bool IsAccountant(this ClaimsPrincipal user) => user.FindFirstValue("role") == JwtTokenIssuer.AccountantRole;
 

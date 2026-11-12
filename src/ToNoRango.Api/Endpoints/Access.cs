@@ -63,7 +63,9 @@ internal static class Access
 
     public static string Actor(this HttpContext context) =>
         context.User.FindFirstValue(JwtRegisteredClaimNames.Email) is { } email
-            ? context.User.FindFirstValue("role") == JwtTokenIssuer.AccountantRole ? $"Contador: {email}" : email
+            ? context.User.FindFirstValue("role") == JwtTokenIssuer.AccountantRole
+                ? context.User.FindFirstValue(JwtTokenIssuer.PartnerKindClaim) == "SoftwareHouse" ? $"Software house: {email}" : $"Contador: {email}"
+                : email
             : "plataforma";
 
     public static async ValueTask<object?> RequireTenantAccess(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
@@ -145,7 +147,7 @@ public sealed class JwtTokenIssuer(IConfiguration configuration) : ITokenIssuer
 {
     private static readonly TimeSpan Lifetime = TimeSpan.FromHours(10);
 
-    public (string Token, DateTimeOffset ExpiresAt) IssueAccountant(Guid userId, Guid firmId, string name, string email)
+    public (string Token, DateTimeOffset ExpiresAt) IssueAccountant(Guid userId, Guid firmId, string name, string email, string kind)
     {
         var expiresAt = DateTimeOffset.UtcNow.Add(Lifetime);
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["Jwt:Key"]!));
@@ -162,7 +164,8 @@ public sealed class JwtTokenIssuer(IConfiguration configuration) : ITokenIssuer
                 [JwtRegisteredClaimNames.Email] = email,
                 [JwtRegisteredClaimNames.Name] = name,
                 ["role"] = AccountantRole,
-                [AccountantFirmClaim] = firmId.ToString()
+                [AccountantFirmClaim] = firmId.ToString(),
+                [PartnerKindClaim] = kind
             }
         });
 
@@ -171,6 +174,7 @@ public sealed class JwtTokenIssuer(IConfiguration configuration) : ITokenIssuer
 
     public const string AccountantRole = "Accountant";
     public const string AccountantFirmClaim = "accountant_firm";
+    public const string PartnerKindClaim = "partner_kind";
 
     public (string Token, DateTimeOffset ExpiresAt) Issue(Guid userId, Guid tenantId, string name, string email, string role, string? velosoSession = null)
     {

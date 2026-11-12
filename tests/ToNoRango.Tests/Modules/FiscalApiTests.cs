@@ -229,7 +229,7 @@ public class FiscalApiTests
         var deliveries = new MemoryRepository<FiscalWebhookDelivery>();
         var documents = new MemoryRepository<FiscalDocument>();
         var keys = new FiscalApiKeyService(new MemoryRepository<FiscalApiKey>(), Substitute.For<IUnitOfWork>(), TimeProvider.System);
-        var service = new FiscalWebhookService(new MemoryRepository<FiscalWebhook>(), deliveries, documents, keys, sender, protector, Substitute.For<IUnitOfWork>(), TimeProvider.System);
+        var service = new FiscalWebhookService(new MemoryRepository<FiscalWebhook>(), deliveries, documents, new MemoryRepository<AccountantFirm>(), keys, sender, protector, Substitute.For<IUnitOfWork>(), TimeProvider.System);
         return (service, deliveries, documents);
     }
 
@@ -329,5 +329,21 @@ public class FiscalApiTests
         FiscalWebhookSender.IsPublic(IPAddress.Parse("8.8.8.8")).ShouldBeTrue();
         FiscalWebhookSender.IsPublic(IPAddress.Parse("172.20.0.3")).ShouldBeFalse();
         FiscalWebhookSender.IsPublic(IPAddress.Parse("::ffff:10.0.0.1")).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Software_house_ve_e_revoga_so_as_proprias_chaves()
+    {
+        var repository = new MemoryRepository<FiscalApiKey>();
+        var service = new FiscalApiKeyService(repository, Substitute.For<IUnitOfWork>(), TimeProvider.System);
+        var partner = Guid.NewGuid();
+        await service.CreateAsync(Tenant, Store, new CreateApiKeyRequest("Da loja", true, true), "dono", CancellationToken.None);
+        var mine = await service.CreateAsync(Tenant, Store, new CreateApiKeyRequest("Do parceiro", true, true), "dev", CancellationToken.None, partner);
+        var storeKey = (await service.ListAsync(Store, CancellationToken.None)).Single(key => key.PartnerFirmId == null);
+
+        (await service.ListAsync(Store, CancellationToken.None, partner)).Single().Id.ShouldBe(mine.Value.Key.Id);
+        (await service.RevokeAsync(Store, storeKey.Id, CancellationToken.None, partner)).IsFailure.ShouldBeTrue();
+        (await service.RevokeAsync(Store, mine.Value.Key.Id, CancellationToken.None, partner)).IsSuccess.ShouldBeTrue();
+        (await service.RevokeAsync(Store, storeKey.Id, CancellationToken.None)).IsSuccess.ShouldBeTrue();
     }
 }
