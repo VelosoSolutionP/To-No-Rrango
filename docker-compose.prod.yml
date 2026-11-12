@@ -19,6 +19,35 @@ services:
       # Consulta de produtos por código de barras; sem usuário, o botão avisa que não está configurado.
       Gtin__Username: "${TNR_GTIN_USUARIO:-}"
       Gtin__Password: "${TNR_GTIN_SENHA:-}"
+      # Com o container fiscal ligado, só ele envia os webhooks: TNR_FISCAL_WORKER_NA_API=false no .env.
+      FiscalApi__RunWorker: "${TNR_FISCAL_WORKER_NA_API:-true}"
+
+  # Camada fiscal do ZEST num container próprio (mesma imagem, papel "fiscal"): API fiscal, portal de
+  # parceiros e webhooks. Só sobe com: docker compose ... --profile fiscal up -d --build fiscal
+  # O túnel manda /api/fiscal/v1 e /api/accountant para cá (veja docs/FISCAL-CONTAINER.md).
+  fiscal:
+    profiles: ["fiscal"]
+    build:
+      context: .
+      dockerfile: src/ToNoRango.Api/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8090:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      App__Role: fiscal
+      Database__MigrateOnStartup: "false"
+      ConnectionStrings__Postgres: "Host=postgres;Port=5432;Database=tonorango;Username=tonorango;Password=tonorango"
+      ConnectionStrings__Redis: "redis:6379"
+      Jwt__Key: "${TNR_JWT_KEY:-}"
+      Security__EncryptionKey: "${TNR_ENCRYPTION_KEY:-}"
+      Admin__ApiKey: "${TNR_ADMIN_KEY:?defina TNR_ADMIN_KEY no .env}"
+      App__PublicWebUrl: "https://to-no-rango.velososolution.com.br"
+      App__PublicApiUrl: "https://to-no-rango.velososolution.com.br"
+      Cors__AllowedOrigins__0: "https://to-no-rango.velososolution.com.br"
+      Network__TrustForwardedHeaders: "true"
+    depends_on:
+      - api
 
   web:
     build:

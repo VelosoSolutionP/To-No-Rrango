@@ -106,6 +106,10 @@ builder.Services.AddOpenApi(options => options.AddDocumentTransformer((document,
 
 var app = builder.Build();
 
+// "fiscal": the same image serves only the ZEST fiscal layer (fiscal API, partner portal and webhooks),
+// as its own container. "all" (default) is the whole To No Rango.
+var fiscalOnly = string.Equals(app.Configuration["App:Role"], "fiscal", StringComparison.OrdinalIgnoreCase);
+
 // Fails at startup, not at the first credential saved by a customer.
 app.Services.GetRequiredService<ISecretProtector>();
 
@@ -115,7 +119,8 @@ if (app.Configuration.GetValue("Network:TrustForwardedHeaders", false))
 }
 
 // Production turns this on in docker-compose.prod.yml, so a deploy never runs new code on an old schema.
-if (app.Environment.IsDevelopment() || app.Configuration.GetValue("Database:MigrateOnStartup", false))
+// The fiscal container never migrates: the main API owns the schema, two migrators would race.
+if (!fiscalOnly && (app.Environment.IsDevelopment() || app.Configuration.GetValue("Database:MigrateOnStartup", false)))
 {
     using var scope = app.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<ToNoRangoDbContext>();
@@ -154,14 +159,18 @@ if (app.Environment.IsDevelopment() || app.Configuration["OpenApi:Exposed"] == "
         .AllowAnonymous();
 }
 
-app.MapPublicEndpoints();
-app.MapAdminEndpoints();
-app.MapAuthEndpoints();
-app.MapVelosoIdEndpoints();
-app.MapPlatformEndpoints();
-app.MapModuleEndpoints();
-app.MapOperationEndpoints();
-app.MapWebhookEndpoints();
+if (!fiscalOnly)
+{
+    app.MapPublicEndpoints();
+    app.MapAdminEndpoints();
+    app.MapAuthEndpoints();
+    app.MapVelosoIdEndpoints();
+    app.MapPlatformEndpoints();
+    app.MapModuleEndpoints();
+    app.MapOperationEndpoints();
+    app.MapWebhookEndpoints();
+}
+
 app.MapFiscalApiEndpoints();
 app.MapAccountantEndpoints();
 

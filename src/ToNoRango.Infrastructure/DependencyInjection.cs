@@ -87,7 +87,13 @@ public static class DependencyInjection
 
         services.AddScoped<ToNoRango.Application.Fiscal.IFiscalGateway, AcbrFiscalGateway>();
 
-        services.AddHostedService<OutboxWorker>();
+        // The fiscal container (App:Role = fiscal) runs only the fiscal webhooks; store work stays in the main API.
+        var fiscalOnly = string.Equals(configuration["App:Role"], "fiscal", StringComparison.OrdinalIgnoreCase);
+
+        if (!fiscalOnly)
+        {
+            services.AddHostedService<OutboxWorker>();
+        }
 
         var gtin = configuration.GetSection(Integrations.GtinOptions.SectionName).Get<Integrations.GtinOptions>() ?? new Integrations.GtinOptions();
         services.AddSingleton(gtin);
@@ -99,7 +105,10 @@ public static class DependencyInjection
             client.DefaultRequestHeaders.UserAgent.ParseAdd("VelosoSolution-Client/1.0");
             client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
         });
-        services.AddHostedService<Integrations.GtinImportWorker>();
+        if (!fiscalOnly)
+        {
+            services.AddHostedService<Integrations.GtinImportWorker>();
+        }
 
         var fiscalApi = configuration.GetSection(Integrations.FiscalApiOptions.SectionName).Get<Integrations.FiscalApiOptions>() ?? new Integrations.FiscalApiOptions();
         services.AddSingleton(fiscalApi);
@@ -109,7 +118,11 @@ public static class DependencyInjection
                 client.DefaultRequestHeaders.UserAgent.ParseAdd("ZEST-Fiscal-Webhook/1.0");
             })
             .ConfigurePrimaryHttpMessageHandler(() => Integrations.FiscalWebhookSender.CreateHandler(fiscalApi));
-        services.AddHostedService<Integrations.FiscalWebhookWorker>();
+        // Only one process may send webhooks: with the fiscal container up, the main API sets FiscalApi:RunWorker=false.
+        if (fiscalOnly || configuration.GetValue("FiscalApi:RunWorker", true))
+        {
+            services.AddHostedService<Integrations.FiscalWebhookWorker>();
+        }
 
         services.AddSingleton(configuration.GetSection(Fiscal.NfseOptions.SectionName).Get<Fiscal.NfseOptions>() ?? new Fiscal.NfseOptions());
         services.AddSingleton<ToNoRango.Application.Fiscal.INfseGateway, Fiscal.NationalNfseGateway>();
