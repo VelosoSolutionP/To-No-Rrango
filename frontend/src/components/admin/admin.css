@@ -1773,3 +1773,12 @@
 .vx.fx-gate { display: block; min-height: 100vh; }
 .vx.fx-gate .fx-portal-login { width: min(560px, 92vw); margin: 0 auto; padding-top: 8vh; }
 .vx button.vx-brand { text-align: left; width: 100%; background: none; border: 0; cursor: pointer; }
+
+/* Integration hub. */
+.vx .fx-hub { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.9rem; margin-bottom: 1.2rem; }
+.vx .fx-hub-card { display: grid; gap: 0.5rem; align-content: space-between; }
+.vx .fx-hub-card header, .vx .fx-hub-card footer { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+.vx .fx-hub-card h3 { margin: 0; font-size: 1rem; }
+.vx .fx-hub-card p { margin: 0; }
+.vx .fx-hub-card.is-bad { border-color: var(--danger, #ef4444); }
+.vx .fx-hub-card.is-warn { border-color: var(--warning, #f59e0b); }

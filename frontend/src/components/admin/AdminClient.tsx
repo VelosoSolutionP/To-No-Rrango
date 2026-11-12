@@ -39,12 +39,13 @@ import { Kitchen } from "./modules/Kitchen";
 import { Overview } from "./modules/Overview";
 import { Pdv } from "./modules/Pdv";
 import { ZestIa } from "./modules/ZestIa";
+import { Integrations } from "./modules/Integrations";
 import { Customers, Suppliers } from "./modules/Parties";
 import { Products } from "./modules/Products";
 import { Icon } from "./Icon";
 import { Settings } from "./modules/Settings";
 
-type Tab = "overview" | "orders" | "kitchen" | "pdv" | "distribution" | "products" | "menu" | "customers" | "suppliers" | "inventory" | "finance" | "fiscal" | "reports" | "zest" | "settings";
+type Tab = "overview" | "orders" | "kitchen" | "pdv" | "distribution" | "products" | "menu" | "customers" | "suppliers" | "inventory" | "finance" | "fiscal" | "reports" | "zest" | "integrations" | "settings";
 
 const roleName: Record<UserRole, string> = { Owner: "Dono", Manager: "Gerente", Attendant: "Atendente", Kitchen: "Cozinha" };
 
@@ -66,6 +67,7 @@ const tabs: Array<{ id: Tab; group: string; label: string; roles: UserRole[]; mo
   { id: "fiscal", group: "Gestão", label: "Fiscal", roles: management, modules: ["fiscal", "fiscal_nfce"] },
   { id: "reports", group: "Gestão", label: "Relatórios", roles: management, modules: ["pedidos"], locked: true },
   { id: "zest", group: "Inteligência", label: "ZEST IA", roles: management, modules: ["ia"] },
+  { id: "integrations", group: "Ajustes", label: "Integrações", roles: management },
   { id: "settings", group: "Ajustes", label: "Configurações", roles: management },
 ];
 
@@ -83,7 +85,7 @@ const products: Array<{ id: Product; label: string; icon: string }> = [
 const tabIcons: Record<Tab, string> = {
   overview: "overview", orders: "orders", kitchen: "kitchen", pdv: "pos", distribution: "truck",
   products: "box", menu: "menu", customers: "customers", suppliers: "parties",
-  inventory: "inventory", finance: "finance", fiscal: "fiscal", reports: "reports", zest: "zest", settings: "settings",
+  inventory: "inventory", finance: "finance", fiscal: "fiscal", reports: "reports", zest: "zest", integrations: "plug", settings: "settings",
 };
 
 function messageOf(error: unknown): string {
@@ -668,6 +670,9 @@ export function AdminClient() {
               />
             ) : null}
             {tab === "finance" && hasEstablishment && http ? <Finance establishmentId={selectedId} http={http} /> : null}
+            {tab === "integrations" && hasEstablishment && http ? (
+              <Integrations establishmentId={selectedId} http={http} modules={session.modules} onOpen={(target) => goTo(target as Tab)} />
+            ) : null}
 
             {tab === "settings" ? (
               <Settings

@@ -101,6 +101,10 @@ internal static class ModuleEndpoints
         }).DisableAntiforgery();
 
         MapUsers(admin.MapGroup("/users").RequireRoles(UserRole.Owner));
+
+        // Integration hub: every connection of the store and its health, in one read.
+        admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).MapGet($"{Establishment}/integrations", async (Guid establishmentId, ToNoRango.Application.Integrations.IntegrationHubService service, CancellationToken ct) =>
+            Results.Ok(await service.GetAsync(establishmentId, ct)));
         MapDelivery(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).RequireModule(Modules.Pedidos));
         MapCouriers(admin.MapGroup(string.Empty).RequireModule(Modules.Rastreio));
         MapPayments(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).RequireModule(Modules.Pagamentos));
