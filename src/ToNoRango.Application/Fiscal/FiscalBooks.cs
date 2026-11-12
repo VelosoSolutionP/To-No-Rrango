@@ -31,7 +31,7 @@ public sealed class FiscalNoteSource(IRepository<PurchaseEntry> purchases, IRepo
         var issuedFrom = new DateTimeOffset(start.AddDays(-2).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
         var issuedTo = new DateTimeOffset(end.AddDays(2).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
         var issued = await documents.ListAsync(
-            item => item.EstablishmentId == establishmentId && item.Status == FiscalDocumentStatus.Authorized && item.CreatedAt >= issuedFrom && item.CreatedAt <= issuedTo,
+            item => item.EstablishmentId == establishmentId && !item.IsSimulation && item.Status == FiscalDocumentStatus.Authorized && item.CreatedAt >= issuedFrom && item.CreatedAt <= issuedTo,
             item => item.Number,
             cancellationToken,
             take: 20000);

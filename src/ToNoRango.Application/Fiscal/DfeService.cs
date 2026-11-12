@@ -312,9 +312,11 @@ public sealed class DfeService(
                 return Result<FiscalDocumentDto>.Failure(AppErrors.Conflict("fiscal.not_cancellable", "Só uma nota autorizada pode ser cancelada."));
             }
 
-            var answer = await emitter.CancelAsync(
-                new DfeCancel(document.Model, document.Environment, profile.State, profile.Cnpj, document.AccessKey, document.Protocol, reason, Credentials(profile)),
-                CancellationToken.None);
+            var answer = document.IsSimulation
+                ? new DfeEventResult(true, "Simulação.", FiscalDocument.SimulatedProtocol)
+                : await emitter.CancelAsync(
+                    new DfeCancel(document.Model, document.Environment, profile.State, profile.Cnpj, document.AccessKey, document.Protocol, reason, Credentials(profile)),
+                    CancellationToken.None);
 
             if (!answer.Accepted)
             {
@@ -432,6 +434,108 @@ public sealed class DfeService(
         return null;
     }
 
+    /// <summary>
+    /// Note asked by a partner system through the fiscal API. The external id makes it idempotent:
+    /// the same id never creates a second note, it returns the one already issued. A test key
+    /// simulates the authorization without the SEFAZ and without touching the store's numbering.
+    /// </summary>
+    public Task<Result<FiscalDocumentDto>> IssueExternalAsync(Guid establishmentId, ApiNoteRequest request, bool simulate, CancellationToken cancellationToken) =>
+        Guarded.RunAsync<FiscalDocumentDto>(async () =>
+        {
+            var error = FiscalApiRules.Validate(request);
+
+            if (error is not null)
+            {
+                return Result<FiscalDocumentDto>.Failure(AppErrors.Validation(error));
+            }
+
+            var profile = await RequireProfileAsync(establishmentId, cancellationToken);
+            var orderId = FiscalApiRules.DocumentKey(establishmentId, request.ExternalId, simulate);
+            var existing = await documents.FirstOrDefaultAsync(item => item.OrderId == orderId && item.Model == request.Model, cancellationToken);
+
+            if (existing is { Status: FiscalDocumentStatus.Authorized or FiscalDocumentStatus.Contingency or FiscalDocumentStatus.Cancelled })
+            {
+                return FiscalService.ToDto(existing);
+            }
+
+            var total = request.Lines.Sum(line => line.TotalInCents + line.FreightInCents - line.DiscountInCents);
+            var now = clock.GetUtcNow();
+            var nfe = request.Model == FiscalDocument.NfeModel;
+            var key = request.ReferencedKey is null ? null : new string(request.ReferencedKey.Where(char.IsAsciiDigit).ToArray());
+            var recipient = request.Recipient;
+            var recipientDocument = recipient is null ? null : new string(recipient.Document.Where(char.IsAsciiDigit).ToArray());
+            var document = existing;
+
+            if (document is null)
+            {
+                int series, number;
+
+                if (simulate)
+                {
+                    // Own series and sequence: the store's real numbering never gets a hole from a test.
+                    series = FiscalApiRules.SimulationSeries;
+                    number = await documents.CountAsync(item => item.EstablishmentId == establishmentId && item.Model == request.Model && item.IsSimulation, cancellationToken) + 1;
+                }
+                else
+                {
+                    series = nfe ? profile.NfeSeries : profile.Series;
+                    number = nfe ? profile.TakeNfeNumber() : profile.TakeNumber();
+                }
+
+                document = new FiscalDocument(
+                    profile.TenantId, establishmentId, orderId, request.ExternalId.Trim(), series, number, simulate ? 2 : profile.Environment, total, now,
+                    request.Model, recipientDocument, recipient?.Name.Trim() is { } name ? name[..Math.Min(name.Length, 60)] : null, request.Purpose, key);
+                documents.Add(document);
+            }
+            else
+            {
+                document.Restart(simulate ? 2 : profile.Environment, total, now);
+            }
+
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+
+            if (simulate)
+            {
+                document.Simulate(FiscalApiRules.SimulatedAccessKey(profile, document, now), clock.GetUtcNow());
+                await unitOfWork.SaveChangesAsync(CancellationToken.None);
+                return FiscalService.ToDto(document);
+            }
+
+            var issue = new DfeIssue(
+                request.Model, document.Environment, document.Series, document.Number, document.NumericCode, now,
+                new DfeIssuer(profile.Cnpj, profile.LegalName, profile.TradeName, profile.StateRegistration, profile.Street, profile.Number, profile.District, profile.CityIbgeCode, profile.City, profile.State, profile.PostalCode),
+                recipient is null
+                    ? null
+                    : new DfeRecipient(recipientDocument!, recipient.Name, recipient.StateRegistration, recipient.Street, recipient.Number, recipient.District, recipient.CityIbgeCode, recipient.City, recipient.State, recipient.PostalCode, recipient.Email),
+                request.Lines.Select(line => new DfeLine(
+                    line.Code, line.Description, line.Quantity, line.TotalInCents, line.FreightInCents, line.DiscountInCents,
+                    line.Ncm, line.Cfop, string.IsNullOrWhiteSpace(line.Cest) ? null : line.Cest, line.IcmsCst, line.IcmsRate, line.PisCofinsCst, line.PisRate, line.CofinsRate, true)).ToList(),
+                (request.Payments ?? []).Select(payment => new DfePayment(FiscalApiRules.PaymentKind(payment.Method), payment.AmountInCents)).ToList(),
+                request.IsDelivery,
+                request.AdditionalInfo,
+                Credentials(profile),
+                Purpose: request.Purpose,
+                Nature: string.IsNullOrWhiteSpace(request.Nature) ? null : request.Nature.Trim(),
+                ReferencedKeys: key is null ? null : [key],
+                IsEntry: request.IsEntry,
+                FinalConsumer: !nfe || request.FinalConsumer);
+
+            var result = await emitter.AuthorizeAsync(issue, CancellationToken.None);
+
+            if (result.Outcome == DfeOutcome.Unanswered && !nfe)
+            {
+                var offline = emitter.Sign(issue with { OfflineContingency = true, ContingencyAt = now, ContingencyReason = "SEFAZ SEM RESPOSTA NO MOMENTO DA VENDA" });
+                document.MarkContingency(offline.AccessKey!, offline.Xml!, $"Emitida em contingência: {result.Message}. Envie em até 24 horas.", clock.GetUtcNow());
+            }
+            else
+            {
+                Apply(document, result);
+            }
+
+            await unitOfWork.SaveChangesAsync(CancellationToken.None);
+            return FiscalService.ToDto(document);
+        });
+
     /// <summary>Carta de correção (CC-e) de uma NF-e autorizada. Não corrige valores, impostos, partes nem datas.</summary>
     public Task<Result<FiscalDocumentDto>> CorrectAsync(Guid establishmentId, Guid documentId, CorrectionRequest request, CancellationToken cancellationToken) =>
         Guarded.RunAsync<FiscalDocumentDto>(async () =>
@@ -457,9 +561,11 @@ public sealed class DfeService(
             }
 
             var sequence = document.CorrectionSequence + 1;
-            var answer = await emitter.CorrectAsync(
-                new DfeCorrection(document.Environment, profile.State, profile.Cnpj, document.AccessKey, sequence, text, Credentials(profile)),
-                CancellationToken.None);
+            var answer = document.IsSimulation
+                ? new DfeEventResult(true, "Simulação.", FiscalDocument.SimulatedProtocol)
+                : await emitter.CorrectAsync(
+                    new DfeCorrection(document.Environment, profile.State, profile.Cnpj, document.AccessKey, sequence, text, Credentials(profile)),
+                    CancellationToken.None);
 
             if (!answer.Accepted)
             {

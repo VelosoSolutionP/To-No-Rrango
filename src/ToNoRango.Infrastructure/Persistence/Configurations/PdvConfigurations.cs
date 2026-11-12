@@ -146,3 +146,56 @@ public sealed class FiscalAuditEntryConfiguration : IEntityTypeConfiguration<ToN
         builder.HasIndex(entry => entry.TenantId);
     }
 }
+
+public sealed class FiscalApiKeyConfiguration : IEntityTypeConfiguration<ToNoRango.Domain.Fiscal.FiscalApiKey>
+{
+    public void Configure(EntityTypeBuilder<ToNoRango.Domain.Fiscal.FiscalApiKey> builder)
+    {
+        builder.ToTable("api_keys", "fiscal");
+        builder.HasKey(key => key.Id);
+        builder.Property(key => key.Id).ValueGeneratedNever();
+        builder.Property(key => key.Name).HasMaxLength(60).IsRequired();
+        builder.Property(key => key.Prefix).HasMaxLength(16).IsRequired();
+        builder.Property(key => key.Hash).HasMaxLength(64).IsRequired();
+        builder.Property(key => key.CreatedBy).HasMaxLength(160).IsRequired();
+        builder.Ignore(key => key.IsActive);
+        builder.HasIndex(key => key.Hash).IsUnique();
+        builder.HasIndex(key => key.EstablishmentId);
+        builder.HasIndex(key => key.TenantId);
+    }
+}
+
+public sealed class FiscalWebhookConfiguration : IEntityTypeConfiguration<ToNoRango.Domain.Fiscal.FiscalWebhook>
+{
+    public void Configure(EntityTypeBuilder<ToNoRango.Domain.Fiscal.FiscalWebhook> builder)
+    {
+        builder.ToTable("webhooks", "fiscal");
+        builder.HasKey(webhook => webhook.Id);
+        builder.Property(webhook => webhook.Id).ValueGeneratedNever();
+        builder.Property(webhook => webhook.Url).HasMaxLength(500).IsRequired();
+        builder.Property(webhook => webhook.EncryptedSecret).HasMaxLength(500).IsRequired();
+        builder.Property(webhook => webhook.Subscribed).HasMaxLength(300).IsRequired();
+        builder.Ignore(webhook => webhook.SubscribedEvents);
+        builder.HasIndex(webhook => new { webhook.EstablishmentId, webhook.IsActive });
+        builder.HasIndex(webhook => webhook.TenantId);
+    }
+}
+
+public sealed class FiscalWebhookDeliveryConfiguration : IEntityTypeConfiguration<ToNoRango.Domain.Fiscal.FiscalWebhookDelivery>
+{
+    public void Configure(EntityTypeBuilder<ToNoRango.Domain.Fiscal.FiscalWebhookDelivery> builder)
+    {
+        builder.ToTable("webhook_deliveries", "fiscal");
+        builder.HasKey(delivery => delivery.Id);
+        builder.Property(delivery => delivery.Id).ValueGeneratedNever();
+        builder.Property(delivery => delivery.EventKey).HasMaxLength(120).IsRequired();
+        builder.Property(delivery => delivery.Event).HasMaxLength(40).IsRequired();
+        builder.Property(delivery => delivery.Payload).HasColumnType("text").IsRequired();
+        builder.Property(delivery => delivery.LastError).HasMaxLength(500);
+        // The same event never goes twice to the same webhook, even if two scans overlap.
+        builder.HasIndex(delivery => new { delivery.WebhookId, delivery.EventKey }).IsUnique();
+        builder.HasIndex(delivery => new { delivery.Status, delivery.NextAttemptAt });
+        builder.HasIndex(delivery => new { delivery.EstablishmentId, delivery.CreatedAt });
+        builder.HasIndex(delivery => delivery.TenantId);
+    }
+}

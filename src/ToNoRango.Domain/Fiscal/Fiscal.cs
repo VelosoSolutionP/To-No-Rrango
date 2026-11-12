@@ -378,6 +378,9 @@ public sealed class FiscalDocument : AggregateRoot
     /// <summary>finNFe: 1 normal, 2 complementar, 3 ajuste, 4 devolução.</summary>
     public int Purpose { get; private set; } = 1;
     public string? ReferencedKey { get; private set; }
+
+    /// <summary>Issued with a test key of the fiscal API: never sent to the SEFAZ and outside every book.</summary>
+    public bool IsSimulation { get; private set; }
     public string? CorrectionText { get; private set; }
     public string? CorrectionProtocol { get; private set; }
     public DateTimeOffset? CorrectedAt { get; private set; }
@@ -512,6 +515,20 @@ public sealed class FiscalDocument : AggregateRoot
         CorrectedAt = now;
         Xml = eventXml is null ? Xml : $"{Xml}\n<!-- carta de correcao {sequence} -->\n{eventXml}";
         UpdatedAt = now;
+    }
+
+    public const string SimulatedProtocol = "SIMULACAO";
+
+    /// <summary>A test-key note: authorized on the spot with a made-up key, nothing reaches the SEFAZ.</summary>
+    public void Simulate(string accessKey, DateTimeOffset now)
+    {
+        if (Environment != 2)
+        {
+            throw new InvalidOperationException("Nota simulada só existe em homologação.");
+        }
+
+        IsSimulation = true;
+        Authorize(accessKey, SimulatedProtocol, null, "Simulação: nada foi enviado à SEFAZ.", now);
     }
 
     public void MarkUnanswered(string message, DateTimeOffset now)

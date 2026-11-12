@@ -101,6 +101,16 @@ public static class DependencyInjection
         });
         services.AddHostedService<Integrations.GtinImportWorker>();
 
+        var fiscalApi = configuration.GetSection(Integrations.FiscalApiOptions.SectionName).Get<Integrations.FiscalApiOptions>() ?? new Integrations.FiscalApiOptions();
+        services.AddSingleton(fiscalApi);
+        services.AddHttpClient<ToNoRango.Application.Fiscal.IWebhookSender, Integrations.FiscalWebhookSender>(client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(10);
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("ZEST-Fiscal-Webhook/1.0");
+            })
+            .ConfigurePrimaryHttpMessageHandler(() => Integrations.FiscalWebhookSender.CreateHandler(fiscalApi));
+        services.AddHostedService<Integrations.FiscalWebhookWorker>();
+
         return services;
     }
 }

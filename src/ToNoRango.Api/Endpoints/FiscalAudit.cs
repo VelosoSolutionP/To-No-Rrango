@@ -30,14 +30,27 @@ internal static class FiscalAudit
         ("/files/efd-icms-ipi", "POST", FiscalAuditEntry.FileCategory, "EFD ICMS/IPI"),
         ("/files/efd-contribuicoes", "POST", FiscalAuditEntry.FileCategory, "EFD Contribuições"),
         ("/accountant-package", "POST", FiscalAuditEntry.FileCategory, "Pacote do contador"),
+        ("/v1/notes", "POST", "emissao", "Emitiu nota pela API"),
+        ("/fiscal/api/keys", "POST", "integracao", "Criou chave da API fiscal"),
+        ("/fiscal/api/keys/{keyId:guid}", "DELETE", "integracao", "Revogou chave da API fiscal"),
+        ("/fiscal/api/webhooks", "POST", "integracao", "Cadastrou webhook"),
+        ("/fiscal/api/webhooks/{webhookId:guid}", "DELETE", "integracao", "Removeu webhook"),
     ];
 
     public static async ValueTask<object?> Filter(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
         var http = context.HttpContext;
 
-        if (HttpMethods.IsGet(http.Request.Method) || Describe(http) is not { } label
-            || !Guid.TryParse(http.Request.RouteValues["establishmentId"]?.ToString(), out var establishmentId))
+        if (HttpMethods.IsGet(http.Request.Method) || Describe(http) is not { } label)
+        {
+            return await next(context);
+        }
+
+        // The fiscal API has no store in the route: the key says which store it is.
+        var establishmentId = http.FiscalCaller()?.EstablishmentId
+            ?? (Guid.TryParse(http.Request.RouteValues["establishmentId"]?.ToString(), out var routed) ? routed : Guid.Empty);
+
+        if (establishmentId == Guid.Empty)
         {
             return await next(context);
         }
@@ -81,16 +94,17 @@ internal static class FiscalAudit
             var service = scope.ServiceProvider.GetRequiredService<FiscalAuditService>();
             var clock = scope.ServiceProvider.GetRequiredService<TimeProvider>();
             var values = http.Request.RouteValues;
-            var target = new[] { "documentId", "orderId", "noteId", "menuItemId" }.Select(key => values[key]?.ToString()).FirstOrDefault(value => value is not null);
+            var caller = http.FiscalCaller();
+            var target = new[] { "documentId", "orderId", "noteId", "menuItemId", "keyId", "webhookId" }.Select(key => values[key]?.ToString()).FirstOrDefault(value => value is not null);
 
             await service.RecordAsync(
                 establishmentId,
-                http.Actor(),
+                caller?.Actor ?? http.Actor(),
                 label.Category,
                 label.Action,
                 target,
                 PeriodOf(arguments),
-                DetailsOf(arguments),
+                caller is { IsTest: true } ? $"Chave de teste (simulação). {DetailsOf(arguments)}".Trim() : DetailsOf(arguments),
                 status is >= 200 and < 300,
                 status,
                 clock.GetUtcNow(),
@@ -132,6 +146,12 @@ internal static class FiscalAudit
                     return $"Modelo {gap.Model}, série {gap.Series}, números {gap.FromNumber} a {gap.ToNumber}. Justificativa: {gap.Reason}";
                 case DfeSettingsRequest settings:
                     return $"Ambiente {(settings.Environment == 1 ? "produção" : "homologação")}, série NF-e {settings.NfeSeries}, próximo número {settings.NfeNextNumber}";
+                case ApiNoteRequest note:
+                    return $"Modelo {note.Model}, finalidade {note.Purpose}, id externo {note.ExternalId}";
+                case CreateApiKeyRequest key:
+                    return $"{key.Name}: {(key.IsTest ? "teste" : "produção")}, {(key.CanIssue ? "emite" : "só consulta")}";
+                case CreateWebhookRequest webhook:
+                    return $"{(Uri.TryCreate(webhook.Url, UriKind.Absolute, out var uri) ? uri.Host : "endereço inválido")}: {string.Join(", ", webhook.Events ?? [])}";
                 case AccountantPackageRequest package:
                     return $"SINTEGRA {(package.Sintegra ? "sim" : "não")}, SPED {(package.Sped ? "sim" : "não")}";
             }

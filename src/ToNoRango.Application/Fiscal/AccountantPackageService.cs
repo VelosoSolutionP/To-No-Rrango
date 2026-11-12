@@ -31,7 +31,7 @@ public sealed class AccountantPackageService(
 
             var start = new DateTimeOffset(request.Year, request.Month, 1, 0, 0, 0, TimeSpan.FromHours(-3));
             var end = start.AddMonths(1);
-            var issued = (await documents.ListAsync(item => item.EstablishmentId == establishmentId && item.CreatedAt >= start && item.CreatedAt < end, item => item.Number, cancellationToken, take: 100_000))
+            var issued = (await documents.ListAsync(item => item.EstablishmentId == establishmentId && !item.IsSimulation && item.CreatedAt >= start && item.CreatedAt < end, item => item.Number, cancellationToken, take: 100_000))
                 .Where(item => item.Xml is not null && item.Status is FiscalDocumentStatus.Authorized or FiscalDocumentStatus.Cancelled)
                 .ToList();
             var incoming = (await received.ListAsync(item => item.EstablishmentId == establishmentId && item.IssuedAt >= start && item.IssuedAt < end, item => item.IssuedAt, cancellationToken, take: 100_000))

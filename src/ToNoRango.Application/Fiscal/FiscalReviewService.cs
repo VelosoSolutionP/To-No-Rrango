@@ -122,7 +122,7 @@ public sealed class FiscalReviewService(
                 }
             }
 
-            var recent = await documents.ListAsync(item => item.EstablishmentId == establishmentId && item.CreatedAt >= now.AddDays(-45), item => item.CreatedAt, cancellationToken, descending: true, take: 2000);
+            var recent = await documents.ListAsync(item => item.EstablishmentId == establishmentId && !item.IsSimulation && item.CreatedAt >= now.AddDays(-45), item => item.CreatedAt, cancellationToken, descending: true, take: 2000);
 
             foreach (var note in recent.Where(item => item.Status == FiscalDocumentStatus.Rejected).Take(20))
             {

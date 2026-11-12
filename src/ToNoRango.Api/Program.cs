@@ -58,6 +58,11 @@ builder.Services.AddRateLimiter(options =>
     options.AddPolicy("public", context => FixedWindowByIp(context, 60));
     // ZEST relays every customer from one address, so it gets a larger window.
     options.AddPolicy("zest", context => FixedWindowByIp(context, 1200));
+    // Per key, not per address: a partner server calls for many stores from one IP.
+    options.AddPolicy(ToNoRango.Api.Endpoints.FiscalApiEndpoints.RateLimitPolicy, context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Request.Headers["X-Api-Key"].ToString() is { Length: >= 16 } key ? key[..16] : context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = 300, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 });
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
@@ -157,6 +162,7 @@ app.MapPlatformEndpoints();
 app.MapModuleEndpoints();
 app.MapOperationEndpoints();
 app.MapWebhookEndpoints();
+app.MapFiscalApiEndpoints();
 
 app.Run();
 

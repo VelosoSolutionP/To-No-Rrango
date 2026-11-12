@@ -127,7 +127,7 @@ public sealed class FiscalService(
             var items = await menuItems.ListAsync(item => item.EstablishmentId == establishmentId && item.IsActive, item => item.Name, cancellationToken);
             var taxes = (await productData.ListAsync(item => item.EstablishmentId == establishmentId, item => item.MenuItemId, cancellationToken, take: 2000))
                 .ToDictionary(item => item.MenuItemId);
-            var notes = await documents.ListAsync(item => item.EstablishmentId == establishmentId, item => item.CreatedAt, cancellationToken, descending: true, take: 100);
+            var notes = await documents.ListAsync(item => item.EstablishmentId == establishmentId && !item.IsSimulation, item => item.CreatedAt, cancellationToken, descending: true, take: 100);
             var paid = await orderList.ListAsync(
                 item => item.EstablishmentId == establishmentId && item.PaymentStatus == PaymentStatus.Paid && item.Status != OrderStatus.Cancelled,
                 item => item.CreatedAt,

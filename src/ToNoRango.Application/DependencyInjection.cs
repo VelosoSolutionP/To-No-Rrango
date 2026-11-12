@@ -49,6 +49,9 @@ public static class DependencyInjection
         services.AddScoped<FiscalNoteSource>();
         services.AddScoped<FiscalBooksService>();
         services.AddScoped<FiscalAuditService>();
+        services.AddScoped<FiscalApiKeyService>();
+        services.AddScoped<FiscalApiService>();
+        services.AddScoped<FiscalWebhookService>();
         services.AddScoped<ZestService>();
         services.AddScoped<ZestSalesService>();
         services.AddScoped<MediaService>();
