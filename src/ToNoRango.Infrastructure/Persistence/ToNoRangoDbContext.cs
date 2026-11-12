@@ -112,6 +112,7 @@ public sealed class ToNoRangoDbContext : DbContext
         ApplyTenantFilter<ToNoRango.Domain.Feedback.OrderRating>(modelBuilder);
         ApplyTenantFilter<KnowledgeGap>(modelBuilder);
         ApplyTenantFilter<FiscalNumberGap>(modelBuilder);
+        ApplyTenantFilter<FiscalAuditEntry>(modelBuilder);
         ApplyTenantFilter<ReceivedNote>(modelBuilder);
         ApplyTenantFilter<ZestConnection>(modelBuilder);
         ApplyTenantFilter<ToNoRango.Domain.Media.MediaFile>(modelBuilder);

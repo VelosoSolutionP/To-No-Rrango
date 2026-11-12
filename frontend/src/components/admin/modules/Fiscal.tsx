@@ -2,6 +2,7 @@
 
 import { type FormEvent, useState } from "react";
 import { formatBRL, type AdminHttp } from "@/lib/admin-api";
+import { FiscalBooksView, FiscalHistoryView } from "./FiscalBooks";
 import { Empty, ErrorMessage, Input, ModuleHeading, SubTabs, text, toCents, toDecimal, useAction, useLoad } from "./shared";
 import { openDanfe } from "./danfe";
 import { AccountantPackageView, ConsultingBanner, FiscalDatalists, FiscalReviewView, FiscalTablesView, ManualNoteForm, type ManualDraft, ReceivedNotesView, useFiscalTables } from "./FiscalExtras";
@@ -165,7 +166,7 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory, draft 
   const hasSintegra = hasNfce && modules.includes("fiscal_sintegra");
   const hasSped = hasNfce && modules.includes("fiscal_sped");
   const [warnings, setWarnings] = useState<string[]>([]);
-  const [view, setView] = useState<"issue" | "review" | "received" | "manual" | "closing" | "config" | "products" | "duties" | "entries" | "tables">(draft && hasNfce ? "manual" : hasNfce ? "issue" : "entries");
+  const [view, setView] = useState<"issue" | "review" | "received" | "manual" | "closing" | "config" | "products" | "duties" | "entries" | "books" | "history" | "tables">(draft && hasNfce ? "manual" : hasNfce ? "issue" : "entries");
   const tables = useFiscalTables(http, establishmentId);
   const base = `/establishments/${establishmentId}`;
   const purchases = useLoad(() => http.get<Purchase[]>(`${base}/purchases`).catch(() => []), [establishmentId]);
@@ -388,7 +389,7 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory, draft 
         options={[
           ...(hasNfce ? [{ value: "issue" as const, label: "Emitir" }, { value: "review" as const, label: "Conferência IA" }, { value: "received" as const, label: "Notas recebidas" }, { value: "manual" as const, label: "Devolução e ajuste" }, { value: "closing" as const, label: "Fechamento do contador" }, { value: "config" as const, label: "Configuração" }, { value: "products" as const, label: "Tributação dos produtos" }] : []),
           ...(hasNfce ? [{ value: "duties" as const, label: "Obrigações e inutilização" }] : []),
-          ...(hasEntry ? [{ value: "entries" as const, label: "Notas de entrada" }] : []),
+          ...(hasEntry ? [{ value: "entries" as const, label: "Notas de entrada" }, { value: "books" as const, label: "Apuração e livros" }, { value: "history" as const, label: "Histórico e auditoria" }] : []),
           { value: "tables" as const, label: "Tabelas CFOP e CST" },
         ]}
         value={view}
@@ -399,6 +400,8 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory, draft 
       {view === "review" && hasNfce ? <FiscalReviewView establishmentId={establishmentId} http={http} /> : null}
       {view === "closing" && hasNfce ? <AccountantPackageView establishmentId={establishmentId} http={http} /> : null}
       {view === "tables" ? <FiscalTablesView tables={tables.data ?? null} /> : null}
+      {view === "books" && hasEntry ? <FiscalBooksView establishmentId={establishmentId} http={http} /> : null}
+      {view === "history" && hasEntry ? <FiscalHistoryView establishmentId={establishmentId} http={http} /> : null}
 
       {view === "config" && data ? (
         <article className="card vx-box">

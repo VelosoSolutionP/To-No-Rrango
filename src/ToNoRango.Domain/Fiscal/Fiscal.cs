@@ -686,3 +686,47 @@ public sealed class ReceivedNote : AggregateRoot
         UpdatedAt = now;
     }
 }
+
+/// <summary>
+/// Who did what in the fiscal area and when: emission, cancellation, correction, number gaps,
+/// certificate, files for the tax authority and the accountant package. Never updated, never deleted.
+/// </summary>
+public sealed class FiscalAuditEntry : AggregateRoot
+{
+    public const string FileCategory = "arquivo";
+
+    public Guid TenantId { get; private set; }
+    public Guid EstablishmentId { get; private set; }
+    public DateTimeOffset At { get; private set; }
+    public string Actor { get; private set; } = string.Empty;
+    public string Category { get; private set; } = string.Empty;
+    public string Action { get; private set; } = string.Empty;
+    public string? Target { get; private set; }
+
+    /// <summary>Competence (yyyy-MM) when the operation refers to a month.</summary>
+    public string? Period { get; private set; }
+    public string? Details { get; private set; }
+    public bool Succeeded { get; private set; }
+    public int StatusCode { get; private set; }
+
+    private FiscalAuditEntry() { }
+
+    public FiscalAuditEntry(Guid tenantId, Guid establishmentId, DateTimeOffset at, string actor, string category, string action, string? target, string? period, string? details, bool succeeded, int statusCode)
+    {
+        Id = GuidV7.New();
+        TenantId = Ensure.NotEmpty(tenantId, nameof(TenantId));
+        EstablishmentId = Ensure.NotEmpty(establishmentId, nameof(EstablishmentId));
+        At = at;
+        Actor = Clip(string.IsNullOrWhiteSpace(actor) ? "desconhecido" : actor.Trim(), 160)!;
+        Category = Clip(Ensure.NotNullOrWhiteSpace(category, nameof(category)).Trim(), 40)!;
+        Action = Clip(Ensure.NotNullOrWhiteSpace(action, nameof(action)).Trim(), 120)!;
+        Target = Clip(target, 120);
+        Period = Clip(period, 7);
+        Details = Clip(details, 1000);
+        Succeeded = succeeded;
+        StatusCode = statusCode;
+    }
+
+    private static string? Clip(string? value, int max) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Length <= max ? value : value[..max];
+}

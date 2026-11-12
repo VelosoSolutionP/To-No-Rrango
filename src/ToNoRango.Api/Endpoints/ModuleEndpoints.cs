@@ -108,9 +108,9 @@ internal static class ModuleEndpoints
         MapInventory(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).RequireModule(Modules.Estoque));
         MapFinance(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).RequireModule(Modules.Financeiro));
         MapReports(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).RequireModule(Modules.Relatorios));
-        MapFiscal(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).RequireModule(Modules.Fiscal));
-        MapFiscalNfce(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).RequireModule(Modules.FiscalNfce));
-        var fiscalManagers = admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager);
+        MapFiscal(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).RequireModule(Modules.Fiscal).AddEndpointFilter(FiscalAudit.Filter));
+        MapFiscalNfce(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).RequireModule(Modules.FiscalNfce).AddEndpointFilter(FiscalAudit.Filter));
+        var fiscalManagers = admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).AddEndpointFilter(FiscalAudit.Filter);
         MapFiscalFile(fiscalManagers.MapGroup(string.Empty).RequireModule(Modules.FiscalSintegra), "sintegra", FiscalFileKind.Sintegra);
         MapFiscalFile(fiscalManagers.MapGroup(string.Empty).RequireModule(Modules.FiscalSped), "efd-icms-ipi", FiscalFileKind.EfdIcmsIpi);
         MapFiscalFile(fiscalManagers.MapGroup(string.Empty).RequireModule(Modules.FiscalSped), "efd-contribuicoes", FiscalFileKind.EfdContribuicoes);
@@ -307,6 +307,19 @@ internal static class ModuleEndpoints
     {
         group.MapPost($"{Establishment}/nfe/preview", async (Guid establishmentId, NfeXmlRequest request, NfeImportService service, CancellationToken ct) =>
             (await service.PreviewAsync(establishmentId, request, ct)).ToHttpResult());
+
+        // Register of entries and exits, tax assessment, months and audit: conference for the accountant.
+        group.MapGet($"{Establishment}/fiscal/book", async (Guid establishmentId, int year, int month, FiscalBooksService service, CancellationToken ct) =>
+            (await service.GetBookAsync(establishmentId, new FiscalPeriodRequest(year, month), ct)).ToHttpResult());
+
+        group.MapGet($"{Establishment}/fiscal/assessment", async (Guid establishmentId, int year, int month, long? previousIcmsCredit, FiscalBooksService service, CancellationToken ct) =>
+            (await service.GetAssessmentAsync(establishmentId, new FiscalPeriodRequest(year, month, previousIcmsCredit ?? 0), ct)).ToHttpResult());
+
+        group.MapGet($"{Establishment}/fiscal/periods", async (Guid establishmentId, int? months, FiscalBooksService service, TimeProvider clock, CancellationToken ct) =>
+            Results.Ok(await service.GetPeriodsAsync(establishmentId, months ?? 12, DateOnly.FromDateTime(clock.GetLocalNow().DateTime), ct)));
+
+        group.MapGet($"{Establishment}/fiscal/audit", async (Guid establishmentId, int? take, FiscalBooksService service, CancellationToken ct) =>
+            Results.Ok(await service.GetAuditAsync(establishmentId, take ?? 200, ct)));
     }
 
     private static void MapFiscalFile(RouteGroupBuilder group, string route, FiscalFileKind kind) =>

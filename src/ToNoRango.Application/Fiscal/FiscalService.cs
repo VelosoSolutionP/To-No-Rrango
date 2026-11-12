@@ -112,9 +112,9 @@ public sealed class FiscalService(
     IRepository<FiscalProfile> profiles,
     IRepository<ProductFiscalData> productData,
     IRepository<FiscalDocument> documents,
-    IRepository<ToNoRango.Domain.Inventory.PurchaseEntry> purchases,
     IFiscalGateway gateway,
     DfeService dfe,
+    FiscalNoteSource noteSource,
     IUnitOfWork unitOfWork,
     TimeProvider clock)
 {
@@ -357,41 +357,7 @@ public sealed class FiscalService(
             var start = new DateOnly(request.Year, request.Month, 1);
             var end = start.AddMonths(1).AddDays(-1);
             var warnings = new List<string>();
-            var notes = new List<FiscalNote>();
-
-            var bought = await purchases.ListAsync(item => item.EstablishmentId == establishmentId && item.IssuedOn >= start && item.IssuedOn <= end, item => item.IssuedOn, cancellationToken, take: 5000);
-            var withoutXml = bought.Count(item => item.NfeXml is null);
-
-            if (withoutXml > 0)
-            {
-                warnings.Add($"{withoutXml} compra(s) do período sem XML ficaram fora do arquivo.");
-            }
-
-            notes.AddRange(bought.Where(item => item.NfeXml is not null).Select(item => TryRead(item.NfeXml!, true, item.InvoiceNumber, warnings)).OfType<FiscalNote>());
-
-            var issuedFrom = new DateTimeOffset(start.AddDays(-2).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
-            var issuedTo = new DateTimeOffset(end.AddDays(2).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
-            var issued = await documents.ListAsync(
-                item => item.EstablishmentId == establishmentId && item.Status == FiscalDocumentStatus.Authorized && item.CreatedAt >= issuedFrom && item.CreatedAt <= issuedTo,
-                item => item.Number,
-                cancellationToken,
-                take: 20000);
-            var homologation = issued.Count(item => item.Environment == NfceIniBuilder.HomologationEnvironment);
-
-            if (homologation > 0)
-            {
-                warnings.Add($"{homologation} nota(s) de homologação ficaram fora: elas não têm valor fiscal.");
-            }
-
-            var production = issued.Where(item => item.Environment != NfceIniBuilder.HomologationEnvironment).ToList();
-            var noXml = production.Count(item => string.IsNullOrEmpty(item.Xml));
-
-            if (noXml > 0)
-            {
-                warnings.Add($"{noXml} NFC-e sem XML guardado ficaram fora do arquivo.");
-            }
-
-            notes.AddRange(production.Where(item => !string.IsNullOrEmpty(item.Xml)).Select(item => TryRead(item.Xml!, false, item.Number.ToString(), warnings)).OfType<FiscalNote>().Where(note => note.IssuedOn >= start && note.IssuedOn <= end));
+            var notes = await noteSource.LoadAsync(establishmentId, start, end, warnings, cancellationToken);
 
             string content;
             string name;

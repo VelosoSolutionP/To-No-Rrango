@@ -127,3 +127,22 @@ public sealed class ReceivedNoteConfiguration : IEntityTypeConfiguration<ToNoRan
         builder.HasIndex(note => note.TenantId);
     }
 }
+
+public sealed class FiscalAuditEntryConfiguration : IEntityTypeConfiguration<ToNoRango.Domain.Fiscal.FiscalAuditEntry>
+{
+    public void Configure(EntityTypeBuilder<ToNoRango.Domain.Fiscal.FiscalAuditEntry> builder)
+    {
+        builder.ToTable("audit_entries", "fiscal");
+        builder.HasKey(entry => entry.Id);
+        builder.Property(entry => entry.Id).ValueGeneratedNever();
+        builder.Property(entry => entry.Actor).HasMaxLength(160).IsRequired();
+        builder.Property(entry => entry.Category).HasMaxLength(40).IsRequired();
+        builder.Property(entry => entry.Action).HasMaxLength(120).IsRequired();
+        builder.Property(entry => entry.Target).HasMaxLength(120);
+        builder.Property(entry => entry.Period).HasMaxLength(7);
+        builder.Property(entry => entry.Details).HasMaxLength(1000);
+        builder.HasIndex(entry => new { entry.EstablishmentId, entry.At });
+        builder.HasIndex(entry => new { entry.EstablishmentId, entry.Category, entry.Period });
+        builder.HasIndex(entry => entry.TenantId);
+    }
+}
