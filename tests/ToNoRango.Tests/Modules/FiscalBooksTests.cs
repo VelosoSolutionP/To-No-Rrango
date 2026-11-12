@@ -1,3 +1,4 @@
+using Shouldly;
 using ToNoRango.Application.Fiscal;
 using ToNoRango.Domain.Fiscal;
 using ToNoRango.Domain.Inventory;
@@ -29,7 +30,7 @@ public class FiscalBooksTests
 <transp><modFrete>9</modFrete></transp></infNFe></NFe></nfeProc>
 """;
 
-    private static FiscalBooksService Service(TaxRegime regime, bool homologation = false)
+    private static FiscalBooksService Service(TaxRegime regime, bool homologation = false, params ServiceInvoice[] services)
     {
         var profile = new FiscalProfile(Tenant, Store);
         profile.SetRegime(regime);
@@ -41,7 +42,7 @@ public class FiscalBooksTests
         sale.Authorize(new string('7', 44), "131260000000001", ExitXml, "ok", DateTimeOffset.UtcNow);
 
         var source = new FiscalNoteSource(new MemoryRepository<PurchaseEntry>(purchase), new MemoryRepository<FiscalDocument>(sale));
-        return new FiscalBooksService(source, new MemoryRepository<FiscalProfile>(profile), new MemoryRepository<FiscalAuditEntry>());
+        return new FiscalBooksService(source, new MemoryRepository<FiscalProfile>(profile), new MemoryRepository<FiscalAuditEntry>(), new MemoryRepository<ServiceInvoice>(services));
     }
 
     [Fact]
@@ -120,5 +121,29 @@ public class FiscalBooksTests
         Assert.Equal("desconhecido", entry.Actor);
         Assert.Equal(1000, entry.Details!.Length);
         Assert.Throws<ArgumentException>(() => new FiscalAuditEntry(Tenant, Store, DateTimeOffset.UtcNow, "a", "", "x", null, null, null, true, 200));
+    }
+
+    private static ServiceInvoice ServiceNote(long cents, decimal? rate, bool withheld = false, int environment = 1)
+    {
+        var note = new ServiceInvoice(Tenant, Store, Guid.NewGuid().ToString("N")[..10], 1, 1, environment, "DPS", "11444777000161", "Cliente", "010101", "Suporte", cents, rate, withheld, new DateOnly(2026, 11, 20), DateTimeOffset.UtcNow);
+        note.Authorize(new string('3', 50), null, null, DateTimeOffset.UtcNow);
+        return note;
+    }
+
+    [Fact]
+    public async Task Nfse_entra_com_iss_e_presuncao_de_32_por_cento()
+    {
+        var result = await Service(TaxRegime.LucroPresumido, false, ServiceNote(100000, 3m), ServiceNote(50000, 5m, withheld: true), ServiceNote(70000, 2m, environment: 2))
+            .GetAssessmentAsync(Store, new FiscalPeriodRequest(2026, 11), CancellationToken.None);
+
+        var taxes = result.Value.Taxes.ToDictionary(tax => tax.Tax);
+        result.Value.ServicesInCents.ShouldBe(150000);
+        taxes["ISS"].BalanceInCents.ShouldBe(3000);
+        taxes["PIS"].BalanceInCents.ShouldBe(130 + 975);
+        taxes["COFINS"].BalanceInCents.ShouldBe(600 + 4500);
+        // IRPJ: (200,00 x 8% + 1.500,00 x 32%) x 15% = (16 + 480) x 15% = 74,40
+        taxes["IRPJ"].BalanceInCents.ShouldBe(7440);
+        // CSLL: (200,00 x 12% + 1.500,00 x 32%) x 9% = (24 + 480) x 9% = 45,36
+        taxes["CSLL"].BalanceInCents.ShouldBe(4536);
     }
 }

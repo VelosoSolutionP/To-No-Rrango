@@ -112,7 +112,9 @@ public sealed record FiscalAssessmentDto(
     int EntryNotes,
     IReadOnlyList<FiscalTaxLine> Taxes,
     IReadOnlyList<FiscalCfopTotal> ByCfop,
-    IReadOnlyList<string> Warnings);
+    IReadOnlyList<string> Warnings,
+    long ServicesInCents = 0,
+    int ServiceNotes = 0);
 
 public sealed record FiscalPeriodSummary(int Year, int Month, int ExitNotes, int EntryNotes, long ExitsInCents, long EntriesInCents, int FilesGenerated, DateTimeOffset? LastFileAt, IReadOnlyList<string> Files);
 
@@ -120,8 +122,17 @@ public sealed record FiscalPeriodSummary(int Year, int Month, int ExitNotes, int
 /// Register of entries and exits, consolidation by CFOP and the monthly tax assessment.
 /// Everything here is a conference tool: the numbers come from the XML and must be reviewed by the accountant.
 /// </summary>
-public sealed class FiscalBooksService(FiscalNoteSource source, IRepository<FiscalProfile> profiles, IRepository<FiscalAuditEntry> audit)
+public sealed class FiscalBooksService(
+    FiscalNoteSource source,
+    IRepository<FiscalProfile> profiles,
+    IRepository<FiscalAuditEntry> audit,
+    IRepository<ServiceInvoice>? serviceNotes = null)
 {
+    // Lucro Presumido for services: IRPJ and CSLL both on 32% of revenue; PIS 0,65% and COFINS 3% cumulative.
+    private const decimal ServicePresumption = 0.32m;
+    private const decimal PisCumulative = 0.0065m;
+    private const decimal CofinsCumulative = 0.03m;
+
     // Lucro Presumido for trade: IRPJ on 8% of revenue at 15% (+10% above R$ 20 mil/month), CSLL on 12% at 9%.
     private const decimal IrpjPresumption = 0.08m;
     private const decimal CsllPresumption = 0.12m;
@@ -193,8 +204,33 @@ public sealed class FiscalBooksService(FiscalNoteSource source, IRepository<Fisc
                 taxes.Add(new FiscalTaxLine("IPI", "IPI nas compras", 0, ipi, 0, "Informativo: comércio varejista não se credita do IPI; entra no custo."));
             }
 
-            var pisDebits = exits.Sum(note => note.Pis);
-            var cofinsDebits = exits.Sum(note => note.Cofins);
+            // Services (NFS-e) by competence: ISS here, and their share of PIS, COFINS, IRPJ and CSLL below.
+            var services = serviceNotes is null
+                ? []
+                : (await serviceNotes.ListAsync(
+                    note => note.EstablishmentId == establishmentId && !note.IsSimulation && note.Status == FiscalDocumentStatus.Authorized
+                        && note.Competence >= start && note.Competence <= end,
+                    note => note.Competence,
+                    cancellationToken,
+                    take: 20000))
+                .Where(note => note.Environment == 1)
+                .ToList();
+            var serviceRevenue = services.Sum(note => note.AmountInCents);
+
+            if (services.Count > 0)
+            {
+                var own = services.Where(note => !note.IssWithheld && note.IssRate is not null).ToList();
+                var iss = own.Sum(note => (long)Math.Round(note.AmountInCents * note.IssRate!.Value / 100m, MidpointRounding.AwayFromZero));
+                var withheld = services.Where(note => note.IssWithheld).Sum(note => note.AmountInCents);
+                var unknown = services.Count(note => !note.IssWithheld && note.IssRate is null);
+                taxes.Add(new FiscalTaxLine("ISS", "ISS das NFS-e", iss, 0, iss,
+                    $"Alíquota de cada nota sobre o serviço.{(withheld > 0 ? $" {Money(withheld)} com ISS retido pelo tomador fica de fora." : string.Empty)}{(unknown > 0 ? $" {unknown} nota(s) sem alíquota informada (a da cidade) não entram na soma." : string.Empty)}"));
+            }
+
+            var servicePis = regime == TaxRegime.LucroReal ? (long)Math.Round(serviceRevenue * PisNonCumulative, MidpointRounding.AwayFromZero) : (long)Math.Round(serviceRevenue * PisCumulative, MidpointRounding.AwayFromZero);
+            var serviceCofins = regime == TaxRegime.LucroReal ? (long)Math.Round(serviceRevenue * CofinsNonCumulative, MidpointRounding.AwayFromZero) : (long)Math.Round(serviceRevenue * CofinsCumulative, MidpointRounding.AwayFromZero);
+            var pisDebits = exits.Sum(note => note.Pis) + servicePis;
+            var cofinsDebits = exits.Sum(note => note.Cofins) + serviceCofins;
 
             if (regime == TaxRegime.LucroReal)
             {
@@ -207,15 +243,16 @@ public sealed class FiscalBooksService(FiscalNoteSource source, IRepository<Fisc
             }
             else
             {
-                taxes.Add(new FiscalTaxLine("PIS", "PIS cumulativo", pisDebits, 0, pisDebits, "Destacado nas saídas (0,65% no Lucro Presumido, sem crédito)."));
-                taxes.Add(new FiscalTaxLine("COFINS", "COFINS cumulativa", cofinsDebits, 0, cofinsDebits, "Destacado nas saídas (3% no Lucro Presumido, sem crédito)."));
+                taxes.Add(new FiscalTaxLine("PIS", "PIS cumulativo", pisDebits, 0, pisDebits, $"Destacado nas saídas (0,65% no Lucro Presumido, sem crédito){ServiceShare("0,65%", serviceRevenue)}."));
+                taxes.Add(new FiscalTaxLine("COFINS", "COFINS cumulativa", cofinsDebits, 0, cofinsDebits, $"Destacado nas saídas (3% no Lucro Presumido, sem crédito){ServiceShare("3%", serviceRevenue)}."));
 
-                var irpjBase = (long)Math.Round(revenue * IrpjPresumption, MidpointRounding.AwayFromZero);
+                var irpjBase = (long)Math.Round(revenue * IrpjPresumption + serviceRevenue * ServicePresumption, MidpointRounding.AwayFromZero);
                 var irpj = (long)Math.Round(irpjBase * 0.15m, MidpointRounding.AwayFromZero)
                     + (long)Math.Round(Math.Max(0, irpjBase - IrpjAdditionalThresholdInCents) * 0.10m, MidpointRounding.AwayFromZero);
-                var csll = (long)Math.Round(revenue * CsllPresumption * 0.09m, MidpointRounding.AwayFromZero);
-                taxes.Add(new FiscalTaxLine("IRPJ", "IRPJ (estimativa do mês)", irpj, 0, irpj, "Presunção de 8% sobre o faturamento (comércio), 15% mais 10% acima de R$ 20 mil. O recolhimento é trimestral."));
-                taxes.Add(new FiscalTaxLine("CSLL", "CSLL (estimativa do mês)", csll, 0, csll, "Presunção de 12% sobre o faturamento (comércio), 9%. O recolhimento é trimestral."));
+                var csll = (long)Math.Round((revenue * CsllPresumption + serviceRevenue * ServicePresumption) * 0.09m, MidpointRounding.AwayFromZero);
+                var servicesNote = serviceRevenue > 0 ? " Serviços (NFS-e) com presunção de 32%." : string.Empty;
+                taxes.Add(new FiscalTaxLine("IRPJ", "IRPJ (estimativa do mês)", irpj, 0, irpj, $"Presunção de 8% sobre o faturamento (comércio), 15% mais 10% acima de R$ 20 mil.{servicesNote} O recolhimento é trimestral."));
+                taxes.Add(new FiscalTaxLine("CSLL", "CSLL (estimativa do mês)", csll, 0, csll, $"Presunção de 12% sobre o faturamento (comércio), 9%.{servicesNote} O recolhimento é trimestral."));
             }
 
             if (exits.Any(note => note.Model == FiscalDocument.NfceModel) && exits.All(note => note.Icms == 0))
@@ -235,7 +272,9 @@ public sealed class FiscalBooksService(FiscalNoteSource source, IRepository<Fisc
                 entries.Count,
                 taxes,
                 ByCfop(notes),
-                warnings);
+                warnings,
+                serviceRevenue,
+                services.Count);
         });
 
     /// <summary>The last months: notes in and out, and which files were generated and when.</summary>
@@ -281,6 +320,9 @@ public sealed class FiscalBooksService(FiscalNoteSource source, IRepository<Fisc
         var entries = await audit.ListAsync(item => item.EstablishmentId == establishmentId, item => item.At, cancellationToken, descending: true, take: Math.Clamp(take, 1, 1000));
         return entries.Select(item => new FiscalAuditDto(item.Id, item.At, item.Actor, item.Category, item.Action, item.Target, item.Period, item.Details, item.Succeeded, item.StatusCode)).ToList();
     }
+
+    private static string ServiceShare(string rate, long serviceRevenue) =>
+        serviceRevenue > 0 ? $", mais {rate} sobre {Money(serviceRevenue)} de serviços (NFS-e)" : string.Empty;
 
     private static (DateOnly Start, DateOnly End)? Period(FiscalPeriodRequest request)
     {

@@ -30,6 +30,8 @@ interface Assessment {
   entriesInCents: number;
   exitNotes: number;
   entryNotes: number;
+  servicesInCents?: number;
+  serviceNotes?: number;
   taxes: TaxLine[];
   byCfop: CfopTotal[];
   warnings: string[];
@@ -167,6 +169,7 @@ export function FiscalBooksView({ http, establishmentId }: { http: AdminHttp; es
               <div className="kpi"><small>Regime</small><strong className="kpi-text">{data.regime}</strong></div>
               <div className="kpi"><small>Saídas ({data.exitNotes})</small><strong>{formatBRL(data.exitsInCents)}</strong></div>
               <div className="kpi"><small>Entradas ({data.entryNotes})</small><strong>{formatBRL(data.entriesInCents)}</strong></div>
+              {data.servicesInCents ? <div className="kpi"><small>Serviços NFS-e ({data.serviceNotes})</small><strong>{formatBRL(data.servicesInCents)}</strong></div> : null}
             </div>
             <div className="admin-table-wrap">
               <table className="admin-table">
