@@ -163,6 +163,7 @@ app.MapModuleEndpoints();
 app.MapOperationEndpoints();
 app.MapWebhookEndpoints();
 app.MapFiscalApiEndpoints();
+app.MapAccountantEndpoints();
 
 app.Run();
 

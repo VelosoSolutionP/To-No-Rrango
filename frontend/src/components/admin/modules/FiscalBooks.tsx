@@ -265,6 +265,7 @@ const categoryLabel: Record<string, string> = {
   recebidas: "Notas recebidas",
   arquivo: "Arquivo",
   integracao: "API e webhooks",
+  contador: "Contador",
 };
 
 export function FiscalHistoryView({ http, establishmentId }: { http: AdminHttp; establishmentId: string }) {

@@ -18,7 +18,7 @@ export const UNAUTHORIZED_EVENT = "tonorango:admin-unauthorized";
 
 async function adminFetch<T>(
   path: string,
-  session: AdminSession,
+  session: Pick<AdminSession, "token">,
   init?: RequestInit,
 ): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -89,10 +89,13 @@ export async function loadModules(session: AdminSession): Promise<string[]> {
   return me.contract.modules;
 }
 
-/** Small typed client handed to the module screens. */
-export function createAdminHttp(session: AdminSession) {
+/**
+ * Small typed client handed to the module screens. The accountant portal passes its own prefix and
+ * reuses the same fiscal screens, because its routes mirror the panel's.
+ */
+export function createAdminHttp(session: Pick<AdminSession, "token">, prefix = "/api/admin") {
   const send = <T>(method: string, path: string, body?: unknown) =>
-    adminFetch<T>(`/api/admin${path}`, session, {
+    adminFetch<T>(`${prefix}${path}`, session, {
       method,
       body: body === undefined ? undefined : JSON.stringify(body),
     });
@@ -107,7 +110,7 @@ export function createAdminHttp(session: AdminSession) {
       const form = new FormData();
       form.append("file", file, "foto.jpg");
 
-      const response = await fetch(`${API_BASE_URL}/api/admin${path}`, {
+      const response = await fetch(`${API_BASE_URL}${prefix}${path}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${session.token}` },
         body: form,

@@ -199,3 +199,68 @@ public sealed class FiscalWebhookDeliveryConfiguration : IEntityTypeConfiguratio
         builder.HasIndex(delivery => delivery.TenantId);
     }
 }
+
+public sealed class AccountantFirmConfiguration : IEntityTypeConfiguration<ToNoRango.Domain.Fiscal.AccountantFirm>
+{
+    public void Configure(EntityTypeBuilder<ToNoRango.Domain.Fiscal.AccountantFirm> builder)
+    {
+        builder.ToTable("accountant_firms", "fiscal");
+        builder.HasKey(firm => firm.Id);
+        builder.Property(firm => firm.Id).ValueGeneratedNever();
+        builder.Property(firm => firm.Name).HasMaxLength(120).IsRequired();
+        builder.Property(firm => firm.Document).HasMaxLength(14).IsRequired();
+        builder.Property(firm => firm.Crc).HasMaxLength(20).IsRequired();
+        builder.Property(firm => firm.Email).HasMaxLength(200).IsRequired();
+        builder.Property(firm => firm.Phone).HasMaxLength(20);
+        builder.HasIndex(firm => firm.Document);
+    }
+}
+
+public sealed class AccountantUserConfiguration : IEntityTypeConfiguration<ToNoRango.Domain.Fiscal.AccountantUser>
+{
+    public void Configure(EntityTypeBuilder<ToNoRango.Domain.Fiscal.AccountantUser> builder)
+    {
+        builder.ToTable("accountant_users", "fiscal");
+        builder.HasKey(user => user.Id);
+        builder.Property(user => user.Id).ValueGeneratedNever();
+        builder.Property(user => user.Name).HasMaxLength(120).IsRequired();
+        builder.Property(user => user.Email).HasMaxLength(200).IsRequired();
+        builder.Property(user => user.PasswordHash).HasMaxLength(500).IsRequired();
+        builder.HasIndex(user => user.Email).IsUnique();
+        builder.HasIndex(user => user.FirmId);
+    }
+}
+
+public sealed class AccountantLinkConfiguration : IEntityTypeConfiguration<ToNoRango.Domain.Fiscal.AccountantLink>
+{
+    public void Configure(EntityTypeBuilder<ToNoRango.Domain.Fiscal.AccountantLink> builder)
+    {
+        builder.ToTable("accountant_links", "fiscal");
+        builder.HasKey(link => link.Id);
+        builder.Property(link => link.Id).ValueGeneratedNever();
+        builder.Property(link => link.EstablishmentName).HasMaxLength(120).IsRequired();
+        builder.Property(link => link.InvitedEmail).HasMaxLength(200).IsRequired();
+        builder.Property(link => link.CodeHash).HasMaxLength(64);
+        builder.Property(link => link.InvitedBy).HasMaxLength(160).IsRequired();
+        builder.HasIndex(link => link.CodeHash).IsUnique().HasFilter("\"CodeHash\" IS NOT NULL");
+        builder.HasIndex(link => new { link.FirmId, link.Status });
+        builder.HasIndex(link => new { link.EstablishmentId, link.Status });
+        builder.HasIndex(link => link.TenantId);
+    }
+}
+
+public sealed class AccountantMessageConfiguration : IEntityTypeConfiguration<ToNoRango.Domain.Fiscal.AccountantMessage>
+{
+    public void Configure(EntityTypeBuilder<ToNoRango.Domain.Fiscal.AccountantMessage> builder)
+    {
+        builder.ToTable("accountant_messages", "fiscal");
+        builder.HasKey(message => message.Id);
+        builder.Property(message => message.Id).ValueGeneratedNever();
+        builder.Property(message => message.Author).HasMaxLength(160).IsRequired();
+        builder.Property(message => message.Text).HasMaxLength(2000).IsRequired();
+        builder.Property(message => message.ResolvedBy).HasMaxLength(160);
+        builder.HasIndex(message => new { message.EstablishmentId, message.CreatedAt });
+        builder.HasIndex(message => message.LinkId);
+        builder.HasIndex(message => message.TenantId);
+    }
+}

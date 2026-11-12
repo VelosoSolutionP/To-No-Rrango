@@ -35,6 +35,8 @@ internal static class FiscalAudit
         ("/fiscal/api/keys/{keyId:guid}", "DELETE", "integracao", "Revogou chave da API fiscal"),
         ("/fiscal/api/webhooks", "POST", "integracao", "Cadastrou webhook"),
         ("/fiscal/api/webhooks/{webhookId:guid}", "DELETE", "integracao", "Removeu webhook"),
+        ("/fiscal/accountant/invites", "POST", "contador", "Convidou contador"),
+        ("/fiscal/accountant/links/{linkId:guid}", "DELETE", "contador", "Tirou o acesso do contador"),
     ];
 
     public static async ValueTask<object?> Filter(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
@@ -95,7 +97,7 @@ internal static class FiscalAudit
             var clock = scope.ServiceProvider.GetRequiredService<TimeProvider>();
             var values = http.Request.RouteValues;
             var caller = http.FiscalCaller();
-            var target = new[] { "documentId", "orderId", "noteId", "menuItemId", "keyId", "webhookId" }.Select(key => values[key]?.ToString()).FirstOrDefault(value => value is not null);
+            var target = new[] { "documentId", "orderId", "noteId", "menuItemId", "keyId", "webhookId", "linkId" }.Select(key => values[key]?.ToString()).FirstOrDefault(value => value is not null);
 
             await service.RecordAsync(
                 establishmentId,
@@ -148,6 +150,8 @@ internal static class FiscalAudit
                     return $"Ambiente {(settings.Environment == 1 ? "produção" : "homologação")}, série NF-e {settings.NfeSeries}, próximo número {settings.NfeNextNumber}";
                 case ApiNoteRequest note:
                     return $"Modelo {note.Model}, finalidade {note.Purpose}, id externo {note.ExternalId}";
+                case InviteAccountantRequest invite:
+                    return $"E-mail {invite.Email}";
                 case CreateApiKeyRequest key:
                     return $"{key.Name}: {(key.IsTest ? "teste" : "produção")}, {(key.CanIssue ? "emite" : "só consulta")}";
                 case CreateWebhookRequest webhook:

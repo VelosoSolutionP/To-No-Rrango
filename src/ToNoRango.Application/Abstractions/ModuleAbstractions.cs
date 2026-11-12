@@ -37,6 +37,9 @@ public interface IPasswordHasher
 public interface ITokenIssuer
 {
     (string Token, DateTimeOffset ExpiresAt) Issue(Guid userId, Guid tenantId, string name, string email, string role, string? velosoSession = null);
+
+    /// <summary>Session of the accountant portal: no tenant, only the office. It never opens the store panel.</summary>
+    (string Token, DateTimeOffset ExpiresAt) IssueAccountant(Guid userId, Guid firmId, string name, string email);
 }
 
 public interface ISecretProtector

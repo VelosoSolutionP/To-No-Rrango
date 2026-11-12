@@ -109,6 +109,7 @@ internal static class ModuleEndpoints
         MapFinance(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).RequireModule(Modules.Financeiro));
         MapReports(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).RequireModule(Modules.Relatorios));
         MapFiscal(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).RequireModule(Modules.Fiscal).AddEndpointFilter(FiscalAudit.Filter));
+        AccountantEndpoints.MapStoreSide(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).RequireModule(Modules.Fiscal).AddEndpointFilter(FiscalAudit.Filter));
         FiscalApiEndpoints.MapFiscalApiManagement(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).RequireModule(Modules.Fiscal).AddEndpointFilter(FiscalAudit.Filter));
         MapFiscalNfce(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).RequireModule(Modules.FiscalNfce).AddEndpointFilter(FiscalAudit.Filter));
         var fiscalManagers = admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).AddEndpointFilter(FiscalAudit.Filter);

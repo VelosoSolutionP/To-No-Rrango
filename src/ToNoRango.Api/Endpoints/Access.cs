@@ -62,7 +62,9 @@ internal static class Access
         Guid.TryParse(user.FindFirstValue(JwtRegisteredClaimNames.Sub), out var id) ? id : null;
 
     public static string Actor(this HttpContext context) =>
-        context.User.FindFirstValue(JwtRegisteredClaimNames.Email) ?? "plataforma";
+        context.User.FindFirstValue(JwtRegisteredClaimNames.Email) is { } email
+            ? context.User.FindFirstValue("role") == JwtTokenIssuer.AccountantRole ? $"Contador: {email}" : email
+            : "plataforma";
 
     public static async ValueTask<object?> RequireTenantAccess(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
@@ -142,6 +144,33 @@ internal static class Access
 public sealed class JwtTokenIssuer(IConfiguration configuration) : ITokenIssuer
 {
     private static readonly TimeSpan Lifetime = TimeSpan.FromHours(10);
+
+    public (string Token, DateTimeOffset ExpiresAt) IssueAccountant(Guid userId, Guid firmId, string name, string email)
+    {
+        var expiresAt = DateTimeOffset.UtcNow.Add(Lifetime);
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["Jwt:Key"]!));
+
+        var token = new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
+        {
+            Issuer = configuration["Jwt:Issuer"],
+            Audience = configuration["Jwt:Audience"],
+            Expires = expiresAt.UtcDateTime,
+            SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256),
+            Claims = new Dictionary<string, object>
+            {
+                [JwtRegisteredClaimNames.Sub] = userId.ToString(),
+                [JwtRegisteredClaimNames.Email] = email,
+                [JwtRegisteredClaimNames.Name] = name,
+                ["role"] = AccountantRole,
+                [AccountantFirmClaim] = firmId.ToString()
+            }
+        });
+
+        return (token, expiresAt);
+    }
+
+    public const string AccountantRole = "Accountant";
+    public const string AccountantFirmClaim = "accountant_firm";
 
     public (string Token, DateTimeOffset ExpiresAt) Issue(Guid userId, Guid tenantId, string name, string email, string role, string? velosoSession = null)
     {
