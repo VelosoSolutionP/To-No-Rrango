@@ -1234,11 +1234,18 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                         .HasMaxLength(60)
                         .HasColumnType("character varying(60)");
 
+                    b.Property<string>("MunicipalRegistration")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
                     b.Property<DateTimeOffset?>("NextDistributionAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("NextNumber")
                         .HasColumnType("integer");
+
+                    b.Property<long>("NextServiceNumber")
+                        .HasColumnType("bigint");
 
                     b.Property<int>("NfeNextNumber")
                         .ValueGeneratedOnAdd()
@@ -1261,6 +1268,9 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(8)");
 
                     b.Property<int>("Series")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ServiceSeries")
                         .HasColumnType("integer");
 
                     b.Property<string>("SpedProfile")
@@ -1555,6 +1565,121 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("received_notes", "fiscal");
+                });
+
+            modelBuilder.Entity("ToNoRango.Domain.Fiscal.ServiceInvoice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AccessKey")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<long>("AmountInCents")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("CancelReason")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<DateTimeOffset?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly>("Competence")
+                        .HasColumnType("date");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("DpsId")
+                        .IsRequired()
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)");
+
+                    b.Property<int>("Environment")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("EstablishmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ExternalId")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<bool>("IsSimulation")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal?>("IssRate")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<bool>("IssWithheld")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Message")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<long>("Number")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Series")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ServiceCode")
+                        .IsRequired()
+                        .HasMaxLength(6)
+                        .HasColumnType("character varying(6)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TakerDocument")
+                        .IsRequired()
+                        .HasMaxLength(14)
+                        .HasColumnType("character varying(14)");
+
+                    b.Property<string>("TakerName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Xml")
+                        .HasMaxLength(512)
+                        .HasColumnType("text");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("EstablishmentId", "CreatedAt");
+
+                    b.HasIndex("EstablishmentId", "IsSimulation", "ExternalId")
+                        .IsUnique();
+
+                    b.HasIndex("EstablishmentId", "IsSimulation", "Environment", "Series", "Number")
+                        .IsUnique();
+
+                    b.ToTable("service_invoices", "fiscal");
                 });
 
             modelBuilder.Entity("ToNoRango.Domain.Identity.User", b =>

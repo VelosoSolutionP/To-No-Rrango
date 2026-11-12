@@ -63,6 +63,31 @@ public sealed class FiscalProfile : AggregateRoot
     public int NfeSeries { get; private set; } = 1;
     public int NfeNextNumber { get; private set; } = 1;
 
+    /// <summary>NFS-e (padrão nacional): municipal registration, DPS series and the next DPS number.</summary>
+    public string? MunicipalRegistration { get; private set; }
+    public int ServiceSeries { get; private set; } = 1;
+    public long NextServiceNumber { get; private set; } = 1;
+
+    public long TakeServiceNumber() => NextServiceNumber++;
+
+    public void SetServiceSettings(string? municipalRegistration, int series, long nextNumber)
+    {
+        // DPS series issued by the taxpayer's own system go from 1 to 49999 (50000 and up belong to the government apps).
+        if (series is < 1 or > 49_999)
+        {
+            throw new ArgumentException("A série da DPS vai de 1 a 49999.", nameof(series));
+        }
+
+        if (nextNumber is < 1 or > 999_999_999_999_999)
+        {
+            throw new ArgumentException("Próximo número da DPS inválido.", nameof(nextNumber));
+        }
+
+        MunicipalRegistration = string.IsNullOrWhiteSpace(municipalRegistration) ? null : Ensure.MaxLength(municipalRegistration.Trim(), 15, nameof(municipalRegistration));
+        ServiceSeries = series;
+        NextServiceNumber = nextNumber;
+    }
+
     /// <summary>Último NSU baixado da distribuição DF-e e quando a SEFAZ pode ser consultada de novo.</summary>
     public long LastNsu { get; private set; }
     public DateTimeOffset? NextDistributionAt { get; private set; }

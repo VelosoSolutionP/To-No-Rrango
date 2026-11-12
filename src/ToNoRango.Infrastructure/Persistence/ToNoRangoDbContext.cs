@@ -118,6 +118,7 @@ public sealed class ToNoRangoDbContext : DbContext
         ApplyTenantFilter<FiscalWebhookDelivery>(modelBuilder);
         ApplyTenantFilter<AccountantLink>(modelBuilder);
         ApplyTenantFilter<AccountantMessage>(modelBuilder);
+        ApplyTenantFilter<ServiceInvoice>(modelBuilder);
         ApplyTenantFilter<ReceivedNote>(modelBuilder);
         ApplyTenantFilter<ZestConnection>(modelBuilder);
         ApplyTenantFilter<ToNoRango.Domain.Media.MediaFile>(modelBuilder);

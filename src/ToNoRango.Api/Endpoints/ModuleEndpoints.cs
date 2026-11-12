@@ -116,6 +116,7 @@ internal static class ModuleEndpoints
         AccountantEndpoints.MapStoreSide(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).RequireModule(Modules.Fiscal).AddEndpointFilter(FiscalAudit.Filter));
         FiscalApiEndpoints.MapFiscalApiManagement(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).RequireModule(Modules.Fiscal).AddEndpointFilter(FiscalAudit.Filter));
         MapFiscalNfce(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).RequireModule(Modules.FiscalNfce).AddEndpointFilter(FiscalAudit.Filter));
+        NfseEndpoints.MapPanel(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).RequireModule(Modules.FiscalNfce).AddEndpointFilter(FiscalAudit.Filter));
         var fiscalManagers = admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).AddEndpointFilter(FiscalAudit.Filter);
         MapFiscalFile(fiscalManagers.MapGroup(string.Empty).RequireModule(Modules.FiscalSintegra), "sintegra", FiscalFileKind.Sintegra);
         MapFiscalFile(fiscalManagers.MapGroup(string.Empty).RequireModule(Modules.FiscalSped), "efd-icms-ipi", FiscalFileKind.EfdIcmsIpi);

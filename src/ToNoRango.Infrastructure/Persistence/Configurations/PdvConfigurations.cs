@@ -264,3 +264,30 @@ public sealed class AccountantMessageConfiguration : IEntityTypeConfiguration<To
         builder.HasIndex(message => message.TenantId);
     }
 }
+
+public sealed class ServiceInvoiceConfiguration : IEntityTypeConfiguration<ToNoRango.Domain.Fiscal.ServiceInvoice>
+{
+    public void Configure(EntityTypeBuilder<ToNoRango.Domain.Fiscal.ServiceInvoice> builder)
+    {
+        builder.ToTable("service_invoices", "fiscal");
+        builder.HasKey(note => note.Id);
+        builder.Property(note => note.Id).ValueGeneratedNever();
+        builder.Property(note => note.ExternalId).HasMaxLength(40).IsRequired();
+        builder.Property(note => note.DpsId).HasMaxLength(45).IsRequired();
+        builder.Property(note => note.AccessKey).HasMaxLength(50);
+        builder.Property(note => note.Xml).HasColumnType("text");
+        builder.Property(note => note.Message).HasMaxLength(2000);
+        builder.Property(note => note.TakerDocument).HasMaxLength(14).IsRequired();
+        builder.Property(note => note.TakerName).HasMaxLength(150).IsRequired();
+        builder.Property(note => note.ServiceCode).HasMaxLength(6).IsRequired();
+        builder.Property(note => note.Description).HasMaxLength(2000).IsRequired();
+        builder.Property(note => note.IssRate).HasPrecision(5, 2);
+        builder.Property(note => note.CancelReason).HasMaxLength(255);
+        builder.Property<uint>("xmin").IsRowVersion();
+        // Same external id never makes a second note; same DPS number never goes twice.
+        builder.HasIndex(note => new { note.EstablishmentId, note.IsSimulation, note.ExternalId }).IsUnique();
+        builder.HasIndex(note => new { note.EstablishmentId, note.IsSimulation, note.Environment, note.Series, note.Number }).IsUnique();
+        builder.HasIndex(note => new { note.EstablishmentId, note.CreatedAt });
+        builder.HasIndex(note => note.TenantId);
+    }
+}

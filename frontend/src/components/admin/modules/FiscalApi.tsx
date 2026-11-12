@@ -85,6 +85,8 @@ const routes = [
   ["GET", "/notes/{id}/xml", "XML autorizado"],
   ["POST", "/notes/{id}/cancel", "Cancela ({ reason } com 15 a 255 letras)"],
   ["POST", "/notes/{id}/correction", "Carta de correção da NF-e ({ text })"],
+  ["POST", "/service-notes", "Emite NFS-e nacional ({ externalId, taker, serviceCode, description, amountInCents, issRate })"],
+  ["GET", "/service-notes", "Lista NFS-e; /service-notes/{id}, /xml e /cancel como nas notas"],
   ["GET", "/books/assessment", "Apuração do mês (?year, ?month); só chave de produção"],
   ["GET", "/books/register", "Livro de entradas e saídas; só chave de produção"],
 ];

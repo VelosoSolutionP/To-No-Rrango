@@ -31,6 +31,9 @@ internal static class FiscalAudit
         ("/files/efd-contribuicoes", "POST", FiscalAuditEntry.FileCategory, "EFD Contribuições"),
         ("/accountant-package", "POST", FiscalAuditEntry.FileCategory, "Pacote do contador"),
         ("/v1/notes", "POST", "emissao", "Emitiu nota pela API"),
+        ("/v1/service-notes", "POST", "emissao", "Emitiu NFS-e pela API"),
+        ("/fiscal/nfse", "POST", "emissao", "Emitiu NFS-e"),
+        ("/fiscal/nfse/settings", "PUT", "configuracao", "Alterou inscrição municipal, série ou número da NFS-e"),
         ("/fiscal/api/keys", "POST", "integracao", "Criou chave da API fiscal"),
         ("/fiscal/api/keys/{keyId:guid}", "DELETE", "integracao", "Revogou chave da API fiscal"),
         ("/fiscal/api/webhooks", "POST", "integracao", "Cadastrou webhook"),
@@ -140,6 +143,12 @@ internal static class FiscalAudit
         {
             switch (argument)
             {
+                case ServiceNoteRequest service:
+                    return $"Serviço {service.ServiceCode}, id externo {service.ExternalId}";
+                case CancelServiceNoteRequest cancelService:
+                    return $"Justificativa: {cancelService.Reason}";
+                case NfseSettingsRequest nfse:
+                    return $"Série DPS {nfse.Series}, próximo número {nfse.NextNumber}";
                 case CancelNoteRequest cancel:
                     return $"Justificativa: {cancel.Reason}";
                 case CorrectionRequest correction:

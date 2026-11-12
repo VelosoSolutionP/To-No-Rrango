@@ -111,6 +111,9 @@ public static class DependencyInjection
             .ConfigurePrimaryHttpMessageHandler(() => Integrations.FiscalWebhookSender.CreateHandler(fiscalApi));
         services.AddHostedService<Integrations.FiscalWebhookWorker>();
 
+        services.AddSingleton(configuration.GetSection(Fiscal.NfseOptions.SectionName).Get<Fiscal.NfseOptions>() ?? new Fiscal.NfseOptions());
+        services.AddSingleton<ToNoRango.Application.Fiscal.INfseGateway, Fiscal.NationalNfseGateway>();
+
         return services;
     }
 }

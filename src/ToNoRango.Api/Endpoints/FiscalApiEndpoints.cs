@@ -65,6 +65,8 @@ internal static class FiscalApiEndpoints
         api.MapPost("/notes/{noteId:guid}/correction", async (HttpContext http, Guid noteId, CorrectionRequest request, FiscalApiService service, CancellationToken ct) =>
             (await service.CorrectAsync(http.FiscalCaller()!, noteId, request, ct)).ToHttpResult());
 
+        NfseEndpoints.MapApi(api);
+
         // Books are the store's real data: only a live key reads them.
         api.MapGet("/books/assessment", async (HttpContext http, int year, int month, long? previousIcmsCredit, FiscalBooksService service, CancellationToken ct) =>
             http.FiscalCaller()!.IsTest
