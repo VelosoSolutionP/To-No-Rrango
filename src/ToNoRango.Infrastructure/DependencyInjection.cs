@@ -89,6 +89,18 @@ public static class DependencyInjection
 
         services.AddHostedService<OutboxWorker>();
 
+        var gtin = configuration.GetSection(Integrations.GtinOptions.SectionName).Get<Integrations.GtinOptions>() ?? new Integrations.GtinOptions();
+        services.AddSingleton(gtin);
+        services.AddSingleton<Integrations.GtinGate>();
+        services.AddHttpClient<ToNoRango.Application.Catalog.IGtinCatalog, Integrations.RscGtinCatalog>(client =>
+        {
+            client.BaseAddress = new Uri(gtin.BaseUrl.TrimEnd('/') + "/");
+            client.Timeout = TimeSpan.FromSeconds(30);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("VelosoSolution-Client/1.0");
+            client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+        });
+        services.AddHostedService<Integrations.GtinImportWorker>();
+
         return services;
     }
 }

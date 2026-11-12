@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using ToNoRango.Application.Abstractions;
+using ToNoRango.Application.Catalog;
 using ToNoRango.Application.Contracts;
 using ToNoRango.Application.Delivery;
 using ToNoRango.Application.Finance;
@@ -115,6 +116,7 @@ internal static class ModuleEndpoints
         MapFiscalFile(fiscalManagers.MapGroup(string.Empty).RequireModule(Modules.FiscalSped), "efd-contribuicoes", FiscalFileKind.EfdContribuicoes);
         MapWhatsApp(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager, UserRole.Attendant).RequireModule(Modules.WhatsApp));
         MapZest(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).RequireModule(Modules.Ia));
+        MapGtin(admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager).RequireModule(Modules.Cardapio));
 
         return app;
     }
@@ -379,6 +381,36 @@ internal static class ModuleEndpoints
 
         group.MapGet($"{Establishment}/fiscal/documents/{{documentId:guid}}/xml", async (Guid establishmentId, Guid documentId, FiscalService service, CancellationToken ct) =>
             (await service.GetXmlAsync(establishmentId, documentId, ct)).ToHttpResult());
+    }
+
+    private static void MapGtin(RouteGroupBuilder group)
+    {
+        static string MediaBase(HttpRequest request, IAppUrls urls) => urls.PublicApiUrl ?? $"{request.Scheme}://{request.Host}";
+
+        group.MapGet($"{Establishment}/gtin/{{code}}", async (Guid establishmentId, string code, HttpRequest request, IAppUrls urls, GtinService service, CancellationToken ct) =>
+        {
+            // The provider allows 2 calls a minute; past 85 s the tunnel would cut the request anyway.
+            using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            limit.CancelAfter(TimeSpan.FromSeconds(85));
+
+            try
+            {
+                return (await service.LookupAsync(establishmentId, code, MediaBase(request, urls), limit.Token)).ToHttpResult();
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                return Results.Problem(title: "gtin.busy", detail: "A base de produtos está ocupada com uma importação. Tente de novo em instantes.", statusCode: StatusCodes.Status503ServiceUnavailable);
+            }
+        });
+
+        group.MapPost($"{Establishment}/gtin/imports", async (Guid establishmentId, GtinImportRequest body, HttpRequest request, IAppUrls urls, GtinService service, CancellationToken ct) =>
+            (await service.StartImportAsync(establishmentId, body, MediaBase(request, urls), ct)).ToHttpResult());
+
+        group.MapGet($"{Establishment}/gtin/imports/current", (Guid establishmentId, GtinService service) =>
+            service.GetImport(establishmentId) is { } job ? Results.Ok(job) : Results.NoContent());
+
+        group.MapPost($"{Establishment}/gtin/imports/current/cancel", (Guid establishmentId, GtinService service) =>
+            service.CancelImport(establishmentId) is { } job ? Results.Ok(job) : Results.NoContent());
     }
 
     private static void MapWhatsApp(RouteGroupBuilder group)

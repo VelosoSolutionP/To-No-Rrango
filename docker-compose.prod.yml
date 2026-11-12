@@ -16,6 +16,9 @@ services:
       VelosoId__RedirectUri: "https://to-no-rango.velososolution.com.br/admin"
       VelosoId__PasswordLoginEnabled: "false"
       VelosoId__OwnerEmail: "dono@tonorango.velososolution.com.br"
+      # Consulta de produtos por código de barras; sem usuário, o botão avisa que não está configurado.
+      Gtin__Username: "${TNR_GTIN_USUARIO:-}"
+      Gtin__Password: "${TNR_GTIN_SENHA:-}"
 
   web:
     build:

@@ -49,6 +49,8 @@ public static class DependencyInjection
         services.AddScoped<ZestService>();
         services.AddScoped<ZestSalesService>();
         services.AddScoped<MediaService>();
+        services.AddScoped<Catalog.GtinService>();
+        services.AddSingleton<Catalog.GtinImportQueue>();
         services.AddScoped<WhatsAppService>();
 
         return services;

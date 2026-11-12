@@ -1,10 +1,11 @@
 "use client";
 
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { formatBRL, type AdminHttp } from "@/lib/admin-api";
 import type { MenuItem, PublicMenu } from "@/lib/types";
 import { DataTable, FormDrawer, StatusChip } from "../DataTable";
 import { ImageUpload } from "../ImageUpload";
+import { GtinImport, type GtinLookup } from "./GtinImport";
 import { ErrorMessage, ModuleHeading, SubTabs, quantity, text, toCents, toDecimal, useAction, useLoad } from "./shared";
 
 interface StockItem {
@@ -90,6 +91,7 @@ export function Products({
   const [view, setView] = useState<"sale" | "inputs">("sale");
   const [editing, setEditing] = useState<Row | "new" | null>(null);
   const [editingInput, setEditingInput] = useState<StockItem | "new" | null>(null);
+  const [importing, setImporting] = useState(false);
 
   const rows: Row[] = useMemo(
     () => (menu?.categories ?? []).flatMap((category) => category.items.map((item) => ({ ...item, categoryName: category.name }))),
@@ -116,7 +118,9 @@ export function Products({
 
   return (
     <section className="admin-section">
-      <ModuleHeading eyebrow="Cadastros" title="Produtos" hint="O cadastro que liga venda, composição, compra, fornecedor e tributação." />
+      <ModuleHeading eyebrow="Cadastros" title="Produtos" hint="O cadastro que liga venda, composição, compra, fornecedor e tributação.">
+        <button className="secondary-button" onClick={() => setImporting(true)} type="button">Importar por código de barras</button>
+      </ModuleHeading>
       <div className="kpi-strip">
         <div className="kpi"><small>Produtos de venda</small><strong>{rows.filter((row) => row.isActive).length}</strong></div>
         <div className="kpi"><small>Em promoção</small><strong>{rows.filter((row) => (row.compareAtPriceInCents ?? 0) > row.priceInCents).length}</strong></div>
@@ -260,6 +264,10 @@ export function Products({
         />
       ) : null}
 
+      {importing ? (
+        <GtinImport base={base} hasFiscal={hasFiscal} http={http} menu={menu} onClose={() => setImporting(false)} onImported={onMenuChanged} />
+      ) : null}
+
       {editingInput ? (
         <FormDrawer onClose={() => setEditingInput(null)} subtitle="Insumo" title={editingInput === "new" ? "Novo insumo" : editingInput.name}>
           <form
@@ -326,7 +334,43 @@ function ProductDrawer({
   const [recipe, setRecipe] = useState<RecipeLine[]>([]);
   const [recipeLoaded, setRecipeLoaded] = useState(false);
   const [pick, setPick] = useState("");
+  const [lookup, setLookup] = useState<{ busy: boolean; message: string | null; tone: "ok" | "warn" }>({ busy: false, message: null, tone: "ok" });
+  const formRef = useRef<HTMLFormElement>(null);
   const categories = menu?.categories ?? [];
+
+  /** Fills the form from the barcode base. Only empty fields are filled, so nothing typed is lost. */
+  async function findByBarcode() {
+    const form = formRef.current;
+    const field = (name: string) => form?.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement | null;
+    const code = (field("barcode")?.value ?? "").replace(/\D/g, "");
+    if (!code) {
+      setLookup({ busy: false, message: "Digite ou leia o código de barras primeiro.", tone: "warn" });
+      return;
+    }
+    setLookup({ busy: true, message: "Consultando a base de produtos… pode levar até 1 minuto (limite do plano).", tone: "ok" });
+    try {
+      const found = await http.get<GtinLookup>(`${base}/gtin/${code}`);
+      const fill = (name: string, value: string | null) => {
+        const input = field(name);
+        if (input && value && !input.value.trim()) input.value = value;
+      };
+      fill("name", found.name);
+      fill("description", found.brand);
+      fill("ncm", found.ncm);
+      fill("cest", found.cest);
+      if (found.imageUrl && !imageUrl) setImageUrl(found.imageUrl);
+      const duplicate = found.existingItemId && found.existingItemId !== product?.id;
+      setLookup({
+        busy: false,
+        tone: duplicate ? "warn" : "ok",
+        message: duplicate
+          ? `Atenção: este código já está no produto "${found.existingItemName}".`
+          : `Encontrado: ${found.name}${found.ncm ? ` · NCM ${found.ncm}` : ""}. Confira e defina o preço.`,
+      });
+    } catch (failure) {
+      setLookup({ busy: false, tone: "warn", message: failure instanceof Error ? failure.message : "Não foi possível consultar." });
+    }
+  }
 
   useEffect(() => {
     if (product && hasStock) {
@@ -399,7 +443,7 @@ function ProductDrawer({
           <button className={tab === value ? "is-active" : ""} key={value} onClick={() => setTab(value)} type="button">{label}</button>
         ))}
       </div>
-      <form className="drawer-form" onSubmit={save}>
+      <form className="drawer-form" onSubmit={save} ref={formRef}>
         <div hidden={tab !== "general"}>
           <div className="drawer-form">
             <label className="field"><span>Nome *</span><input defaultValue={product?.name ?? ""} maxLength={120} name="name" required /></label>
@@ -414,8 +458,15 @@ function ProductDrawer({
             </div>
             <div className="field-row">
               <label className="field"><span>Código interno (SKU)</span><input defaultValue={product?.sku ?? ""} maxLength={30} name="sku" /></label>
-              <label className="field"><span>Código de barras (EAN)</span><input defaultValue={product?.barcode ?? ""} inputMode="numeric" maxLength={14} name="barcode" placeholder="leitor no PDV" /></label>
+              <label className="field">
+                <span>Código de barras (EAN)</span>
+                <span className="field-inline">
+                  <input defaultValue={product?.barcode ?? ""} inputMode="numeric" maxLength={14} name="barcode" placeholder="leitor no PDV" />
+                  <button className="secondary-button" disabled={lookup.busy} onClick={() => void findByBarcode()} type="button">{lookup.busy ? "Buscando…" : "Buscar"}</button>
+                </span>
+              </label>
             </div>
+            {lookup.message ? <p className={lookup.tone === "warn" ? "form-error" : "muted"}>{lookup.message}</p> : null}
             <label className="field"><span>Descrição</span><textarea defaultValue={product?.description ?? ""} maxLength={500} name="description" /></label>
             <ImageUpload hint="Foto quadrada ou deitada, com boa luz, vende mais." label="Foto" onChange={setImageUrl} value={imageUrl} />
             <label className="module-check"><input defaultChecked={product?.isAvailable ?? true} name="isAvailable" type="checkbox" /> <span>Disponível para venda</span></label>
