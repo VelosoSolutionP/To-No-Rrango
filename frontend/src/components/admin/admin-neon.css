@@ -1592,3 +1592,11 @@
   .fx-line input:first-child { grid-column: 1 / -1; }
 }
 @media (prefers-reduced-motion: reduce) { .fx-banner-glow { animation: none; } .fx-note, .fx-note:hover { transition: none; transform: none; } }
+.fx-findings { display: grid; gap: 10px; margin-top: 12px; }
+.fx-finding { padding: 12px 14px 12px 18px; border-radius: 14px; background: var(--nx-glass); border: 1px solid rgba(255, 255, 255, 0.07); position: relative; box-shadow: var(--nx-raise); }
+.fx-finding::before { content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 4px; border-radius: 0 4px 4px 0; background: var(--nx-lilac); box-shadow: 0 0 12px var(--nx-lilac); }
+.fx-finding.is-critical::before { background: #f87171; box-shadow: 0 0 12px #f87171; }
+.fx-finding.is-warning::before { background: #fbbf24; box-shadow: 0 0 12px #fbbf24; }
+.fx-finding-level { display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted, #9a9aa6); }
+.fx-finding p { margin: 4px 0 0; }
+.fx-finding-action { color: var(--nx-orange-2); font-weight: 600; }

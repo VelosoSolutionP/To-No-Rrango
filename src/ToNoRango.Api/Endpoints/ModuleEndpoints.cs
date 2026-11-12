@@ -338,6 +338,25 @@ internal static class ModuleEndpoints
             (await service.GetXmlAsync(establishmentId, noteId, ct)).ToHttpResult());
         group.MapPost($"{Establishment}/fiscal/received/{{noteId:guid}}/imported", async (Guid establishmentId, Guid noteId, ReceivedNotesService service, CancellationToken ct) =>
             (await service.MarkImportedAsync(establishmentId, noteId, ct)).ToHttpResult());
+        group.MapPost($"{Establishment}/fiscal/accountant-package", async (Guid establishmentId, AccountantPackageRequest request, AccountantPackageService service, HttpContext http, CancellationToken ct) =>
+        {
+            // SINTEGRA e SPED entram no pacote só quando o contrato libera esses módulos.
+            var allowed = new List<string>();
+            var tenant = http.RequestServices.GetRequiredService<ITenantContext>().CurrentTenantId;
+            var access = http.RequestServices.GetRequiredService<IModuleAccess>();
+
+            foreach (var module in new[] { Modules.FiscalSintegra, Modules.FiscalSped })
+            {
+                if (http.IsPlatform() || (tenant is { } id && await access.IsAllowedAsync(id, module, ct)))
+                {
+                    allowed.Add(module);
+                }
+            }
+
+            return (await service.BuildAsync(establishmentId, allowed, request, ct)).ToHttpResult();
+        });
+        group.MapGet($"{Establishment}/fiscal/review", async (Guid establishmentId, FiscalReviewService service, CancellationToken ct) =>
+            (await service.ReviewAsync(establishmentId, ct)).ToHttpResult());
         group.MapGet($"{Establishment}/fiscal/tables", (Guid establishmentId) => Results.Ok(FiscalTables.All()));
         group.MapPost($"{Establishment}/fiscal/manual-notes", async (Guid establishmentId, ManualNoteRequest request, DfeService service, CancellationToken ct) =>
             (await service.IssueManualAsync(establishmentId, request, ct)).ToHttpResult());

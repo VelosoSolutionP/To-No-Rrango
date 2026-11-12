@@ -3,6 +3,7 @@
 import { type FormEvent, useMemo, useState } from "react";
 import { formatBRL, type AdminHttp } from "@/lib/admin-api";
 import { WHATSAPP_URL } from "@/lib/site";
+import { openDanfe } from "./danfe";
 import { Empty, ErrorMessage, text, toCents, useAction, useLoad } from "./shared";
 
 export interface FiscalCode {
@@ -177,6 +178,7 @@ export function ReceivedNotesView({ http, establishmentId, onOpenInventory }: { 
               </div>
               <strong className="fx-note-total">{formatBRL(note.totalInCents)}</strong>
               <div className="fx-note-actions">
+                {note.hasXml ? <button className="link-button" onClick={() => void http.get<{ xml: string }>(`${base}/${note.id}/xml`).then((file) => openDanfe(file.xml, { cancelled: note.situation === 3 }))} type="button">DANFE</button> : null}
                 {note.hasXml ? <button className="link-button" onClick={() => void download(note)} type="button">XML</button> : null}
                 {note.hasXml && note.status !== "Imported" && note.situation === 1 ? <button className="secondary-button" disabled={action.busy} onClick={() => void toPurchase(note)} type="button">Lançar em Compras</button> : null}
               </div>
@@ -379,6 +381,101 @@ export function FiscalTablesView({ tables }: { tables: FiscalTables | null }) {
       <div className="fx-table">
         {rows.slice(0, 400).map((item) => <div key={item.code}><b>{item.code}</b><span>{item.description}</span></div>)}
       </div>
+    </article>
+  );
+}
+
+interface Finding {
+  level: "Info" | "Warning" | "Critical";
+  area: string;
+  title: string;
+  detail: string;
+  action: string;
+}
+
+interface Review {
+  checkedAt: string;
+  critical: number;
+  warnings: number;
+  findings: Finding[];
+}
+
+export function FiscalReviewView({ http, establishmentId }: { http: AdminHttp; establishmentId: string }) {
+  const review = useLoad(() => http.get<Review>(`/establishments/${establishmentId}/fiscal/review`), [establishmentId]);
+  const data = review.data;
+  const levels = { Critical: "Crítico", Warning: "Atenção", Info: "Aviso" } as const;
+
+  return (
+    <article className="card vx-box fx-card">
+      <div className="vx-panel-title">
+        <h3>Conferência da IA fiscal <em>ZEST</em></h3>
+        <button className="secondary-button" disabled={review.loading} onClick={() => void review.reload()} type="button">{review.loading ? "Conferindo…" : "Conferir de novo"}</button>
+      </div>
+      <p className="muted">A IA confere cadastro, notas, prazos e rejeições e diz o que fazer. Ela não decide tributação: toda mudança passa pelo contador.</p>
+      <ErrorMessage message={review.error} />
+      {data ? (
+        <>
+          <div className="kpi-strip">
+            <div className={`kpi ${data.critical ? "is-alert" : ""}`}><small>Críticos</small><strong>{data.critical}</strong></div>
+            <div className={`kpi ${data.warnings ? "is-warn" : ""}`}><small>Atenção</small><strong>{data.warnings}</strong></div>
+            <div className="kpi"><small>Conferido</small><strong className="kpi-text">{new Date(data.checkedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</strong></div>
+          </div>
+          {data.findings.length === 0 ? <Empty>Nada a apontar agora. Tudo em ordem.</Empty> : (
+            <div className="fx-findings">
+              {data.findings.map((finding, index) => (
+                <div className={`fx-finding is-${finding.level.toLowerCase()}`} key={index}>
+                  <span className="fx-finding-level">{levels[finding.level]} · {finding.area}</span>
+                  <strong>{finding.title}</strong>
+                  <p>{finding.detail}</p>
+                  <p className="fx-finding-action">→ {finding.action}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      ) : null}
+    </article>
+  );
+}
+
+export function AccountantPackageView({ http, establishmentId }: { http: AdminHttp; establishmentId: string }) {
+  const last = new Date();
+  last.setMonth(last.getMonth() - 1);
+  const [period, setPeriod] = useState(`${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, "0")}`);
+  const [result, setResult] = useState<{ issuedNotes: number; receivedNotes: number; warnings: string[] } | null>(null);
+  const action = useAction(async () => undefined);
+
+  function build() {
+    const [year, month] = period.split("-").map(Number);
+    void action.run(async () => {
+      const file = await http.post<{ fileName: string; contentBase64: string; issuedNotes: number; receivedNotes: number; warnings: string[] }>(
+        `/establishments/${establishmentId}/fiscal/accountant-package`, { year, month });
+      const bytes = Uint8Array.from(atob(file.contentBase64), (char) => char.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: "application/zip" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = file.fileName;
+      link.click();
+      URL.revokeObjectURL(url);
+      setResult(file);
+    });
+  }
+
+  return (
+    <article className="card vx-box fx-card">
+      <div className="vx-panel-title"><h3>Fechamento do mês <em>para o contador</em></h3></div>
+      <p className="muted">Um arquivo .zip com os XMLs emitidos e recebidos, o SINTEGRA e o SPED do mês (se liberados no contrato) e um resumo em planilha. O escritório confere, valida no programa oficial e transmite.</p>
+      <div className="module-form module-form-flat">
+        <label className="field"><span>Competência</span><input onChange={(event) => setPeriod(event.target.value)} type="month" value={period} /></label>
+        <button className="primary-button" disabled={action.busy} onClick={build} type="button">{action.busy ? "Montando o pacote…" : "Baixar pacote do mês"}</button>
+      </div>
+      <ErrorMessage message={action.error} />
+      {result ? (
+        <div className="fx-sync">
+          <b>{result.issuedNotes}</b> nota(s) emitida(s) e <b>{result.receivedNotes}</b> recebida(s) no pacote.
+          {result.warnings.length ? <ul>{result.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul> : " Sem avisos."}
+        </div>
+      ) : null}
     </article>
   );
 }

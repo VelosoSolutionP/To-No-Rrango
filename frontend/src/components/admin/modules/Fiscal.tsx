@@ -3,7 +3,8 @@
 import { type FormEvent, useState } from "react";
 import { formatBRL, type AdminHttp } from "@/lib/admin-api";
 import { Empty, ErrorMessage, Input, ModuleHeading, SubTabs, text, toCents, toDecimal, useAction, useLoad } from "./shared";
-import { ConsultingBanner, FiscalDatalists, FiscalTablesView, ManualNoteForm, type ManualDraft, ReceivedNotesView, useFiscalTables } from "./FiscalExtras";
+import { openDanfe } from "./danfe";
+import { AccountantPackageView, ConsultingBanner, FiscalDatalists, FiscalReviewView, FiscalTablesView, ManualNoteForm, type ManualDraft, ReceivedNotesView, useFiscalTables } from "./FiscalExtras";
 
 interface Purchase {
   id: string;
@@ -164,7 +165,7 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory, draft 
   const hasSintegra = hasNfce && modules.includes("fiscal_sintegra");
   const hasSped = hasNfce && modules.includes("fiscal_sped");
   const [warnings, setWarnings] = useState<string[]>([]);
-  const [view, setView] = useState<"issue" | "received" | "manual" | "config" | "products" | "duties" | "entries" | "tables">(draft && hasNfce ? "manual" : hasNfce ? "issue" : "entries");
+  const [view, setView] = useState<"issue" | "review" | "received" | "manual" | "closing" | "config" | "products" | "duties" | "entries" | "tables">(draft && hasNfce ? "manual" : hasNfce ? "issue" : "entries");
   const tables = useFiscalTables(http, establishmentId);
   const base = `/establishments/${establishmentId}`;
   const purchases = useLoad(() => http.get<Purchase[]>(`${base}/purchases`).catch(() => []), [establishmentId]);
@@ -347,6 +348,13 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory, draft 
     });
   }
 
+  function printDanfe(note: FiscalDocument) {
+    void action.run(async () => {
+      const file = await http.get<{ fileName: string; xml: string }>(`${base}/fiscal/documents/${note.id}/xml`);
+      openDanfe(file.xml, { cancelled: note.status === "Cancelled", homologation: note.environment === 2 });
+    });
+  }
+
   function downloadXml(document_: FiscalDocument) {
     void action.run(async () => {
       const file = await http.get<{ fileName: string; xml: string }>(`${base}/fiscal/documents/${document_.id}/xml`);
@@ -378,7 +386,7 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory, draft 
       <SubTabs
         onChange={setView}
         options={[
-          ...(hasNfce ? [{ value: "issue" as const, label: "Emitir" }, { value: "received" as const, label: "Notas recebidas" }, { value: "manual" as const, label: "Devolução e ajuste" }, { value: "config" as const, label: "Configuração" }, { value: "products" as const, label: "Tributação dos produtos" }] : []),
+          ...(hasNfce ? [{ value: "issue" as const, label: "Emitir" }, { value: "review" as const, label: "Conferência IA" }, { value: "received" as const, label: "Notas recebidas" }, { value: "manual" as const, label: "Devolução e ajuste" }, { value: "closing" as const, label: "Fechamento do contador" }, { value: "config" as const, label: "Configuração" }, { value: "products" as const, label: "Tributação dos produtos" }] : []),
           ...(hasNfce ? [{ value: "duties" as const, label: "Obrigações e inutilização" }] : []),
           ...(hasEntry ? [{ value: "entries" as const, label: "Notas de entrada" }] : []),
           { value: "tables" as const, label: "Tabelas CFOP e CST" },
@@ -388,6 +396,8 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory, draft 
 
       {view === "received" && hasNfce ? <ReceivedNotesView establishmentId={establishmentId} http={http} onOpenInventory={(xml) => onOpenInventory(xml)} /> : null}
       {view === "manual" && hasNfce ? <ManualNoteForm draft={draft} establishmentId={establishmentId} http={http} onIssued={() => void overview.reload()} tables={tables.data ?? null} /> : null}
+      {view === "review" && hasNfce ? <FiscalReviewView establishmentId={establishmentId} http={http} /> : null}
+      {view === "closing" && hasNfce ? <AccountantPackageView establishmentId={establishmentId} http={http} /> : null}
       {view === "tables" ? <FiscalTablesView tables={tables.data ?? null} /> : null}
 
       {view === "config" && data ? (
@@ -575,6 +585,7 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory, draft 
                     <td>{note.message ?? "—"}</td>
                     <td className="num">{formatBRL(note.totalInCents)}</td>
                     <td className="table-actions">
+                      {note.hasXml && (note.status === "Authorized" || note.status === "Cancelled" || note.status === "Contingency") ? <button className="link-button" disabled={action.busy} onClick={() => printDanfe(note)} type="button">DANFE</button> : null}
                       {note.hasXml ? <button className="link-button" disabled={action.busy} onClick={() => downloadXml(note)} type="button">Baixar XML</button> : null}
                       {direct && note.status === "Authorized" && note.model === 55 ? <button className="link-button" disabled={dfeAction.busy} onClick={() => correctNote(note)} type="button">Carta de correção{note.correctionSequence ? ` (${note.correctionSequence})` : ""}</button> : null}
                       {direct && note.status === "Authorized" ? <button className="link-button" disabled={dfeAction.busy} onClick={() => cancelNote(note)} type="button">Cancelar</button> : null}
