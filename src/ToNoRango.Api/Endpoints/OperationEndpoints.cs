@@ -1,3 +1,5 @@
+using ToNoRango.Application.Abstractions;
+using ToNoRango.Application.Payments;
 using System.Security.Claims;
 using ToNoRango.Application.Contracts;
 using ToNoRango.Application.Delivery;
@@ -60,6 +62,20 @@ internal static class OperationEndpoints
 
         cashiers.MapPost($"{Establishment}/pdv/sales", async (Guid establishmentId, CounterSaleRequest request, HttpContext http, PdvService service, CancellationToken ct) =>
             (await service.SellAsync(establishmentId, request, http.Actor(), CanDiscount(http), ct)).ToHttpResult());
+
+        // Pix/card through Mercado Pago at the counter: the screen polls here; Pix is re-read at the gateway.
+        cashiers.MapPost($"{Establishment}/pdv/sales/{{orderId:guid}}/settle", async (Guid establishmentId, Guid orderId, HttpContext http, PdvService service, PaymentService payments, IOrderRepository orders, CancellationToken ct) =>
+        {
+            if (await orders.GetByIdAsync(orderId, ct) is { } order && order.EstablishmentId == establishmentId)
+            {
+                await payments.GetCurrentAsync(order.Code, ct);
+            }
+
+            return (await service.SettleOnlineAsync(establishmentId, orderId, http.Actor(), ct)).ToHttpResult();
+        });
+
+        cashiers.MapPost($"{Establishment}/pdv/sales/{{orderId:guid}}/abandon", async (Guid establishmentId, Guid orderId, HttpContext http, PdvService service, CancellationToken ct) =>
+            (await service.AbandonOnlineAsync(establishmentId, orderId, http.Actor(), ct)).ToHttpResult());
 
         cashiers.MapPost($"{Establishment}/pdv/orders/{{orderId:guid}}/receive", async (Guid establishmentId, Guid orderId, ReceiveOrderRequest request, HttpContext http, PdvService service, CancellationToken ct) =>
             (await service.ReceiveAsync(establishmentId, orderId, request, http.Actor(), ct)).ToHttpResult());

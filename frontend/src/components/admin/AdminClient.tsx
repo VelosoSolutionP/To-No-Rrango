@@ -58,7 +58,7 @@ const tabs: Array<{ id: Tab; group: string; label: string; roles: UserRole[]; mo
   { id: "overview", group: "Operação", label: "Visão geral", roles: ["Owner", "Manager", "Attendant"] },
   { id: "orders", group: "Operação", label: "Pedidos", roles: everyone, modules: ["pedidos"] },
   { id: "kitchen", group: "Operação", label: "Cozinha", roles: everyone, modules: ["pedidos"] },
-  { id: "pdv", group: "Operação", label: "PDV", roles: ["Owner", "Manager", "Attendant"], modules: ["pedidos"] },
+  { id: "pdv", group: "Operação", label: "Checkout", roles: ["Owner", "Manager", "Attendant"], modules: ["pedidos"] },
   { id: "distribution", group: "Operação", label: "Distribuição", roles: ["Owner", "Manager", "Attendant"], modules: ["pedidos"] },
   { id: "products", group: "Cadastros", label: "Produtos", roles: management, modules: ["cardapio"] },
   { id: "menu", group: "Cadastros", label: "Cardápio", roles: management, modules: ["cardapio"] },

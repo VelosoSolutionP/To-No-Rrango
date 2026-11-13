@@ -25,7 +25,8 @@ public sealed record CounterSaleRequest(
     string? DiscountReason,
     DeliveryAddressRequest? DeliveryAddress,
     IReadOnlyList<CreateOrderItemRequest> Items,
-    string? IdempotencyKey = null);
+    string? IdempotencyKey = null,
+    bool ChargeOnline = false);
 
 public sealed record ReceiveOrderRequest(PaymentMethod PaymentMethod);
 
@@ -212,6 +213,8 @@ public sealed class PdvService(
             return Result<CounterSaleDto>.Failure(AppErrors.Validation("Abra o caixa antes de vender."));
         }
 
+        var online = request.ChargeOnline && request.PaymentMethod is PaymentMethod.Pix or PaymentMethod.CardOnDelivery;
+
         var orderRequest = new CreateOrderRequest(
             string.IsNullOrWhiteSpace(request.CustomerName) ? CounterCustomer : request.CustomerName.Trim(),
             string.IsNullOrWhiteSpace(request.CustomerPhone) ? "balcao" : request.CustomerPhone.Trim(),
@@ -235,6 +238,14 @@ public sealed class PdvService(
             },
             async (order, token) =>
             {
+                // Pix or card charged through Mercado Pago: the sale waits, unpaid, for the gateway.
+                // It only enters the shift and the kitchen when the payment is approved (SettleOnlineAsync).
+                if (online)
+                {
+                    await unitOfWork.SaveChangesAsync(token);
+                    return;
+                }
+
                 await lifecycle.ChangeStatusAsync(order, OrderStatus.Confirmed, operatorName, "Venda no balcão.", token);
                 await lifecycle.MarkPaidAsync(order, token);
                 session.RegisterSale(order, operatorName, clock.UtcNow);
@@ -289,6 +300,67 @@ public sealed class PdvService(
         }, cancellationToken));
 
     /// <summary>Cancels a sale of the open shift: the order is cancelled (stock returns) and the money leaves the register.</summary>
+    /// <summary>
+    /// A counter sale charged through Mercado Pago: once the gateway approved it, it enters the open
+    /// shift and goes to the kitchen. Returns the sale while it is still waiting (Order.PaymentStatus Pending).
+    /// </summary>
+    public Task<Result<CounterSaleDto>> SettleOnlineAsync(Guid establishmentId, Guid orderId, string operatorName, CancellationToken cancellationToken) =>
+        Guarded.RunAsync<CounterSaleDto>(() => unitOfWork.ExecuteInTransactionAsync<Result<CounterSaleDto>>(async token =>
+        {
+            var session = await FindOpenAsync(establishmentId, token);
+
+            if (session is null)
+            {
+                return Result<CounterSaleDto>.Failure(AppErrors.Validation("Abra o caixa antes de receber."));
+            }
+
+            var order = await orders.GetByIdAsync(orderId, token);
+
+            if (order is null || order.EstablishmentId != establishmentId || order.Channel != OrderChannel.Pdv)
+            {
+                return Result<CounterSaleDto>.Failure(AppErrors.NotFound("order.not_found", "Venda não encontrada."));
+            }
+
+            if (order.PaymentStatus == PaymentStatus.Paid && session.Movements.All(movement => movement.OrderId != order.Id))
+            {
+                if (order.Status == OrderStatus.Pending)
+                {
+                    await lifecycle.ChangeStatusAsync(order, OrderStatus.Confirmed, operatorName, "Venda no balcão paga pelo Mercado Pago.", token);
+                }
+
+                session.RegisterSale(order, operatorName, clock.UtcNow);
+                await unitOfWork.SaveChangesAsync(token);
+            }
+
+            return new CounterSaleDto(OrderDto.From(order), CashSessionDto.From(session));
+        }, cancellationToken));
+
+    /// <summary>The customer gave up paying the Mercado Pago charge: the waiting sale is cancelled.</summary>
+    public Task<Result<CounterSaleDto>> AbandonOnlineAsync(Guid establishmentId, Guid orderId, string operatorName, CancellationToken cancellationToken) =>
+        Guarded.RunAsync<CounterSaleDto>(() => unitOfWork.ExecuteInTransactionAsync<Result<CounterSaleDto>>(async token =>
+        {
+            var session = await FindOpenAsync(establishmentId, token);
+            var order = await orders.GetByIdAsync(orderId, token);
+
+            if (session is null || order is null || order.EstablishmentId != establishmentId || order.Channel != OrderChannel.Pdv)
+            {
+                return Result<CounterSaleDto>.Failure(AppErrors.NotFound("order.not_found", "Venda não encontrada."));
+            }
+
+            if (order.PaymentStatus != PaymentStatus.Pending)
+            {
+                return Result<CounterSaleDto>.Failure(AppErrors.Validation("O pagamento já foi aprovado: cancele a venda pelo caixa."));
+            }
+
+            if (order.CanTransitionTo(OrderStatus.Cancelled))
+            {
+                await lifecycle.ChangeStatusAsync(order, OrderStatus.Cancelled, operatorName, "Cliente não pagou no Mercado Pago.", token);
+                await unitOfWork.SaveChangesAsync(token);
+            }
+
+            return new CounterSaleDto(OrderDto.From(order), CashSessionDto.From(session));
+        }, cancellationToken));
+
     public async Task<Result<CounterSaleDto>> CancelSaleAsync(Guid establishmentId, Guid orderId, CancelSaleRequest request, string operatorName, CancellationToken cancellationToken)
     {
         var result = await Guarded.RunAsync<CounterSaleDto>(() => unitOfWork.ExecuteInTransactionAsync<Result<CounterSaleDto>>(async token =>

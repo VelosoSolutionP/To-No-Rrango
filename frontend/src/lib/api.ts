@@ -97,6 +97,11 @@ export const api = {
     });
   },
 
+  /** Mercado Pago checkout page (card or Pix) for one order. */
+  createCheckout(code: string): Promise<{ url: string }> {
+    return apiFetch<{ url: string }>(`/api/public/orders/${encodeURIComponent(code)}/payments/checkout`, { method: "POST" });
+  },
+
   confirmCheckout(code: string, paymentId: string): Promise<OrderPayment | null> {
     return apiFetch<OrderPayment | null>(`/api/public/orders/${encodeURIComponent(code)}/payments/checkout/confirm`, {
       method: "POST",

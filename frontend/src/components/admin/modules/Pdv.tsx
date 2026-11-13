@@ -2,7 +2,9 @@
 
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { formatBRL, formatDateTime, type AdminHttp } from "@/lib/admin-api";
-import type { AdminOrder, MenuItem, PaymentMethod, PublicMenu } from "@/lib/types";
+import { api } from "@/lib/api";
+import type { AdminOrder, CheckoutOptions, MenuItem, OrderPayment, PaymentMethod, PublicMenu } from "@/lib/types";
+import { openDanfeNfce } from "./danfe";
 import { ErrorMessage, text, toCents, useAction, useLoad } from "./shared";
 
 interface CashMovement {
@@ -116,6 +118,12 @@ export function Pdv({
   const [table, setTable] = useState<string | null>(null);
   const [comanda, setComanda] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<AdminOrder | null>(null);
+  const [charging, setCharging] = useState<AdminOrder | null>(null);
+  const [online, setOnline] = useState<CheckoutOptions | null>(null);
+  const slug = menu?.establishment.slug;
+  useEffect(() => {
+    if (slug) api.getCheckoutOptions(slug).then(setOnline).catch(() => setOnline(null));
+  }, [slug]);
   const customers = useLoad(() => http.get<CustomerLite[]>(`${base}/customers`).catch(() => []), [base]);
   const session = overview.data?.current ?? null;
 
@@ -199,6 +207,7 @@ export function Pdv({
           delivery={mode === "delivery"}
           menu={menu}
           onBack={() => setComanda(null)}
+          online={online}
           onSell={async (payload) => {
             if (mode === "tables" && comanda) {
               const done = await action.run(() => http.post(`${base}/tables/${encodeURIComponent(comanda)}/orders`, payload));
@@ -212,13 +221,26 @@ export function Pdv({
             const done = await action.run(async () => {
               sold = (await http.post<{ order: AdminOrder }>(`${base}/pdv/sales`, payload)).order;
             });
-            if (done && sold) setReceipt(sold);
+            const order = sold as AdminOrder | null;
+            if (done && order) {
+              if (order.paymentStatus === "Pending") setCharging(order);
+              else setReceipt(order);
+            }
             return done;
           }}
         />
       )}
 
-      {receipt ? <Receipt onClose={() => setReceipt(null)} order={receipt} storeName={menu?.establishment.name ?? ""} /> : null}
+      {charging ? (
+        <Charge
+          base={base}
+          http={http}
+          onCancelled={() => { setCharging(null); void action.run(async () => undefined); }}
+          onPaid={(order) => { setCharging(null); setReceipt(order); void action.run(async () => undefined); }}
+          order={charging}
+        />
+      ) : null}
+      {receipt ? <Receipt base={base} http={http} onClose={() => setReceipt(null)} order={receipt} storeName={menu?.establishment.name ?? ""} /> : null}
 
       {drawer === "cash" && session ? (
         <Drawer onClose={() => setDrawer(null)} title="Caixa">
@@ -377,7 +399,9 @@ function SaleView({
   comanda,
   onSell,
   onBack,
+  online,
 }: {
+  online?: CheckoutOptions | null;
   menu: PublicMenu | null;
   busy: boolean;
   canManage: boolean;
@@ -392,6 +416,7 @@ function SaleView({
   const [lines, setLines] = useState<Line[]>([]);
   const [picking, setPicking] = useState<MenuItem | null>(null);
   const [method, setMethod] = useState<PaymentMethod>("Cash");
+  const [viaMachine, setViaMachine] = useState(false);
   const [received, setReceived] = useState("");
   const [discount, setDiscount] = useState("");
   const [dineIn, setDineIn] = useState<string>("");
@@ -419,6 +444,9 @@ function SaleView({
   const total = subtotal - discountCents;
   const receivedCents = centsFromDigits(received);
   const change = method === "Cash" && received ? receivedCents - total : null;
+  // Pix and card go through Mercado Pago when the store has it set up; "maquininha" keeps the old way.
+  const mpAvailable = method === "Pix" ? Boolean(online?.pixOnline || online?.checkoutLink) : method === "CardOnDelivery" ? Boolean(online?.checkoutLink || online?.cardOnline) : false;
+  const chargesOnline = mpAvailable && !viaMachine;
   const isComanda = comanda !== null;
 
   function add(item: MenuItem, optionIds: string[] = []) {
@@ -505,6 +533,7 @@ function SaleView({
             : null,
           items,
           idempotencyKey,
+          chargeOnline: chargesOnline,
         });
 
     if (done) {
@@ -695,6 +724,21 @@ function SaleView({
             </div>
           ) : null}
 
+          {!isComanda && method !== "Cash" ? (
+            mpAvailable ? (
+              <div className="pay-methods" role="group" aria-label="Como cobrar">
+                <button className={!viaMachine ? "is-active" : ""} onClick={() => setViaMachine(false)} type="button">
+                  <span>{method === "Pix" ? "▦" : "🖥"}</span>{method === "Pix" ? "QR na tela" : "Tela do cartão"}
+                </button>
+                <button className={viaMachine ? "is-active" : ""} onClick={() => setViaMachine(true)} type="button">
+                  <span>📟</span>Maquininha
+                </button>
+              </div>
+            ) : (
+              <p className="muted">Mercado Pago não configurado (Integrações → Pagamentos): {method === "Pix" ? "Pix" : "cartão"} recebido na maquininha.</p>
+            )
+          ) : null}
+
           {!isComanda && method === "Cash" && lines.length > 0 ? (
             <div className="cash-calc">
               <div className="cash-quick">
@@ -728,7 +772,7 @@ function SaleView({
             disabled={busy || lines.length === 0 || (change !== null && change < 0)}
             type="submit"
           >
-            {busy ? "Registrando…" : isComanda ? "Enviar para a cozinha" : `Receber ${formatBRL(total)}`}
+            {busy ? "Registrando…" : isComanda ? "Enviar para a cozinha" : chargesOnline ? `Cobrar ${formatBRL(total)} no Mercado Pago` : `Receber ${formatBRL(total)}`}
           </button>
         </footer>
       </form>
@@ -1104,13 +1148,122 @@ function History({ sessions }: { sessions: CashSession[] }) {
 
 /* ------------------------------------------------------------------------------------------------ */
 
-/** Sale receipt (not a fiscal note): shown after the sale, printable on any printer. */
-function Receipt({ order, storeName, onClose }: { order: AdminOrder; storeName: string; onClose: () => void }) {
+/** Mercado Pago charge at the counter: Pix QR on screen, or the card page; waits for the approval. */
+function Charge({ order, base, http, onPaid, onCancelled }: { order: AdminOrder; base: string; http: AdminHttp; onPaid: (order: AdminOrder) => void; onCancelled: () => void }) {
+  const [pix, setPix] = useState<OrderPayment | null>(null);
+  const [cardUrl, setCardUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const isPix = order.paymentMethod === "Pix";
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        if (isPix) {
+          const created = await api.createPix(order.code).catch(() => null);
+          if (alive && created) { setPix(created); return; }
+        }
+        const link = await api.createCheckout(order.code);
+        if (!alive) return;
+        setCardUrl(link.url);
+        window.open(link.url, "_blank", "noopener");
+      } catch (failure) {
+        if (alive) setError(failure instanceof Error ? failure.message : "Não deu para falar com o Mercado Pago.");
+      }
+    })();
+    return () => { alive = false; };
+  }, [order.code, isPix]);
+
+  useEffect(() => {
+    const timer = window.setInterval(async () => {
+      try {
+        const result = await http.post<{ order: AdminOrder }>(`${base}/pdv/sales/${order.id}/settle`);
+        if (result.order.paymentStatus === "Paid") onPaid(result.order);
+      } catch { /* keeps waiting */ }
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [base, http, order.id, onPaid]);
+
+  async function cancel() {
+    if (!window.confirm("Cancelar esta cobrança? A venda é cancelada e não entra no caixa.")) return;
+    try {
+      await http.post(`${base}/pdv/sales/${order.id}/abandon`);
+      onCancelled();
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "Não deu para cancelar.");
+    }
+  }
+
+  return (
+    <div className="modal-backdrop receipt-backdrop" role="presentation">
+      <section className="modal receipt-modal" role="dialog">
+        <div className="receipt">
+          <strong className="receipt-store">{isPix ? "Pix" : "Cartão"} · {formatBRL(order.totalInCents)}</strong>
+          <small>Venda #{order.code} · aguardando o Mercado Pago</small>
+          {pix?.pixQrCodeBase64 ? <img alt="QR Code Pix" src={`data:image/png;base64,${pix.pixQrCodeBase64}`} style={{ width: 240, height: 240, margin: "12px auto", display: "block", background: "#fff", padding: 8 }} /> : null}
+          {pix?.pixQrCode ? (
+            <button className="secondary-button" onClick={() => { void navigator.clipboard?.writeText(pix.pixQrCode ?? ""); setCopied(true); }} type="button">{copied ? "Copiado" : "Copiar Pix copia e cola"}</button>
+          ) : null}
+          {cardUrl ? (
+            <>
+              <small>A tela de pagamento do Mercado Pago abriu em outra aba: o cliente digita o cartão (ou paga com Pix) lá.</small>
+              <a className="secondary-button" href={cardUrl} rel="noopener" target="_blank">Abrir tela do cartão de novo</a>
+            </>
+          ) : null}
+          {!pix && !cardUrl && !error ? <small>Gerando a cobrança…</small> : null}
+          <ErrorMessage message={error} />
+          <small><span className="loading-dot" /> Confirma sozinho quando o pagamento for aprovado.</small>
+        </div>
+        <div className="receipt-actions">
+          <button className="secondary-button" onClick={() => void cancel()} type="button">Cancelar cobrança</button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+/**
+ * After the sale, three ways to finish (owner, 13/11): direct sale on WhatsApp with no receipt,
+ * non-fiscal receipt for places that print one, or the NFC-e.
+ */
+function Receipt({ order, storeName, base, http, onClose }: { order: AdminOrder; storeName: string; base: string; http: AdminHttp; onClose: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
   useEffect(() => {
     const handler = (event: KeyboardEvent) => event.key === "Escape" && onClose();
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
+
+  const phone = (order.customerPhone ?? "").replace(/\D/g, "");
+  const hasPhone = phone.length >= 10;
+
+  function whatsapp() {
+    const lines = [`*${storeName}* · pedido #${order.code}`, ...order.items.map((item) => `${item.quantity}× ${item.name} — ${formatBRL(item.totalInCents)}`), `*Total: ${formatBRL(order.totalInCents)}* (${methodLabels[order.paymentMethod]})`, "Obrigado pela preferência!"];
+    window.open(`https://wa.me/${phone.length <= 11 ? `55${phone}` : phone}?text=${encodeURIComponent(lines.join("\n"))}`, "_blank", "noopener");
+    onClose();
+  }
+
+  async function nfce() {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const note = await http.post<{ id: string; status: string; message: string | null; hasXml: boolean; environment: number }>(`${base}/fiscal/orders/${order.id}/nfce`);
+      if (note.hasXml && (note.status === "Authorized" || note.status === "Contingency")) {
+        const file = await http.get<{ xml: string }>(`${base}/fiscal/documents/${note.id}/xml`);
+        openDanfeNfce(file.xml, { homologation: note.environment === 2 });
+        setMessage("NFC-e autorizada.");
+      } else {
+        setMessage(`NFC-e: ${note.message ?? note.status}. Acompanhe em Fiscal.`);
+      }
+    } catch (failure) {
+      setMessage(failure instanceof Error ? failure.message : "Não deu para emitir a NFC-e.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="modal-backdrop receipt-backdrop" role="presentation">
@@ -1134,9 +1287,12 @@ function Receipt({ order, storeName, onClose }: { order: AdminOrder; storeName: 
           <small>Pagamento: {methodLabels[order.paymentMethod]}</small>
           <small>Obrigado pela preferência!</small>
         </div>
+        {message ? <p className="muted">{message}</p> : null}
         <div className="receipt-actions">
-          <button className="secondary-button" onClick={() => window.print()} type="button">Imprimir comprovante</button>
-          <button className="primary-button" onClick={onClose} type="button">Nova venda (Esc)</button>
+          <button className="secondary-button" disabled={!hasPhone} onClick={whatsapp} title={hasPhone ? "" : "Informe o telefone do cliente na venda"} type="button">Venda direta · WhatsApp</button>
+          <button className="secondary-button" onClick={() => window.print()} type="button">Comprovante não fiscal</button>
+          <button className="secondary-button" disabled={busy} onClick={() => void nfce()} type="button">{busy ? "Emitindo…" : "Emitir NFC-e"}</button>
+          <button className="primary-button" onClick={onClose} type="button">Sem comprovante · nova venda (Esc)</button>
         </div>
       </section>
     </div>
