@@ -13,7 +13,10 @@ namespace ToNoRango.Infrastructure.Email;
 /// </summary>
 public sealed class SmtpEmailSender(IConfiguration configuration) : IEmailSender
 {
-    private string? User => configuration["Email:User"];
+    private string? User => Value("Email:User");
+
+    // Compose passes unset variables as empty strings: empty means "use the default".
+    private string? Value(string key) => string.IsNullOrWhiteSpace(configuration[key]) ? null : configuration[key]!.Trim();
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(User) && !string.IsNullOrWhiteSpace(configuration["Email:Password"]);
 
@@ -29,10 +32,10 @@ public sealed class SmtpEmailSender(IConfiguration configuration) : IEmailSender
             return $"E-mail inválido: {message.To}";
         }
 
-        var host = configuration["Email:Host"] ?? "smtp.zoho.com";
+        var host = Value("Email:Host") ?? "smtp.zoho.com";
         var port = int.TryParse(configuration["Email:Port"], out var configured) ? configured : 465;
         var mime = new MimeMessage();
-        mime.From.Add(new MailboxAddress(configuration["Email:Name"] ?? "To No Rango", configuration["Email:From"] ?? User!));
+        mime.From.Add(new MailboxAddress(Value("Email:Name") ?? "To No Rango", Value("Email:From") ?? User!));
         mime.To.Add(to);
         mime.Subject = message.Subject;
         mime.Body = new BodyBuilder { TextBody = message.Text, HtmlBody = message.Html }.ToMessageBody();
