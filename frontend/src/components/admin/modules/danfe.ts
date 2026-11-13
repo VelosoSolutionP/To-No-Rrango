@@ -65,7 +65,7 @@ h1{font-size:13px;margin:0} h2{font-size:9px;margin:6px 0 2px;text-transform:upp
 table{width:100%;border-collapse:collapse} th,td{border:1px solid #000;padding:2px 3px;font-size:8px;vertical-align:top} th{font-size:7px;text-transform:uppercase}
 .barcode{width:100%;height:38px;fill:#000} .stamp{font-size:20px;color:#b00;border:3px solid #b00;padding:4px 10px;display:inline-block;transform:rotate(-8deg);margin:6px}
 .bar{position:sticky;top:0;background:#111;color:#fff;padding:8px;text-align:center;font:14px Arial} .bar button{font:14px Arial;padding:6px 16px;margin-left:8px;cursor:pointer}
-.cupom{width:80mm;margin:4mm auto;font:11px/1.3 "Courier New",monospace} .cupom hr{border:none;border-top:1px dashed #000} .cupom .qr{display:flex;justify-content:center;margin:6px 0}
+.cupom{width:80mm;margin:4mm auto;font:11px/1.3 "Courier New",monospace} .cupom hr{border:none;border-top:1px dashed #000} .cupom .qr{display:flex;justify-content:center;margin:6px 0} .cupom .qr img,.cupom .qr canvas{width:38mm!important;height:38mm!important;image-rendering:pixelated}
 @media print{.bar{display:none} .page,.cupom{margin:0}}
 `;
 
@@ -151,6 +151,6 @@ export function openDanfeNfce(xml: string, options: { cancelled?: boolean; homol
   ${options.cancelled ? '<div class="c"><span class="stamp">CANCELADA</span></div>' : ""}
   ${homolog ? '<div class="c b">EMITIDA EM AMBIENTE DE HOMOLOGAÇÃO - SEM VALOR FISCAL</div>' : ""}
 </div>
-<script>window.addEventListener("load",function(){ if(window.QRCode){ new QRCode(document.getElementById("qr"),{text:${JSON.stringify(qrUrl)},width:150,height:150}); } else { document.getElementById("qr").textContent=${JSON.stringify(qrUrl)}; } });</script>`;
+<script>window.addEventListener("load",function(){ if(window.QRCode){ new QRCode(document.getElementById("qr"),{text:${JSON.stringify(qrUrl)},width:360,height:360,correctLevel:QRCode.CorrectLevel.M}); } else { document.getElementById("qr").textContent=${JSON.stringify(qrUrl)}; } });</script>`;
   openWindow(`DANFE NFC-e ${val(ide, "nNF")}`, body, '<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>');
 }
