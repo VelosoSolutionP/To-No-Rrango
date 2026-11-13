@@ -38,3 +38,20 @@ public sealed class MenuItemConfiguration : IEntityTypeConfiguration<MenuItem>
         builder.Navigation(item => item.OptionGroups).UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }
+
+public sealed class GtinRecordConfiguration : IEntityTypeConfiguration<GtinRecord>
+{
+    public void Configure(EntityTypeBuilder<GtinRecord> builder)
+    {
+        builder.ToTable("gtin_products", "catalog");
+        builder.HasKey(record => record.Id);
+        builder.Property(record => record.Id).ValueGeneratedNever();
+        builder.Property(record => record.Code).HasMaxLength(14).IsRequired();
+        builder.Property(record => record.Name).HasMaxLength(120).IsRequired();
+        builder.Property(record => record.Brand).HasMaxLength(120);
+        builder.Property(record => record.Ncm).HasMaxLength(8);
+        builder.Property(record => record.Cest).HasMaxLength(7);
+        builder.Property(record => record.Image).HasColumnType("bytea");
+        builder.HasIndex(record => record.Code).IsUnique();
+    }
+}

@@ -182,6 +182,8 @@ public sealed class GtinService(
     GtinImportQueue queue,
     IRepository<MenuItem> menuItems,
     IRepository<MenuCategory> categories,
+    IRepository<GtinRecord> saved,
+    IUnitOfWork unitOfWork,
     MenuService menu,
     MediaService media,
     FiscalService fiscal,
@@ -208,7 +210,7 @@ public sealed class GtinService(
         }
 
         var existing = await menuItems.FirstOrDefaultAsync(item => item.EstablishmentId == establishmentId && item.Barcode == digits, cancellationToken);
-        var found = await catalog.LookupAsync(digits, withImage: true, cancellationToken);
+        var found = await FindAsync(digits, withImage: true, cancellationToken);
 
         if (found.Status == GtinLookupStatus.NotFound)
         {
@@ -262,6 +264,35 @@ public sealed class GtinService(
         return job.ToDto(catalog.Interval);
     }
 
+    /// <summary>Postgres first: a product already bought is never paid for again; new answers are kept for every store.</summary>
+    private async Task<GtinLookupResult> FindAsync(string code, bool withImage, CancellationToken cancellationToken)
+    {
+        var record = await saved.FirstOrDefaultAsync(item => item.Code == code, cancellationToken);
+
+        if (record is not null && (!withImage || record.ImageChecked))
+        {
+            return new GtinLookupResult(GtinLookupStatus.Found, new GtinProduct(record.Code, record.Name, record.Brand, record.Ncm, record.Cest, record.Image), null);
+        }
+
+        var found = await catalog.LookupAsync(code, withImage, cancellationToken);
+
+        if (found is { Status: GtinLookupStatus.Found, Product: { } product })
+        {
+            if (record is null)
+            {
+                saved.Add(new GtinRecord(code, product.Name, product.Brand, product.Ncm, product.Cest, product.Image, withImage, clock.UtcNow));
+            }
+            else
+            {
+                record.Refresh(product.Name, product.Brand, product.Ncm, product.Cest, product.Image, withImage, clock.UtcNow);
+            }
+
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+
+        return found;
+    }
+
     public GtinImportDto? GetImport(Guid establishmentId) => queue.Latest(establishmentId)?.ToDto(catalog.Interval);
 
     public GtinImportDto? CancelImport(Guid establishmentId)
@@ -286,7 +317,7 @@ public sealed class GtinService(
             return new GtinImportLine(code, "skipped", existing.Name, "Já cadastrado.");
         }
 
-        var found = await catalog.LookupAsync(code, job.Request.WithImages, cancellationToken);
+        var found = await FindAsync(code, job.Request.WithImages, cancellationToken);
 
         if (found.Status == GtinLookupStatus.NotFound)
         {
