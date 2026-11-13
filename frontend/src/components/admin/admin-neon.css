@@ -8,26 +8,29 @@
  * "ao vivo"; quem pede menos movimento no aparelho recebe a tela parada.
  */
 .vx {
-  --nx-bg: #07070a;
+  /* Paleta (13/11): escolhida nas bolinhas do menu; padrão = laranja com lilás. Ver admin-hud.css. */
+  --a1: #ff6a1a; --a1-2: #ff8f4d; --a1-3: #ffa066; --a1-d: #f05a0c;
+  --a2: #a98bff; --a2-2: #c9b6ff; --a2-d: #7c5cff;
+  --nx-bg: var(--a-bg, #07070a);
   --nx-glass: rgba(19, 19, 25, 0.78);
   --nx-glass-2: rgba(27, 27, 35, 0.85);
   --nx-well: rgba(0, 0, 0, 0.32);
-  --nx-orange: #ff6a1a;
-  --nx-orange-2: #ff8f4d;
-  --nx-lilac: #a98bff;
-  --nx-lilac-2: #c9b6ff;
-  --nx-neon: linear-gradient(135deg, #ff6a1a 0%, #ff8f4d 30%, #a98bff 75%, #7c5cff 100%);
-  --nx-neon-soft: linear-gradient(135deg, rgba(255, 106, 26, 0.55), rgba(169, 139, 255, 0.32) 60%, rgba(169, 139, 255, 0.06));
+  --nx-orange: var(--a1);
+  --nx-orange-2: var(--a1-2);
+  --nx-lilac: var(--a2);
+  --nx-lilac-2: var(--a2-2);
+  --nx-neon: linear-gradient(135deg, var(--a1) 0%, var(--a1-2) 30%, var(--a2) 75%, var(--a2-d) 100%);
+  --nx-neon-soft: linear-gradient(135deg, color-mix(in srgb, var(--a1) 55%, transparent), color-mix(in srgb, var(--a2) 32%, transparent) 60%, color-mix(in srgb, var(--a2) 6%, transparent));
   --nx-silver: linear-gradient(180deg, #f3f4f7 0%, #b3b8c2 50%, #e3e5ea 100%);
   --nx-raise: 0 24px 50px -28px rgba(0, 0, 0, 0.95), inset 0 1px 0 rgba(255, 255, 255, 0.07);
-  --nx-orb: radial-gradient(circle at 30% 25%, #ffd2b3, #ff8f4d 35%, #e2520a 80%);
-  --nx-orb-shadow: 0 10px 20px -8px rgba(255, 106, 26, 0.9), inset 0 -3px 6px rgba(0, 0, 0, 0.25), inset 0 2px 3px rgba(255, 255, 255, 0.6);
+  --nx-orb: radial-gradient(circle at 30% 25%, var(--a1-3), var(--a1-2) 35%, var(--a1-d) 80%);
+  --nx-orb-shadow: 0 10px 20px -8px color-mix(in srgb, var(--a1) 90%, transparent), inset 0 -3px 6px rgba(0, 0, 0, 0.25), inset 0 2px 3px rgba(255, 255, 255, 0.6);
 
   /* Ações em laranja, inteligência em lilás (Escopo Mestre 3.2). */
   --accent: var(--nx-orange);
   --accent-2: var(--nx-orange-2);
   --accent-ink: #1a0b02;
-  --accent-soft: rgba(255, 106, 26, 0.14);
+  --accent-soft: color-mix(in srgb, var(--a1) 14%, transparent);
   --brand: var(--nx-orange);
   --brand-2: var(--nx-lilac);
   --vx-bg: var(--nx-bg);
@@ -44,8 +47,8 @@
   gap: 18px;
   padding: 18px 18px 18px 0;
   background:
-    radial-gradient(700px 420px at 4% 108%, rgba(255, 106, 26, 0.22), transparent 65%),
-    radial-gradient(800px 520px at 100% 0%, rgba(124, 92, 255, 0.18), transparent 60%),
+    radial-gradient(700px 420px at 4% 108%, color-mix(in srgb, var(--a1) 22%, transparent), transparent 65%),
+    radial-gradient(800px 520px at 100% 0%, color-mix(in srgb, var(--a2-d) 18%, transparent), transparent 60%),
     var(--nx-bg);
   background-attachment: fixed;
 }
@@ -60,8 +63,8 @@
   bottom: -40%;
   height: 70%;
   background:
-    linear-gradient(rgba(255, 106, 26, 0.13) 1px, transparent 1px) 0 0 / 100% 46px,
-    linear-gradient(90deg, rgba(169, 139, 255, 0.1) 1px, transparent 1px) 0 0 / 46px 100%;
+    linear-gradient(color-mix(in srgb, var(--a1) 13%, transparent) 1px, transparent 1px) 0 0 / 100% 46px,
+    linear-gradient(90deg, color-mix(in srgb, var(--a2) 10%, transparent) 1px, transparent 1px) 0 0 / 46px 100%;
   transform: perspective(600px) rotateX(62deg);
   transform-origin: top;
   -webkit-mask-image: linear-gradient(to top, #000 10%, transparent 85%);
@@ -190,8 +193,8 @@
 
 .vx .vx-product.is-active {
   color: #1a0b02;
-  background: linear-gradient(180deg, #ff9a5c, #ff6a1a);
-  box-shadow: 0 8px 18px -6px rgba(255, 106, 26, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  background: linear-gradient(180deg, #ff9a5c, var(--a1));
+  box-shadow: 0 8px 18px -6px color-mix(in srgb, var(--a1) 75%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
 .vx .vx-product-zest:not(.is-active) {
@@ -201,7 +204,7 @@
 .vx .vx-product-zest.is-active {
   color: #140a2b;
   background: linear-gradient(180deg, #d4c6ff, #8f6bff);
-  box-shadow: 0 8px 18px -6px rgba(124, 92, 255, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  box-shadow: 0 8px 18px -6px color-mix(in srgb, var(--a2-d) 85%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .vx .vx-sec {
@@ -259,7 +262,7 @@
 }
 
 .vx .vx-nav button.is-active {
-  background: linear-gradient(90deg, rgba(255, 106, 26, 0.2), rgba(255, 106, 26, 0.02));
+  background: linear-gradient(90deg, color-mix(in srgb, var(--a1) 20%, transparent), color-mix(in srgb, var(--a1) 2%, transparent));
   box-shadow: inset 2px 0 0 var(--nx-orange);
   color: #fff;
 }
@@ -267,7 +270,7 @@
 .vx .vx-nav button.is-active .vx-orb {
   background: var(--nx-orb);
   color: #1a0b02;
-  box-shadow: 0 0 18px -2px rgba(255, 106, 26, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  box-shadow: 0 0 18px -2px color-mix(in srgb, var(--a1) 80%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .vx .vx-nav button.is-active svg {
@@ -279,7 +282,7 @@
   background: var(--nx-orange);
   color: #1a0b02;
   font-weight: 800;
-  box-shadow: 0 0 12px rgba(255, 106, 26, 0.7);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--a1) 70%, transparent);
 }
 
 .vx .vx-foot {
@@ -294,7 +297,7 @@
   background: var(--nx-silver);
   color: #17181c;
   font-weight: 700;
-  box-shadow: 0 0 0 2px #0b0b0f, 0 0 0 3.5px rgba(255, 106, 26, 0.7);
+  box-shadow: 0 0 0 2px #0b0b0f, 0 0 0 3.5px color-mix(in srgb, var(--a1) 70%, transparent);
 }
 
 /* ---------- Cabeçalho ---------- */
@@ -361,8 +364,8 @@
 .vx .vx-pill-hot {
   cursor: pointer;
   color: #1a0b02;
-  background: linear-gradient(180deg, #ffa066, #ff6a1a);
-  box-shadow: 0 8px 20px -8px rgba(255, 106, 26, 0.9);
+  background: linear-gradient(180deg, var(--a1-3), var(--a1));
+  box-shadow: 0 8px 20px -8px color-mix(in srgb, var(--a1) 90%, transparent);
 }
 
 .vx .vx-pill-hot i {
@@ -422,7 +425,7 @@
 .vx .vx-panel-title h3 em,
 .vx .ov-hero h2 em {
   color: var(--nx-orange);
-  text-shadow: 0 0 26px rgba(255, 106, 26, 0.45);
+  text-shadow: 0 0 26px color-mix(in srgb, var(--a1) 45%, transparent);
 }
 
 /* ---------- Botões com relevo ---------- */
@@ -430,23 +433,23 @@
 .vx .primary-button-full {
   border: 0;
   border-radius: 14px;
-  background: linear-gradient(180deg, #ffa066, #ff6a1a 60%, #f05a0c);
+  background: linear-gradient(180deg, var(--a1-3), var(--a1) 60%, var(--a1-d));
   color: #1a0b02;
   font-weight: 800;
-  box-shadow: 0 14px 28px -12px rgba(255, 106, 26, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.55), inset 0 -3px 0 rgba(0, 0, 0, 0.18);
+  box-shadow: 0 14px 28px -12px color-mix(in srgb, var(--a1) 85%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.55), inset 0 -3px 0 rgba(0, 0, 0, 0.18);
   transition: transform 0.15s, box-shadow 0.15s, filter 0.15s;
 }
 
 .vx .primary-button:hover:not(:disabled),
 .vx .primary-button-full:hover:not(:disabled) {
-  background: linear-gradient(180deg, #ffa066, #ff6a1a 60%, #f05a0c);
+  background: linear-gradient(180deg, var(--a1-3), var(--a1) 60%, var(--a1-d));
   filter: brightness(1.06);
   transform: translateY(-2px);
 }
 
 .vx .primary-button:active:not(:disabled) {
   transform: translateY(1px);
-  box-shadow: 0 6px 14px -8px rgba(255, 106, 26, 0.85), inset 0 2px 4px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 6px 14px -8px color-mix(in srgb, var(--a1) 85%, transparent), inset 0 2px 4px rgba(0, 0, 0, 0.25);
 }
 
 .vx .secondary-button,
@@ -463,7 +466,7 @@
 .vx .secondary-button:hover:not(:disabled),
 .vx .secondary-button-small:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: inset 0 0 0 1px rgba(255, 143, 77, 0.45), 0 10px 22px -12px rgba(255, 106, 26, 0.5);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--a1-2) 45%, transparent), 0 10px 22px -12px color-mix(in srgb, var(--a1) 50%, transparent);
 }
 
 .vx .link-button {
@@ -493,7 +496,7 @@
 .vx .field select:focus,
 .vx .pdv-search:focus {
   outline: 0;
-  box-shadow: inset 0 0 0 1.5px rgba(169, 139, 255, 0.7), 0 0 18px -6px rgba(169, 139, 255, 0.8);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--a2) 70%, transparent), 0 0 18px -6px color-mix(in srgb, var(--a2) 80%, transparent);
 }
 
 /* ---------- Indicadores: orbe, número em itálico com degradê, inclinação 3D ---------- */
@@ -542,7 +545,7 @@
 .vx .kpi:hover,
 .vx .stat-tile:hover {
   transform: rotateX(6deg) rotateY(-6deg) translateY(-4px);
-  box-shadow: 0 30px 50px -26px #000, 0 0 30px -14px rgba(255, 106, 26, 0.5);
+  box-shadow: 0 30px 50px -26px #000, 0 0 30px -14px color-mix(in srgb, var(--a1) 50%, transparent);
 }
 
 .vx .kpi strong,
@@ -565,7 +568,7 @@
 }
 
 .vx .kpi.is-alert::before {
-  background: linear-gradient(135deg, #ff4f5e, #ff8f4d);
+  background: linear-gradient(135deg, #ff4f5e, var(--a1-2));
 }
 
 .vx .kpi.is-alert {
@@ -602,7 +605,7 @@
 .vx .vx-chip-lilac {
   background: radial-gradient(circle at 30% 25%, #efe6ff, #b49cff 35%, #6b48f0 85%);
   color: #130a2b;
-  box-shadow: 0 10px 20px -8px rgba(124, 92, 255, 0.9), inset 0 -3px 6px rgba(0, 0, 0, 0.25), inset 0 2px 3px rgba(255, 255, 255, 0.6);
+  box-shadow: 0 10px 20px -8px color-mix(in srgb, var(--a2-d) 90%, transparent), inset 0 -3px 6px rgba(0, 0, 0, 0.25), inset 0 2px 3px rgba(255, 255, 255, 0.6);
 }
 
 /* ---------- Tabelas ---------- */
@@ -618,7 +621,7 @@
 
 .vx .admin-table tbody tr:hover,
 .vx .dt-table tbody tr:hover {
-  background: linear-gradient(90deg, rgba(255, 106, 26, 0.08), transparent 70%);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--a1) 8%, transparent), transparent 70%);
   box-shadow: inset 2px 0 0 var(--nx-orange);
 }
 
@@ -642,7 +645,7 @@
 .vx .admin-modal {
   border-radius: 26px;
   background: linear-gradient(180deg, rgba(28, 28, 36, 0.96), rgba(16, 16, 21, 0.96));
-  box-shadow: 0 40px 90px -30px rgba(0, 0, 0, 0.95), 0 0 50px -16px rgba(255, 106, 26, 0.4), 0 0 70px -24px rgba(124, 92, 255, 0.45);
+  box-shadow: 0 40px 90px -30px rgba(0, 0, 0, 0.95), 0 0 50px -16px color-mix(in srgb, var(--a1) 40%, transparent), 0 0 70px -24px color-mix(in srgb, var(--a2-d) 45%, transparent);
   animation: nx-sobe 0.42s cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
   transform-origin: 50% 100%;
 }
@@ -660,7 +663,7 @@
   border-left: 0;
   border-radius: 24px;
   background: linear-gradient(180deg, rgba(28, 28, 36, 0.97), rgba(14, 14, 19, 0.97));
-  box-shadow: -30px 0 70px -20px rgba(0, 0, 0, 0.9), 0 0 50px -18px rgba(255, 106, 26, 0.4), 0 0 70px -26px rgba(124, 92, 255, 0.45);
+  box-shadow: -30px 0 70px -20px rgba(0, 0, 0, 0.9), 0 0 50px -18px color-mix(in srgb, var(--a1) 40%, transparent), 0 0 70px -26px color-mix(in srgb, var(--a2-d) 45%, transparent);
   animation: nx-desliza 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.05) both;
 }
 
@@ -694,7 +697,7 @@
 .vx .modal-close:hover,
 .vx .drawer-close:hover {
   transform: rotate(90deg);
-  background: rgba(255, 106, 26, 0.2);
+  background: color-mix(in srgb, var(--a1) 20%, transparent);
 }
 
 @keyframes nx-sobe {
@@ -816,7 +819,7 @@
   right: 14px;
   top: 36px;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 143, 77, 0.6), transparent);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--a1-2) 60%, transparent), transparent);
 }
 
 .vx .ov-lane h4 {
@@ -914,7 +917,7 @@
 
 .vx .ov-ticket.is-hot {
   background: linear-gradient(180deg, #2d1a12, #1d1512);
-  box-shadow: 0 0 0 1px rgba(255, 106, 26, 0.55), 0 0 22px -4px rgba(255, 106, 26, 0.55), 0 12px 22px -12px #000;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--a1) 55%, transparent), 0 0 22px -4px color-mix(in srgb, var(--a1) 55%, transparent), 0 12px 22px -12px #000;
 }
 
 .vx .ov-ticket.is-hot::after {
@@ -923,7 +926,7 @@
 
 .vx .ov-ticket.is-hot .ov-time {
   color: var(--nx-orange-2);
-  text-shadow: 0 0 10px rgba(255, 106, 26, 0.8);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--a1) 80%, transparent);
 }
 
 /* ---------- Celular e tablet ---------- */
@@ -1018,7 +1021,7 @@
   border: 0;
   border-radius: 26px;
   background: var(--nx-glass);
-  box-shadow: var(--nx-raise), 0 0 50px -20px rgba(255, 106, 26, 0.45);
+  box-shadow: var(--nx-raise), 0 0 50px -20px color-mix(in srgb, var(--a1) 45%, transparent);
   position: relative;
 }
 
@@ -1044,11 +1047,11 @@
 .vx .cash-received strong {
   font-weight: 700;
   letter-spacing: -0.03em;
-  background: linear-gradient(180deg, #ffd9c2, #ff6a1a);
+  background: linear-gradient(180deg, #ffd9c2, var(--a1));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  filter: drop-shadow(0 0 14px rgba(255, 106, 26, 0.45));
+  filter: drop-shadow(0 0 14px color-mix(in srgb, var(--a1) 45%, transparent));
 }
 
 .vx .cash-counter {
@@ -1080,8 +1083,8 @@
 
 .vx .cash-counter-modes button.is-active {
   color: #1a0b02;
-  background: linear-gradient(180deg, #ff9a5c, #ff6a1a);
-  box-shadow: 0 8px 16px -8px rgba(255, 106, 26, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  background: linear-gradient(180deg, #ff9a5c, var(--a1));
+  box-shadow: 0 8px 16px -8px color-mix(in srgb, var(--a1) 85%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
 .vx .cash-money {
@@ -1189,12 +1192,12 @@
   font-weight: 700;
   font-style: normal;
   text-shadow: none;
-  box-shadow: 0 0 12px rgba(255, 106, 26, 0.8);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--a1) 80%, transparent);
   animation: nx-pop 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.6);
 }
 
 .vx .cash-money-item.has-count .cash-money-face {
-  box-shadow: 0 10px 16px -10px #000, 0 0 0 2px rgba(255, 106, 26, 0.75), 0 0 18px -4px rgba(255, 106, 26, 0.7);
+  box-shadow: 0 10px 16px -10px #000, 0 0 0 2px color-mix(in srgb, var(--a1) 75%, transparent), 0 0 18px -4px color-mix(in srgb, var(--a1) 70%, transparent);
 }
 
 .vx .cash-money-minus {
@@ -1383,11 +1386,11 @@
 
 .vx .table-island:hover {
   transform: translateY(-3px);
-  box-shadow: inset 0 0 0 1px rgba(255, 143, 77, 0.35);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--a1-2) 35%, transparent);
 }
 
 .vx .table-island.is-selected {
-  box-shadow: inset 0 0 0 1.5px var(--nx-orange), 0 0 26px -8px rgba(255, 106, 26, 0.7);
+  box-shadow: inset 0 0 0 1.5px var(--nx-orange), 0 0 26px -8px color-mix(in srgb, var(--a1) 70%, transparent);
 }
 
 .vx .table-3d {
@@ -1541,9 +1544,9 @@
 .fx-banner { position: relative; overflow: hidden; isolation: isolate; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 22px; align-items: center;
   margin: 4px 0 18px; padding: 24px 26px; border-radius: 22px; background: var(--nx-glass); border: 1px solid transparent;
   background-image: linear-gradient(var(--nx-glass-2), var(--nx-glass-2)), var(--nx-neon); background-origin: border-box; background-clip: padding-box, border-box;
-  box-shadow: var(--nx-raise), 0 30px 60px -40px rgba(255, 106, 26, 0.75); transform: perspective(1200px) rotateX(1.2deg); }
+  box-shadow: var(--nx-raise), 0 30px 60px -40px color-mix(in srgb, var(--a1) 75%, transparent); transform: perspective(1200px) rotateX(1.2deg); }
 .fx-banner-glow { position: absolute; inset: -40% -10% auto auto; width: 340px; height: 340px; border-radius: 50%; z-index: -1; filter: blur(50px);
-  background: radial-gradient(circle, rgba(169, 139, 255, 0.55), rgba(255, 106, 26, 0.25) 55%, transparent 70%); animation: fxFloat 10s ease-in-out infinite alternate; }
+  background: radial-gradient(circle, color-mix(in srgb, var(--a2) 55%, transparent), color-mix(in srgb, var(--a1) 25%, transparent) 55%, transparent 70%); animation: fxFloat 10s ease-in-out infinite alternate; }
 @keyframes fxFloat { to { transform: translate(-60px, 40px) scale(1.12); } }
 .fx-banner-tag { margin: 0 0 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--nx-lilac-2); }
 .fx-banner h3 { margin: 0 0 8px; font-size: clamp(18px, 2.2vw, 24px); line-height: 1.2; }
@@ -1557,13 +1560,13 @@
   color: var(--accent-ink); background: var(--nx-orb); box-shadow: var(--nx-orb-shadow); }
 .fx-card { position: relative; }
 .fx-card .vx-panel-title em { font-style: normal; font-weight: 500; color: var(--nx-lilac-2); margin-left: 6px; font-size: 0.8em; }
-.fx-sync { padding: 10px 14px; border-radius: 12px; background: rgba(169, 139, 255, 0.1); border: 1px solid rgba(169, 139, 255, 0.28); }
-.fx-warn { padding: 12px 14px; border-radius: 14px; background: rgba(255, 106, 26, 0.1); border: 1px solid rgba(255, 106, 26, 0.38); box-shadow: 0 0 24px -14px var(--nx-orange); }
+.fx-sync { padding: 10px 14px; border-radius: 12px; background: color-mix(in srgb, var(--a2) 10%, transparent); border: 1px solid color-mix(in srgb, var(--a2) 28%, transparent); }
+.fx-warn { padding: 12px 14px; border-radius: 14px; background: color-mix(in srgb, var(--a1) 10%, transparent); border: 1px solid color-mix(in srgb, var(--a1) 38%, transparent); box-shadow: 0 0 24px -14px var(--nx-orange); }
 .fx-warn-actions { margin-top: 10px; }
 .fx-received { display: grid; gap: 10px; perspective: 1000px; }
 .fx-note { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 14px; align-items: center; padding: 14px 16px; border-radius: 16px;
   background: var(--nx-glass); border: 1px solid rgba(255, 255, 255, 0.07); box-shadow: var(--nx-raise); transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease; }
-.fx-note:hover { transform: translateY(-2px) rotateX(3deg); border-color: rgba(255, 106, 26, 0.45); box-shadow: var(--nx-raise), 0 18px 34px -24px var(--nx-orange); }
+.fx-note:hover { transform: translateY(-2px) rotateX(3deg); border-color: color-mix(in srgb, var(--a1) 45%, transparent); box-shadow: var(--nx-raise), 0 18px 34px -24px var(--nx-orange); }
 .fx-note.is-off { opacity: 0.6; }
 .fx-note-main { display: grid; gap: 4px; min-width: 0; }
 .fx-note-main small { color: var(--muted, #9a9aa6); font-family: ui-monospace, monospace; font-size: 11px; overflow-wrap: anywhere; }

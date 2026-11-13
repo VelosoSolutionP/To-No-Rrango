@@ -3,6 +3,8 @@
 import "../admin/admin.css";
 import "../admin/admin-theme.css";
 import "../admin/admin-neon.css";
+import "../admin/admin-hud.css";
+import { ColorDots } from "../admin/ColorDots";
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { API_BASE_URL, ApiError, problemDetail } from "@/lib/api";
 import { createAdminHttp, formatDateTime, UNAUTHORIZED_EVENT } from "@/lib/admin-api";
@@ -207,6 +209,7 @@ function Desk({ session, onSignOut, onFirm }: { session: PortalSession; onSignOu
             </button>
           ))}
         </nav>
+        <ColorDots />
         <div className="vx-foot">
           <span className="vx-avatar">{session.name.slice(0, 1).toUpperCase()}</span>
           <span className="vx-user"><strong>{session.name}</strong><small>{software ? "Software house" : "Contador"}{session.firm.isPartner ? " parceiro" : ""}</small></span>

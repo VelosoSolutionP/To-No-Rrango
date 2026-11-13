@@ -30,6 +30,8 @@ import { AdminContext } from "./AdminContext";
 import "./admin.css";
 import "./admin-theme.css";
 import "./admin-neon.css";
+import "./admin-hud.css";
+import { ColorDots } from "./ColorDots";
 import { Distribution } from "./modules/Distribution";
 import { Finance } from "./modules/Finance";
 import { Inventory } from "./modules/Inventory";
@@ -564,6 +566,7 @@ export function AdminClient() {
               </Fragment>
             ))}
           </nav>
+          <ColorDots />
           <div className="vx-foot">
             <span className="vx-avatar">{session.userName.slice(0, 1).toUpperCase()}</span>
             <span className="vx-user"><strong>{session.userName}</strong><small>{roleName[session.role]}</small></span>

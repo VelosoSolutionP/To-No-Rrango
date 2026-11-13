@@ -1,0 +1,152 @@
+/*
+ * HUD do ecossistema Veloso Solution no To No Rango (13/11/2026, dono: "o mesmo layout do ZEST
+ * em todas as telas" + "as bolinhas para mudar de cor: tem muita gente que não gosta de laranja").
+ *
+ * Carregado DEPOIS do admin-neon.css: só reveste. Nada aqui tem cor própria — tudo sai da paleta
+ * --a1 (ação) / --a2 (inteligência), que as bolinhas do rodapé do menu trocam. Quem criar tela nova
+ * usa estes tokens; cor fixa faria a tela ignorar a escolha do dono do restaurante.
+ */
+
+/* ---------- Paletas (as mesmas do ZEST, mais o laranja com lilás que já era do To No Rango) ---------- */
+:root[data-cor="verde"] .vx { --a1: #9cc46a; --a1-2: #b2d488; --a1-3: #cfe4b3; --a1-d: #7ea64c; --a2: #34d399; --a2-2: #6ee7b7; --a2-d: #12a877; --a-bg: #08090a; --a-ink: #10160a; }
+:root[data-cor="lilas"] .vx { --a1: #b9a0f5; --a1-2: #cbb8fa; --a1-3: #e2d6ff; --a1-d: #9479e0; --a2: #fb923c; --a2-2: #fdba74; --a2-d: #ea7a1c; --a-bg: #0c0b10; --a-ink: #170f2b; }
+:root[data-cor="grafite"] .vx { --a1: #d4d4d8; --a1-2: #e4e4e7; --a1-3: #f4f4f5; --a1-d: #a1a1aa; --a2: #a1a1aa; --a2-2: #d4d4d8; --a2-d: #71717a; --a-bg: #0b0b0c; --a-ink: #111113; }
+:root[data-cor="azul"] .vx { --a1: #5b9dff; --a1-2: #83b5ff; --a1-3: #b6d3ff; --a1-d: #3b7fe6; --a2: #fbbf24; --a2-2: #fcd34d; --a2-d: #d99f0b; --a-bg: #080b12; --a-ink: #06101f; }
+:root[data-cor="fusao"] .vx { --a1: #9fb0ff; --a1-2: #b9a0f5; --a1-3: #d6dcff; --a1-d: #7d8fe6; --a2: #9cc46a; --a2-2: #b2d488; --a2-d: #5b9dff; --a-bg: #0a0a0f; --a-ink: #0d0f1f; }
+:root[data-cor="carvao"] .vx { --a1: #ff782f; --a1-2: #ff9a57; --a1-3: #ffad7e; --a1-d: #e5601a; --a2: #ff9a57; --a2-2: #ffad7e; --a2-d: #e5601a; --a-bg: #0d0d0f; --a-ink: #16110e; }
+
+:root .vx {
+  --a-ink: #1a0b02;
+  --accent-ink: var(--a-ink);
+  --hud-fio: color-mix(in srgb, var(--a1) 30%, transparent);
+  --hud-fio-2: color-mix(in srgb, var(--a1) 58%, transparent);
+  --hud-luz: color-mix(in srgb, var(--a1) 42%, transparent);
+  --hud-claro: color-mix(in srgb, var(--a1-3) 45%, #fff);
+  --hud-c: 14px;
+  --hud-chanfro: polygon(var(--hud-c) 0, 100% 0, 100% calc(100% - var(--hud-c)), calc(100% - var(--hud-c)) 100%, 0 100%, 0 var(--hud-c));
+  --hud-cantos:
+    linear-gradient(135deg, transparent 9.4px, var(--hud-fio-2) 9.4px 10.6px, transparent 10.6px) 0 0 / 15px 15px no-repeat,
+    linear-gradient(315deg, transparent 9.4px, var(--hud-fio-2) 9.4px 10.6px, transparent 10.6px) 100% 100% / 15px 15px no-repeat;
+}
+
+/* ---------- Superfícies: chanfro + fio de luz nos dois cantos ---------- */
+:root .vx :is(.card, .zx-card, .fx-card, .vx-box, .chart-card, .admin-form-card, .admin-table-wrap, .kpi, .stat-tile) {
+  border-radius: 4px;
+  clip-path: var(--hud-chanfro);
+  background: var(--hud-cantos), var(--nx-glass);
+  box-shadow: inset 0 0 0 1px var(--hud-fio), var(--nx-raise);
+}
+:root .vx :is(.card, .zx-card, .kpi)::before { border-radius: 4px; }
+:root .vx :is(.card, .zx-card, .fx-card, .vx-box, .kpi, .stat-tile) { transition: box-shadow 0.3s, transform 0.3s; }
+:root .vx :is(.card, .zx-card, .fx-card, .vx-box, .kpi):hover {
+  box-shadow: inset 0 0 0 1px var(--a1-2), inset 0 0 28px color-mix(in srgb, var(--a1) 16%, transparent), var(--nx-raise);
+}
+:root .vx :is(.kpi, .stat-tile) { --hud-c: 10px; }
+
+/* ---------- Menu lateral e janelas ---------- */
+:root .vx .vx-side {
+  border-radius: 4px;
+  clip-path: polygon(22px 0, 100% 0, 100% calc(100% - 22px), calc(100% - 22px) 100%, 0 100%, 0 22px);
+  background:
+    linear-gradient(135deg, transparent 15px, var(--hud-fio-2) 15px 16.2px, transparent 16.2px) 0 0 / 23px 23px no-repeat,
+    linear-gradient(315deg, transparent 15px, var(--hud-fio-2) 15px 16.2px, transparent 16.2px) 100% 100% / 23px 23px no-repeat,
+    var(--nx-glass);
+}
+:root .vx .vx-side::before { border-radius: 4px; }
+:root .vx .vx-nav button { border-radius: 3px; clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px); }
+:root .vx .vx-nav button.is-active {
+  background: color-mix(in srgb, var(--a1) 16%, transparent);
+  color: #fff;
+  box-shadow: inset 0 0 0 1px var(--hud-fio-2), inset 0 0 18px color-mix(in srgb, var(--a1) 20%, transparent);
+  text-shadow: 0 0 10px var(--hud-luz);
+}
+:root .vx :is(.modal, .drawer, .admin-modal) {
+  border-radius: 0;
+  clip-path: polygon(22px 0, 100% 0, 100% calc(100% - 22px), calc(100% - 22px) 100%, 0 100%, 0 22px);
+  background: var(--hud-cantos), linear-gradient(170deg, var(--nx-glass-2), var(--nx-bg));
+  box-shadow: inset 0 0 0 1px var(--hud-fio-2), 0 40px 90px -30px var(--hud-luz);
+}
+:root .vx :is(.modal, .drawer)::before { border-radius: 0; }
+:root .vx :is(.modal, .drawer) :is(h2, h3):first-of-type { letter-spacing: 0.1em; text-transform: uppercase; text-shadow: 0 0 12px var(--hud-luz); }
+
+/* ---------- Botões: chanfrados, contorno na cor, acendem por dentro ---------- */
+:root .vx :is(.primary-button, .primary-button-full, .secondary-button, .secondary-button-small) {
+  --cc: var(--hud-fio-2);
+  border: 0;
+  border-radius: 0;
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.78rem;
+  color: var(--hud-claro);
+  background:
+    linear-gradient(135deg, transparent 6.4px, var(--cc) 6.4px 7.6px, transparent 7.6px) 0 0 / 11px 11px no-repeat,
+    linear-gradient(315deg, transparent 6.4px, var(--cc) 6.4px 7.6px, transparent 7.6px) 100% 100% / 11px 11px no-repeat,
+    var(--bgz, linear-gradient(180deg, var(--nx-glass-2), var(--nx-glass)));
+  box-shadow: inset 0 0 0 1px var(--hud-fio-2);
+  transition: box-shadow 0.25s, color 0.25s, text-shadow 0.25s, transform 0.2s;
+}
+:root .vx :is(.primary-button, .primary-button-full, .secondary-button, .secondary-button-small):hover:not(:disabled) {
+  --cc: var(--a1-2);
+  --bgz: linear-gradient(180deg, color-mix(in srgb, var(--a1) 34%, var(--nx-bg)), color-mix(in srgb, var(--a1) 18%, var(--nx-bg)));
+  color: #fff;
+  background:
+    linear-gradient(135deg, transparent 6.4px, var(--cc) 6.4px 7.6px, transparent 7.6px) 0 0 / 11px 11px no-repeat,
+    linear-gradient(315deg, transparent 6.4px, var(--cc) 6.4px 7.6px, transparent 7.6px) 100% 100% / 11px 11px no-repeat,
+    var(--bgz, linear-gradient(180deg, var(--nx-glass-2), var(--nx-glass)));
+  text-shadow: 0 0 10px var(--a1-2);
+  filter: none;
+  transform: none;
+  box-shadow: inset 0 0 0 1px var(--a1-2), inset 0 0 22px color-mix(in srgb, var(--a1) 50%, transparent);
+}
+:root .vx :is(.primary-button, .primary-button-full) {
+  --cc: var(--a1-2);
+  --bgz: linear-gradient(180deg, color-mix(in srgb, var(--a1) 46%, var(--nx-bg)), color-mix(in srgb, var(--a1) 24%, var(--nx-bg)));
+  color: #fff;
+  font-weight: 800;
+  box-shadow: inset 0 0 0 1px var(--a1-2), inset 0 0 18px color-mix(in srgb, var(--a1) 45%, transparent);
+}
+:root .vx :is(.primary-button, .primary-button-full, .secondary-button, .secondary-button-small):active:not(:disabled) { transform: scale(0.98); }
+:root .vx :is(.primary-button, .primary-button-full, .secondary-button, .secondary-button-small):disabled { opacity: 0.45; filter: grayscale(0.6); }
+:root .vx .secondary-button.danger, :root .vx .danger.secondary-button-small {
+  --cc: #ff4d6d; color: #ffd5dc; box-shadow: inset 0 0 0 1px rgba(255, 77, 109, 0.6);
+  --bgz: linear-gradient(180deg, rgba(255, 77, 109, 0.2), rgba(255, 77, 109, 0.08));
+}
+:root .vx .link-button { color: var(--a1-2); letter-spacing: 0.04em; transition: text-shadow 0.2s, color 0.2s; }
+:root .vx .link-button:hover { color: #fff; text-shadow: 0 0 10px var(--a1-2); }
+
+/* ---------- Campos: chanfrados, foco acende por dentro ---------- */
+:root .vx :is(.field input, .field textarea, .field select, .module-line input, .module-line select, .module-form select, .module-stack select, .dt-search, .pdv-search, .fiscal-input) {
+  border-radius: 3px;
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  box-shadow: inset 0 0 0 1px var(--hud-fio), inset 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+:root .vx :is(.field input, .field textarea, .field select, .pdv-search, .dt-search, .fiscal-input):focus {
+  outline: 0;
+  box-shadow: inset 0 0 0 1px var(--a1-2), inset 0 0 16px color-mix(in srgb, var(--a1) 22%, transparent);
+}
+
+/* ---------- Etiquetas e rótulos ---------- */
+:root .vx :is(.admin-badge, .vx-pill) {
+  border-radius: 2px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+}
+:root .vx :is(.vx-panel-title, .admin-section-heading, .eyebrow) { letter-spacing: 0.1em; text-transform: uppercase; }
+:root .vx .admin-table thead th { letter-spacing: 0.1em; text-transform: uppercase; font-size: 0.72rem; }
+
+/* ---------- Bolinhas de cor no rodapé do menu ---------- */
+:root .vx .vx-cores { display: flex; gap: 8px; justify-content: center; padding: 10px 12px 4px; }
+:root .vx .vx-cores button {
+  width: 20px; height: 20px; border-radius: 50%; border: 0; padding: 0; cursor: pointer;
+  background: var(--c);
+  box-shadow: 0 0 0 2px var(--nx-bg), 0 0 0 3px rgba(255, 255, 255, 0.14);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+:root .vx .vx-cores button:hover { transform: scale(1.15); }
+:root .vx .vx-cores button.on { box-shadow: 0 0 0 2px var(--nx-bg), 0 0 0 4px #fff, 0 0 14px var(--a1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .vx :is(.card, .kpi, .primary-button, .secondary-button) { transition: none; }
+}
