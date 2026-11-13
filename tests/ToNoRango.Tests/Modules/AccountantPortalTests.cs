@@ -23,8 +23,9 @@ public class AccountantPortalTests
         public Establishment Store { get; }
         public AccountantPortalService Portal { get; }
         public AccountantDeskService Desk { get; }
+        public IEmailSender Mail { get; } = Substitute.For<IEmailSender>();
 
-        public World()
+        public World(string? mailError = null)
         {
             Store = (Establishment)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(Establishment));
             typeof(Establishment).GetProperty(nameof(Establishment.Id))!.SetValue(Store, Guid.NewGuid());
@@ -37,7 +38,11 @@ public class AccountantPortalTests
             tokens.IssueAccountant(default, default, default!, default!, default!).ReturnsForAnyArgs(("token", DateTimeOffset.UtcNow.AddHours(1)));
 
             Portal = new AccountantPortalService(Firms, Users, Links, Messages, hasher, tokens, Substitute.For<IUnitOfWork>(), TimeProvider.System);
-            Desk = new AccountantDeskService(Links, Messages, Firms, new MemoryRepository<Establishment>(Store), Keys, Webhooks, Substitute.For<IUnitOfWork>(), TimeProvider.System);
+            Mail.IsConfigured.Returns(true);
+            Mail.SendAsync(default!, default).ReturnsForAnyArgs(mailError);
+            var urls = Substitute.For<IAppUrls>();
+            urls.AccountantPortalUrl().Returns("https://loja.test/contador");
+            Desk = new AccountantDeskService(Links, Messages, Firms, new MemoryRepository<Establishment>(Store), Keys, Webhooks, Substitute.For<IUnitOfWork>(), TimeProvider.System, Mail, urls);
         }
 
         public async Task<string> InviteAsync(string email = "contador@escritorio.com", PartnerKind kind = PartnerKind.Accounting) =>
@@ -214,5 +219,34 @@ public class AccountantPortalTests
         partnerKey.IsActive.ShouldBeFalse();
         storeKey.IsActive.ShouldBeTrue();
         partnerHook.IsActive.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Convite_sai_por_email_na_hora_com_o_codigo_e_o_link()
+    {
+        var world = new World();
+
+        var result = await world.Desk.InviteAsync(Tenant, world.Store.Id, new InviteAccountantRequest("Contador@Escritorio.com"), "dono@loja", CancellationToken.None);
+
+        result.Value.Link.InviteEmailedAt.ShouldNotBeNull();
+        result.Value.Link.InviteEmailError.ShouldBeNull();
+        await world.Mail.Received(1).SendAsync(Arg.Is<EmailMessage>(m =>
+            m.To == "contador@escritorio.com" &&
+            m.Text.Contains(result.Value.Code) &&
+            m.Text.Contains("https://loja.test/contador?convite=") &&
+            m.Subject.Contains("Açaí do Veloso")), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Email_que_falha_fica_registrado_e_o_codigo_continua_valendo()
+    {
+        var world = new World("SMTP recusou");
+
+        var result = await world.Desk.InviteAsync(Tenant, world.Store.Id, new InviteAccountantRequest("contador@escritorio.com"), "dono@loja", CancellationToken.None);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Link.InviteEmailedAt.ShouldBeNull();
+        result.Value.Link.InviteEmailError.ShouldBe("SMTP recusou");
+        (await world.Portal.SignUpAsync(world.SignUp(result.Value.Code), CancellationToken.None)).IsSuccess.ShouldBeTrue();
     }
 }

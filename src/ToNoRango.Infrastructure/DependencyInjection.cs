@@ -47,6 +47,7 @@ public static class DependencyInjection
         services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
         services.AddSingleton<ISecretProtector, AesGcmSecretProtector>();
         services.AddSingleton<IAppUrls, AppUrls>();
+        services.AddSingleton<IEmailSender, Email.SmtpEmailSender>();
         services.AddMemoryCache();
         services.AddSingleton(configuration.GetSection(ToNoRango.Application.Identity.VelosoIdOptions.SectionName).Get<ToNoRango.Application.Identity.VelosoIdOptions>() ?? new ToNoRango.Application.Identity.VelosoIdOptions());
         services.AddHttpClient<ToNoRango.Application.Identity.IVelosoIdGateway, Security.VelosoIdGateway>(client => client.Timeout = TimeSpan.FromSeconds(8));

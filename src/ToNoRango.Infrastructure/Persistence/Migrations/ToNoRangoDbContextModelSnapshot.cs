@@ -756,6 +756,13 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("FirmId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("InviteEmailError")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<DateTimeOffset?>("InviteEmailedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("InvitedBy")
                         .IsRequired()
                         .HasMaxLength(160)

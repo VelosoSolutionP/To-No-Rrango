@@ -63,6 +63,9 @@ public interface IAppUrls
     /// <summary>The page the courier opens to share the location of one delivery.</summary>
     string CourierUrl(string token) => $"/entrega/{token}";
 
+    /// <summary>The partners' portal (accountants and software houses).</summary>
+    string AccountantPortalUrl() => "/contador";
+
     /// <summary>Public base address of this API, or null when it is not reachable from the internet.</summary>
     string? PublicApiUrl { get; }
 
@@ -243,4 +246,15 @@ public interface ITextToSpeech
 
     /// <summary>A voice note in ogg/opus as base64, or null when it could not be made.</summary>
     Task<string?> SpeakAsync(string text, CancellationToken cancellationToken);
+}
+
+/// <summary>One e-mail to one person. Html is optional; Text always goes as the plain version.</summary>
+public sealed record EmailMessage(string To, string Subject, string Text, string? Html = null);
+
+/// <summary>Outgoing e-mail. Returns null when the server accepted the message, or the reason it did not.</summary>
+public interface IEmailSender
+{
+    bool IsConfigured { get; }
+
+    Task<string?> SendAsync(EmailMessage message, CancellationToken cancellationToken);
 }

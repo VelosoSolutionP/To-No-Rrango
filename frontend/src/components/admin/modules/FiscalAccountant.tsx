@@ -31,6 +31,8 @@ interface AccountantLink {
   codeExpiresAt: string | null;
   acceptedAt: string | null;
   revokedAt: string | null;
+  inviteEmailedAt?: string | null;
+  inviteEmailError?: string | null;
 }
 
 interface Desk {
@@ -104,7 +106,7 @@ export function FiscalAccountantView({ http, establishmentId }: { http: AdminHtt
   const base = `/establishments/${establishmentId}/fiscal/accountant`;
   const desk = useLoad(() => http.get<Desk>(base), [base]);
   const action = useAction(() => desk.reload());
-  const [invite, setInvite] = useState<{ email: string; code: string } | null>(null);
+  const [invite, setInvite] = useState<{ email: string; code: string; emailed: boolean; error: string | null } | null>(null);
   const portal = typeof window === "undefined" ? "/contador" : `${window.location.origin}/contador`;
   const hasAccountant = (desk.data?.links ?? []).some((link) => link.status === "Active");
 
@@ -115,8 +117,8 @@ export function FiscalAccountantView({ http, establishmentId }: { http: AdminHtt
     const email = String(values.get("email") ?? "");
     const kind = String(values.get("kind") ?? "Accounting");
     await action.run(async () => {
-      const created = await http.post<{ code: string }>(`${base}/invites`, { email, kind });
-      setInvite({ email, code: created.code });
+      const created = await http.post<{ code: string; link: AccountantLink }>(`${base}/invites`, { email, kind });
+      setInvite({ email, code: created.code, emailed: Boolean(created.link?.inviteEmailedAt), error: created.link?.inviteEmailError ?? null });
       form.reset();
     });
   }
@@ -141,19 +143,21 @@ export function FiscalAccountantView({ http, establishmentId }: { http: AdminHtt
         <ErrorMessage message={desk.error ?? action.error} />
         {invite ? (
           <div className="zest-key">
-            <strong>Mande para {invite.email}: o código vale 7 dias e só uma vez.</strong>
+            {invite.emailed
+              ? <strong><StatusChip tone="ok">E-mail enviado</StatusChip> Convite enviado para {invite.email}, com o código e o link do portal. Vale 7 dias e só uma vez.</strong>
+              : <strong><StatusChip tone="warn">E-mail não enviado</StatusChip> {invite.error ?? "O e-mail não saiu."} Mande o código para {invite.email} por outro meio.</strong>}
             <code>{invite.code}</code>
             <span className="muted">Endereço do portal: {portal}</span>
             <div className="fx-actions">
-              <button className="secondary-button" onClick={() => void navigator.clipboard?.writeText(`Acesse ${portal} e use o código ${invite.code} com o e-mail ${invite.email}.`)} type="button">Copiar convite</button>
-              <button className="secondary-button" onClick={() => setInvite(null)} type="button">Já mandei</button>
+              <button className="secondary-button" onClick={() => void navigator.clipboard?.writeText(`Acesse ${portal}?convite=${encodeURIComponent(invite.code)}&email=${encodeURIComponent(invite.email)} e use o código ${invite.code} com o e-mail ${invite.email}.`)} type="button">Copiar convite</button>
+              <button className="secondary-button" onClick={() => setInvite(null)} type="button">{invite.emailed ? "Fechar" : "Já mandei"}</button>
             </div>
           </div>
         ) : null}
         <form className="module-form module-form-flat" onSubmit={sendInvite}>
           <label className="field"><span>Quem</span><select defaultValue="Accounting" name="kind"><option value="Accounting">Contador / escritório contábil</option><option value="SoftwareHouse">Software house (sistema integrado)</option></select></label>
           <label className="field"><span>E-mail</span><input maxLength={200} name="email" placeholder="contato@parceiro.com.br" required type="email" /></label>
-          <div><button className="primary-button" disabled={action.busy} type="submit">Gerar convite</button></div>
+          <div><button className="primary-button" disabled={action.busy} type="submit">Gerar e enviar convite</button></div>
         </form>
 
         {desk.data && desk.data.links.length === 0 ? <Empty>Nenhum parceiro convidado.</Empty> : null}
@@ -170,6 +174,8 @@ export function FiscalAccountantView({ http, establishmentId }: { http: AdminHtt
                     <td>
                       <StatusChip tone={link.status === "Active" ? "ok" : link.status === "Invited" ? "warn" : "muted"}>{statusLabel[link.status]}</StatusChip>
                       {link.status === "Invited" && link.codeExpiresAt ? <small className="muted"> até {formatDateTime(link.codeExpiresAt)}</small> : null}
+                      {link.status === "Invited" && link.inviteEmailedAt ? <> <StatusChip tone="ok">E-mail enviado</StatusChip><small className="muted"> {formatDateTime(link.inviteEmailedAt)}</small></> : null}
+                      {link.status === "Invited" && !link.inviteEmailedAt && link.inviteEmailError ? <> <StatusChip tone="warn">E-mail não enviado</StatusChip></> : null}
                     </td>
                     <td>{formatDateTime(link.acceptedAt ?? link.createdAt)}</td>
                     <td>{link.status !== "Revoked" ? <button className="secondary-button" disabled={action.busy} onClick={() => revoke(link)} type="button">{link.status === "Active" ? "Tirar acesso" : "Cancelar convite"}</button> : null}</td>

@@ -46,14 +46,14 @@ export function AdminLogin({ onLogin, busy, error, onVelosoId, passwordLogin = f
   return (
     <main className="vx-login">
       <header className="vx-login-top">
-        <Link className="vx-login-brand" href="/">
+        <Link className="vx-login-brand" href="/admin">
           <span>TR</span>
           <div>
             <strong>TO-NO-<b>RANGO</b></strong>
             <small>por Veloso Solution</small>
           </div>
         </Link>
-        <Link className="vx-login-product" href="/">
+        <Link className="vx-login-product" href="/admin">
           <i aria-hidden="true">▶</i>
           Conheça o produto
         </Link>

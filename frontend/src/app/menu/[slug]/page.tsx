@@ -38,9 +38,6 @@ export default async function MenuPage({ params }: MenuPageProps) {
             Confira o link ou tente novamente em instantes. Se o problema continuar, fale com o
             estabelecimento.
           </p>
-          <a className="secondary-button" href="/">
-            Voltar ao início
-          </a>
         </div>
       </main>
     );

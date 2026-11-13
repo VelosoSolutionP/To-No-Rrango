@@ -520,7 +520,7 @@ export function AdminClient() {
     <AdminContext.Provider value={{ http, establishmentId: selectedId }}>
       <div className={`vx ${navOpen ? "is-open" : ""}`}>
         <aside className="vx-side">
-          <Link className="vx-brand" href="/">
+          <Link className="vx-brand" href="/admin">
             <span className="vx-mark">TR</span>
             <div>
               <strong>To-No-<em>Rango</em></strong>

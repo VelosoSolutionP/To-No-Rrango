@@ -242,6 +242,7 @@ public sealed class AccountantLinkConfiguration : IEntityTypeConfiguration<ToNoR
         builder.Property(link => link.InvitedEmail).HasMaxLength(200).IsRequired();
         builder.Property(link => link.CodeHash).HasMaxLength(64);
         builder.Property(link => link.InvitedBy).HasMaxLength(160).IsRequired();
+        builder.Property(link => link.InviteEmailError).HasMaxLength(300);
         builder.HasIndex(link => link.CodeHash).IsUnique().HasFilter("\"CodeHash\" IS NOT NULL");
         builder.HasIndex(link => new { link.FirmId, link.Status });
         builder.HasIndex(link => new { link.EstablishmentId, link.Status });

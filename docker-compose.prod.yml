@@ -16,6 +16,13 @@ services:
       VelosoId__RedirectUri: "https://to-no-rango.velososolution.com.br/admin"
       VelosoId__PasswordLoginEnabled: "false"
       VelosoId__OwnerEmail: "dono@tonorango.velososolution.com.br"
+      # Convite do contador sai por e-mail (mesma conta SMTP do resto da Veloso Solution). Sem usuário/senha, fica desligado.
+      Email__Host: "${TNR_SMTP_HOST:-smtp.zoho.com}"
+      Email__Port: "${TNR_SMTP_PORT:-465}"
+      Email__User: "${TNR_SMTP_USER:-}"
+      Email__Password: "${TNR_SMTP_PASS:-}"
+      Email__From: "${TNR_SMTP_FROM:-}"
+      Email__Name: "To No Rango"
       # Consulta de produtos por código de barras; sem usuário, o botão avisa que não está configurado.
       Gtin__Username: "${TNR_GTIN_USUARIO:-}"
       Gtin__Password: "${TNR_GTIN_SENHA:-}"

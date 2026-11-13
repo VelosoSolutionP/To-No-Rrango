@@ -42,7 +42,9 @@ public sealed record AccountantLinkDto(
     DateTimeOffset CreatedAt,
     DateTimeOffset? CodeExpiresAt,
     DateTimeOffset? AcceptedAt,
-    DateTimeOffset? RevokedAt);
+    DateTimeOffset? RevokedAt,
+    DateTimeOffset? InviteEmailedAt = null,
+    string? InviteEmailError = null);
 
 public sealed record PostAccountantMessageRequest(string Text, bool IsRequest = false);
 
@@ -333,7 +335,9 @@ public sealed class AccountantDeskService(
     IRepository<FiscalApiKey> apiKeys,
     IRepository<FiscalWebhook> webhooks,
     IUnitOfWork unitOfWork,
-    TimeProvider clock)
+    TimeProvider clock,
+    IEmailSender? mail = null,
+    IAppUrls? urls = null)
 {
     public const int CodeLength = 10;
 
@@ -382,7 +386,13 @@ public sealed class AccountantDeskService(
             var link = new AccountantLink(tenantId, establishmentId, establishment.Name, email, FiscalApiRules.HashKey(code), actor, now, request.Kind);
             links.Add(link);
             await unitOfWork.SaveChangesAsync(cancellationToken);
-            return new AccountantInviteDto(ToDto(link, null), $"{code[..5]}-{code[5..]}");
+            var shown = $"{code[..5]}-{code[5..]}";
+
+            // Owner (13/11): "quando eu gerar o convite já enviar pra ela automaticamente". The code is
+            // already saved; a mail failure only gets recorded, and the code can still be passed by hand.
+            link.RecordInviteEmail(clock.GetUtcNow(), await SendInviteAsync(link, establishment.Name, shown, cancellationToken));
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return new AccountantInviteDto(ToDto(link, null), shown);
         });
 
     public Task<Result<AccountantLinkDto>> RevokeAsync(Guid establishmentId, Guid linkId, CancellationToken cancellationToken) =>
@@ -500,7 +510,45 @@ public sealed class AccountantDeskService(
         });
 
     private static AccountantLinkDto ToDto(AccountantLink link, AccountantFirm? firm) =>
-        new(link.Id, link.Kind, link.InvitedEmail, link.Status, firm?.Name, firm?.Crc, firm?.IsPartner ?? false, link.InvitedBy, link.CreatedAt, link.CodeExpiresAt, link.AcceptedAt, link.RevokedAt);
+        new(link.Id, link.Kind, link.InvitedEmail, link.Status, firm?.Name, firm?.Crc, firm?.IsPartner ?? false, link.InvitedBy, link.CreatedAt, link.CodeExpiresAt, link.AcceptedAt, link.RevokedAt, link.InviteEmailedAt, link.InviteEmailError);
+
+    /// <summary>Null when the mail server accepted it; otherwise the reason, shown on the invitation.</summary>
+    private async Task<string?> SendInviteAsync(AccountantLink link, string storeName, string code, CancellationToken cancellationToken)
+    {
+        if (mail is null || !mail.IsConfigured)
+        {
+            return "Envio de e-mail não configurado no servidor. Passe o código ao parceiro.";
+        }
+
+        var portal = urls?.AccountantPortalUrl() ?? "/contador";
+        var address = $"{portal}?convite={Uri.EscapeDataString(code)}&email={Uri.EscapeDataString(link.InvitedEmail)}";
+        var role = link.Kind == PartnerKind.Accounting ? "contador(a)" : "software house";
+        var expires = link.CodeExpiresAt?.ToOffset(TimeSpan.FromHours(-3)).ToString("dd/MM/yyyy 'às' HH:mm") ?? "7 dias";
+        var text =
+            $"Olá!\n\n{storeName} convidou você como {role} no To No Rango.\n\n" +
+            $"Código do convite: {code}\n" +
+            $"Abra o portal de parceiros: {address}\n\n" +
+            $"O código vale até {expires} e só funciona com este e-mail ({link.InvitedEmail}).\n" +
+            "Se você já tem acesso ao portal, entre e use o código em \"Adicionar empresa\".\n\n" +
+            "Se não esperava este convite, ignore esta mensagem.\n\nTo No Rango · Veloso Solution";
+        var safeStore = System.Net.WebUtility.HtmlEncode(storeName);
+        var html =
+            "<div style=\"font-family:Arial,sans-serif;max-width:520px;color:#1a1a1a\">" +
+            $"<p>Olá!</p><p><b>{safeStore}</b> convidou você como <b>{role}</b> no To No Rango.</p>" +
+            $"<p style=\"font-size:13px;color:#555\">Código do convite</p><p style=\"font-size:26px;font-weight:bold;letter-spacing:3px;margin:0 0 18px\">{code}</p>" +
+            $"<p><a href=\"{System.Net.WebUtility.HtmlEncode(address)}\" style=\"background:#ff6a1f;color:#fff;padding:12px 22px;text-decoration:none;font-weight:bold;display:inline-block\">Aceitar convite</a></p>" +
+            $"<p style=\"font-size:13px;color:#555\">O código vale até {expires} e só funciona com este e-mail. Se você já tem acesso ao portal, entre e use o código em \"Adicionar empresa\".</p>" +
+            "<p style=\"font-size:12px;color:#888\">Se não esperava este convite, ignore esta mensagem.<br>To No Rango · Veloso Solution</p></div>";
+
+        try
+        {
+            return await mail.SendAsync(new EmailMessage(link.InvitedEmail, $"{storeName} convidou você para o To No Rango", text, html), cancellationToken);
+        }
+        catch (Exception failure) when (failure is not OperationCanceledException)
+        {
+            return $"Falha no envio: {failure.Message}";
+        }
+    }
 
     private static AccountantMessageDto ToDto(AccountantMessage message, AccountantSide side) =>
         new(message.Id, message.FromAccountant, message.FromAccountant == side.IsAccountant, message.Author, message.Text, message.IsRequest, message.ResolvedAt, message.ResolvedBy, message.ReadAt, message.CreatedAt);

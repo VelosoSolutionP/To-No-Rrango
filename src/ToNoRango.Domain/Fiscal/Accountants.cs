@@ -138,6 +138,12 @@ public sealed class AccountantLink : AggregateRoot
     public DateTimeOffset? AcceptedAt { get; private set; }
     public DateTimeOffset? RevokedAt { get; private set; }
 
+    /// <summary>When the mail server accepted the invitation e-mail; null while it was not sent.</summary>
+    public DateTimeOffset? InviteEmailedAt { get; private set; }
+
+    /// <summary>Why the invitation e-mail did not go out (the panel shows it, the code still works by hand).</summary>
+    public string? InviteEmailError { get; private set; }
+
     private AccountantLink() { }
 
     public AccountantLink(Guid tenantId, Guid establishmentId, string establishmentName, string email, string codeHash, string invitedBy, DateTimeOffset now, PartnerKind kind = PartnerKind.Accounting)
@@ -171,6 +177,18 @@ public sealed class AccountantLink : AggregateRoot
         // Single use: the code can never open a second door.
         CodeHash = null;
         CodeExpiresAt = null;
+    }
+
+    public void RecordInviteEmail(DateTimeOffset now, string? error)
+    {
+        if (string.IsNullOrWhiteSpace(error))
+        {
+            InviteEmailedAt = now;
+            InviteEmailError = null;
+            return;
+        }
+
+        InviteEmailError = error.Trim()[..Math.Min(error.Trim().Length, 300)];
     }
 
     public void Revoke(DateTimeOffset now)

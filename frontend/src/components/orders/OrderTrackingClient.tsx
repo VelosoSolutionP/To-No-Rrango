@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, formatBRL, formatDateTime } from "@/lib/api";
 import { prepLabels, type OrderStatus, type OrderTracking } from "@/lib/types";
@@ -99,9 +98,6 @@ export function OrderTrackingClient({ code }: OrderTrackingClientProps) {
           <p className="eyebrow">Pedido</p>
           <h1>Não encontramos este pedido</h1>
           <p className="muted">{error}</p>
-          <Link className="secondary-button" href="/">
-            Voltar ao início
-          </Link>
         </div>
       </main>
     );
@@ -121,9 +117,7 @@ export function OrderTrackingClient({ code }: OrderTrackingClientProps) {
   return (
     <main className="tracking-page pub-hud" style={storeThemeStyle(order?.storePrimaryColor, order?.storeSecondaryColor)}>
       <header className="tracking-header">
-        <Link className="tracking-back" href="/">
-          ← To-No-Rango
-        </Link>
+        <span className="tracking-back">To-No-Rango</span>
         <span className={`status-badge status-${order.status.toLowerCase()}`}>
           {statusLabels[order.status]}
         </span>

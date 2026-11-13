@@ -106,8 +106,15 @@ export function AccountantPortal() {
   return session ? <Desk onSignOut={signOut} onFirm={(firm) => signIn({ ...session, firm })} session={session} /> : <Gate onSignIn={signIn} />;
 }
 
+/** The invitation e-mail opens /contador?convite=CODE&email=...: the form comes filled in. */
+function invitationFromUrl() {
+  const query = new URLSearchParams(window.location.search);
+  return { code: (query.get("convite") ?? "").slice(0, 20), email: (query.get("email") ?? "").slice(0, 200) };
+}
+
 function Gate({ onSignIn }: { onSignIn: (session: PortalSession) => void }) {
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [invitation] = useState(invitationFromUrl);
+  const [mode, setMode] = useState<"login" | "signup">(invitation.code ? "signup" : "login");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -149,7 +156,7 @@ function Gate({ onSignIn }: { onSignIn: (session: PortalSession) => void }) {
             {mode === "signup" ? (
               <>
                 <p className="muted field-wide">A empresa gera o convite no painel dela (Fiscal → Contador e parceiros) para o seu e-mail.</p>
-                <label className="field field-wide"><span>Código do convite</span><input autoComplete="off" name="inviteCode" placeholder="ABCDE-FGHJK" required /></label>
+                <label className="field field-wide"><span>Código do convite</span><input autoComplete="off" defaultValue={invitation.code} name="inviteCode" placeholder="ABCDE-FGHJK" required /></label>
                 <label className="field field-wide"><span>Nome do escritório ou da empresa</span><input maxLength={120} name="firmName" required /></label>
                 <label className="field"><span>CNPJ (ou CPF do contador)</span><input inputMode="numeric" name="document" required /></label>
                 <label className="field"><span>CRC (só contador)</span><input name="crc" placeholder="MG-123456/O" /></label>
@@ -157,7 +164,7 @@ function Gate({ onSignIn }: { onSignIn: (session: PortalSession) => void }) {
                 <label className="field"><span>Telefone (opcional)</span><input name="phone" /></label>
               </>
             ) : null}
-            <label className="field"><span>E-mail</span><input autoComplete="username" name="email" required type="email" /></label>
+            <label className="field"><span>E-mail</span><input autoComplete="username" defaultValue={invitation.email} name="email" required type="email" /></label>
             <label className="field"><span>Senha{mode === "signup" ? " (8 ou mais caracteres)" : ""}</span><input autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "signup" ? 8 : undefined} name="password" required type="password" /></label>
             <ErrorMessage message={error} />
             <div><button className="primary-button" disabled={busy} type="submit">{busy ? "Aguarde…" : mode === "login" ? "Entrar" : "Criar acesso"}</button></div>
@@ -311,7 +318,7 @@ function Overview({ session, companies, http, onOpen, onAdded, onFirm }: {
           </div>
         ) : null}
         <form className="module-form module-form-flat" onSubmit={accept}>
-          <label className="field"><span>Adicionar empresa com código de convite</span><input autoComplete="off" name="code" placeholder="ABCDE-FGHJK" required /></label>
+          <label className="field"><span>Adicionar empresa com código de convite</span><input autoComplete="off" defaultValue={invitationFromUrl().code} name="code" placeholder="ABCDE-FGHJK" required /></label>
           <div><button className="primary-button" disabled={action.busy} type="submit">Adicionar</button></div>
         </form>
         <ErrorMessage message={action.error} />
