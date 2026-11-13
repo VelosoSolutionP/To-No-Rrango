@@ -150,3 +150,7 @@
 @media (prefers-reduced-motion: reduce) {
   .vx :is(.card, .kpi, .primary-button, .secondary-button) { transition: none; }
 }
+
+/* Bolinhas da cor da loja (Configurações): à esquerda, um pouco maiores */
+:root .vx .vx-cores.vx-cores-loja { justify-content: flex-start; padding: 6px 0 4px; gap: 10px; }
+:root .vx .vx-cores.vx-cores-loja button { width: 26px; height: 26px; }

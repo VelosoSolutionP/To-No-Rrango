@@ -219,10 +219,14 @@ public sealed class OrderService(
     {
         var order = await orders.GetByCodeAsync(code, cancellationToken);
 
-        return order is null
-            ? Result<OrderTrackingDto>.Failure(
-                AppErrors.NotFound("order.not_found", "Pedido não encontrado."))
-            : OrderTrackingDto.From(order);
+        if (order is null)
+        {
+            return Result<OrderTrackingDto>.Failure(AppErrors.NotFound("order.not_found", "Pedido não encontrado."));
+        }
+
+        // A tela do cliente segue as cores que o dono escolheu para a loja.
+        var store = await establishments.GetByIdAsync(order.EstablishmentId, cancellationToken);
+        return OrderTrackingDto.From(order) with { StorePrimaryColor = store?.PrimaryColor, StoreSecondaryColor = store?.SecondaryColor };
     }
 
     public async Task<Result<IReadOnlyList<OrderDto>>> ListAsync(

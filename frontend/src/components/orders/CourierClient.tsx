@@ -2,12 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE_URL } from "@/lib/api";
+import { storeThemeStyle, useStoreTheme } from "@/lib/storeTheme";
 
 interface CourierSession {
   isActive: boolean;
   orderCode: string | null;
   storeName: string | null;
   destination: string | null;
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
 }
 
 type Phase = "loading" | "ready" | "tracking" | "ended";
@@ -23,6 +26,12 @@ const issueReasons = ["Cliente não atende", "Endereço não encontrado", "Clien
 
 export function CourierClient({ token }: { token: string }) {
   const [session, setSession] = useState<CourierSession | null>(null);
+  // As respostas da posição não trazem a cor: guarda a do primeiro carregamento.
+  const [colors, setColors] = useState<{ primary?: string | null; secondary?: string | null }>({});
+  useEffect(() => {
+    if (session?.primaryColor) setColors({ primary: session.primaryColor, secondary: session.secondaryColor });
+  }, [session?.primaryColor, session?.secondaryColor]);
+  useStoreTheme(colors.primary, colors.secondary);
   const [phase, setPhase] = useState<Phase>("loading");
   const [problem, setProblem] = useState<string | null>(null);
   const [sentAt, setSentAt] = useState<Date | null>(null);
@@ -195,7 +204,7 @@ export function CourierClient({ token }: { token: string }) {
   }
 
   return (
-    <main className="tracking-page courier-page">
+    <main className="tracking-page courier-page pub-hud" style={storeThemeStyle(colors.primary, colors.secondary)}>
       <section className="tracking-card">
         <p className="eyebrow">{session?.storeName ?? "Entrega"}</p>
         {phase === "ended" ? (

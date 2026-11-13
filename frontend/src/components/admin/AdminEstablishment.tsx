@@ -10,6 +10,17 @@ import type {
   UpdateEstablishmentPayload,
 } from "@/lib/types";
 
+/** As mesmas cores das bolinhas do painel (ColorDots), como cor principal e secundária da loja. */
+const STORE_PALETTES = [
+  { label: "Laranja com lilás", primary: "#f97316", secondary: "#7c3aed", swatch: "linear-gradient(135deg,#f97316 55%,#7c3aed 55%)" },
+  { label: "Verde", primary: "#9cc46a", secondary: "#34d399", swatch: "#9cc46a" },
+  { label: "Lilás com laranja", primary: "#b9a0f5", secondary: "#fb923c", swatch: "linear-gradient(135deg,#b9a0f5 60%,#fb923c 60%)" },
+  { label: "Grafite", primary: "#a1a1aa", secondary: "#d4d4d8", swatch: "#a1a1aa" },
+  { label: "Azul com âmbar", primary: "#5b9dff", secondary: "#fbbf24", swatch: "linear-gradient(135deg,#5b9dff 60%,#fbbf24 60%)" },
+  { label: "Fusão", primary: "#9fb0ff", secondary: "#9cc46a", swatch: "conic-gradient(#b9a0f5,#5b9dff,#9cc46a,#fb923c,#b9a0f5)" },
+  { label: "Carvão com laranja", primary: "#ff782f", secondary: "#ff9a57", swatch: "linear-gradient(135deg,#1b1b1e 55%,#ff782f 55%)" },
+] as const;
+
 interface AdminEstablishmentProps {
   establishment: Establishment | null;
   tenantId: string;
@@ -202,6 +213,27 @@ export function AdminEstablishment({
               value={description}
             />
           </label>
+
+          <div className="field">
+            <span>Cor da loja no cardápio, no acompanhamento do pedido e na tela do entregador</span>
+            <div aria-label="Cores prontas" className="vx-cores vx-cores-loja" role="group">
+              {STORE_PALETTES.map((palette) => (
+                <button
+                  aria-label={palette.label}
+                  className={primaryColor.toLowerCase() === palette.primary && secondaryColor.toLowerCase() === palette.secondary ? "on" : ""}
+                  key={palette.label}
+                  onClick={() => {
+                    setPrimaryColor(palette.primary);
+                    setSecondaryColor(palette.secondary);
+                  }}
+                  style={{ ["--c" as string]: palette.swatch }}
+                  title={palette.label}
+                  type="button"
+                />
+              ))}
+            </div>
+            <small className="muted">Escolha uma pronta ou ajuste as duas cores abaixo. Salve para valer no cardápio.</small>
+          </div>
 
           <div className="admin-form-grid">
             <label className="field">

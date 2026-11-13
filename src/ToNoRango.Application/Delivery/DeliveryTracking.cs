@@ -57,7 +57,7 @@ public sealed record CourierPositionRequest(double Latitude, double Longitude);
 
 public sealed record DeliveryIssueRequest(string Reason);
 
-public sealed record CourierSessionDto(bool IsActive, string? OrderCode, string? StoreName, string? Destination);
+public sealed record CourierSessionDto(bool IsActive, string? OrderCode, string? StoreName, string? Destination, string? PrimaryColor = null, string? SecondaryColor = null);
 
 public sealed record PublicTrackingDto(
     bool IsActive,
@@ -284,7 +284,9 @@ public sealed class DeliveryTrackingService(
             return Finished;
         }
 
-        return new CourierSessionDto(true, session.OrderCode, session.StoreName, session.Destination);
+        var order = await orders.GetByCodeAsync(session.OrderCode, cancellationToken);
+        var shop = order is null ? null : await establishments.GetByIdAsync(order.EstablishmentId, cancellationToken);
+        return new CourierSessionDto(true, session.OrderCode, session.StoreName, session.Destination, shop?.PrimaryColor, shop?.SecondaryColor);
     }
 
     public async Task<Result<CourierSessionDto>> ReportPositionAsync(string token, CourierPositionRequest request, CancellationToken cancellationToken)

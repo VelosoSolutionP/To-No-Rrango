@@ -176,6 +176,8 @@ export interface OrderTracking {
   tableLabel?: string | null;
   courierName?: string | null;
   hasDeliveryIssue?: boolean;
+  storePrimaryColor?: string | null;
+  storeSecondaryColor?: string | null;
   customerName: string;
   customerPhoneMasked: string;
   subtotalInCents: number;

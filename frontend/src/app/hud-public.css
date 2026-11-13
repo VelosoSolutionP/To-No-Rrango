@@ -1,0 +1,113 @@
+/*
+ * HUD do ecossistema Veloso nas telas do cliente (cardápio, acompanhamento do pedido,
+ * entregador) — 13/11/2026, dono: "pra ficar padronizado". Mesma linguagem do painel:
+ * chanfro com fio de luz, botões que acendem por dentro, rótulos em caixa alta.
+ * Sem cor própria: tudo sai de --brand / --brand-2, que são as cores que o dono escolheu
+ * para a loja (lib/storeTheme.ts). Escopo .pub-hud: nada vaza para o painel nem para o site.
+ */
+.pub-hud {
+  --hud-fio: color-mix(in srgb, var(--brand) 30%, transparent);
+  --hud-fio-2: color-mix(in srgb, var(--brand) 58%, transparent);
+  --hud-luz: color-mix(in srgb, var(--brand) 42%, transparent);
+  --hud-claro: color-mix(in srgb, var(--brand-light) 45%, #fff);
+  --hud-c: 14px;
+  --hud-chanfro: polygon(var(--hud-c) 0, 100% 0, 100% calc(100% - var(--hud-c)), calc(100% - var(--hud-c)) 100%, 0 100%, 0 var(--hud-c));
+  --hud-cantos:
+    linear-gradient(135deg, transparent 9.4px, var(--hud-fio-2) 9.4px 10.6px, transparent 10.6px) 0 0 / 15px 15px no-repeat,
+    linear-gradient(315deg, transparent 9.4px, var(--hud-fio-2) 9.4px 10.6px, transparent 10.6px) 100% 100% / 15px 15px no-repeat;
+}
+
+/* Superfícies */
+:root .pub-hud :is(.card, .item-card, .tracking-card, .rating-card, .choice-card, .empty-state, .pix-box, .store-hero-content) {
+  border-radius: 4px;
+  clip-path: var(--hud-chanfro);
+  border-color: transparent;
+  background: var(--hud-cantos), linear-gradient(160deg, var(--surface), var(--surface-2));
+  box-shadow: inset 0 0 0 1px var(--hud-fio), var(--shadow);
+  transition: box-shadow 0.3s, transform 0.3s;
+}
+:root .pub-hud :is(.item-card, .choice-card, .tracking-card):hover {
+  box-shadow: inset 0 0 0 1px var(--brand-hover), inset 0 0 28px color-mix(in srgb, var(--brand) 16%, transparent), var(--shadow);
+}
+:root .pub-hud .choice-card.is-selected {
+  box-shadow: inset 0 0 0 1px var(--brand-light), inset 0 0 26px color-mix(in srgb, var(--brand) 28%, transparent);
+}
+:root .pub-hud :is(.item-card-image, .store-cover, .item-modal-image) { border-radius: 2px; }
+:root .pub-hud .item-card-image { clip-path: polygon(10px 0, 100% 0, 100% 100%, 0 100%, 0 10px); }
+
+/* Janelas e gaveta do carrinho */
+:root .pub-hud :is(.modal, .drawer, .success-modal) {
+  border-radius: 0;
+  clip-path: polygon(22px 0, 100% 0, 100% calc(100% - 22px), calc(100% - 22px) 100%, 0 100%, 0 22px);
+  background: var(--hud-cantos), linear-gradient(170deg, var(--surface-2), var(--background));
+  box-shadow: inset 0 0 0 1px var(--hud-fio-2), 0 40px 90px -30px var(--hud-luz);
+}
+:root .pub-hud .drawer { clip-path: polygon(22px 0, 100% 0, 100% 100%, 0 100%, 0 22px); }
+
+/* Botões: chanfrados, contorno na cor da loja, acendem por dentro */
+:root .pub-hud :is(.primary-button, .primary-button-full, .secondary-button, .add-button, .floating-cart) {
+  --cc: var(--hud-fio-2);
+  border: 0;
+  border-radius: 0;
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--hud-claro);
+  background:
+    linear-gradient(135deg, transparent 6.4px, var(--cc) 6.4px 7.6px, transparent 7.6px) 0 0 / 11px 11px no-repeat,
+    linear-gradient(315deg, transparent 6.4px, var(--cc) 6.4px 7.6px, transparent 7.6px) 100% 100% / 11px 11px no-repeat,
+    var(--bgz, linear-gradient(180deg, var(--surface-2), var(--surface)));
+  box-shadow: inset 0 0 0 1px var(--hud-fio-2);
+  transition: box-shadow 0.25s, color 0.25s, text-shadow 0.25s, transform 0.2s;
+}
+:root .pub-hud :is(.primary-button, .primary-button-full, .add-button, .floating-cart) {
+  --cc: var(--brand-hover);
+  --bgz: linear-gradient(180deg, color-mix(in srgb, var(--brand) 48%, var(--background)), color-mix(in srgb, var(--brand) 26%, var(--background)));
+  color: #fff;
+  font-weight: 800;
+  box-shadow: inset 0 0 0 1px var(--brand-hover), inset 0 0 18px color-mix(in srgb, var(--brand) 45%, transparent), 0 14px 30px -18px var(--hud-luz);
+}
+:root .pub-hud :is(.primary-button, .primary-button-full, .secondary-button, .add-button, .floating-cart):hover:not(:disabled) {
+  --cc: var(--brand-light);
+  --bgz: linear-gradient(180deg, color-mix(in srgb, var(--brand) 60%, var(--background)), color-mix(in srgb, var(--brand) 34%, var(--background)));
+  background:
+    linear-gradient(135deg, transparent 6.4px, var(--cc) 6.4px 7.6px, transparent 7.6px) 0 0 / 11px 11px no-repeat,
+    linear-gradient(315deg, transparent 6.4px, var(--cc) 6.4px 7.6px, transparent 7.6px) 100% 100% / 11px 11px no-repeat,
+    var(--bgz);
+  color: #fff;
+  text-shadow: 0 0 10px var(--brand-light);
+  transform: none;
+  filter: none;
+  box-shadow: inset 0 0 0 1px var(--brand-light), inset 0 0 24px color-mix(in srgb, var(--brand) 55%, transparent);
+}
+:root .pub-hud :is(.primary-button, .primary-button-full, .secondary-button, .add-button):active:not(:disabled) { transform: scale(0.98); }
+:root .pub-hud :is(.primary-button, .primary-button-full, .secondary-button, .add-button):disabled { opacity: 0.45; filter: grayscale(0.6); }
+:root .pub-hud .link-button { color: var(--brand-light); }
+
+/* Campos */
+:root .pub-hud :is(.field input, .field textarea, .field select, .menu-search input, .menu-search, .menu-sort select) {
+  border-radius: 3px;
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  box-shadow: inset 0 0 0 1px var(--hud-fio);
+}
+:root .pub-hud :is(.field input, .field textarea, .field select, .menu-search input):focus {
+  outline: 0;
+  box-shadow: inset 0 0 0 1px var(--brand-hover), inset 0 0 16px color-mix(in srgb, var(--brand) 22%, transparent);
+}
+
+/* Filtros, categorias e etiquetas */
+:root .pub-hud :is(.menu-filter, .pill, .status-badge, .prep-chip, .store-status, .category-nav a, .category-nav button) {
+  border-radius: 2px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+}
+:root .pub-hud .menu-filter.is-active {
+  box-shadow: inset 0 0 0 1px var(--brand-hover), inset 0 0 14px color-mix(in srgb, var(--brand) 35%, transparent);
+  text-shadow: 0 0 10px var(--hud-luz);
+}
+:root .pub-hud :is(.eyebrow, .category-section > h2, .tracking-card h2, .drawer-header h2) { letter-spacing: 0.1em; text-transform: uppercase; }
+
+@media (prefers-reduced-motion: reduce) {
+  :root .pub-hud :is(.item-card, .primary-button, .secondary-button) { transition: none; }
+}

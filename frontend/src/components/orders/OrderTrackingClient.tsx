@@ -7,6 +7,7 @@ import { prepLabels, type OrderStatus, type OrderTracking } from "@/lib/types";
 import { DeliveryMap } from "./DeliveryMap";
 import { OrderPaymentPanel } from "./OrderPaymentPanel";
 import { OrderRating } from "./OrderRating";
+import { storeThemeStyle, useStoreTheme } from "@/lib/storeTheme";
 
 interface OrderTrackingClientProps {
   code: string;
@@ -45,6 +46,7 @@ const deliveryFlow: OrderStatus[] = [
 export function OrderTrackingClient({ code }: OrderTrackingClientProps) {
   const [order, setOrder] = useState<OrderTracking | null>(null);
   const [error, setError] = useState<string | null>(null);
+  useStoreTheme(order?.storePrimaryColor, order?.storeSecondaryColor);
 
   useEffect(() => {
     let active = true;
@@ -92,7 +94,7 @@ export function OrderTrackingClient({ code }: OrderTrackingClientProps) {
 
   if (error && !order) {
     return (
-      <main className="tracking-page">
+      <main className="tracking-page pub-hud">
         <div className="empty-state card">
           <p className="eyebrow">Pedido</p>
           <h1>Não encontramos este pedido</h1>
@@ -107,7 +109,7 @@ export function OrderTrackingClient({ code }: OrderTrackingClientProps) {
 
   if (!order) {
     return (
-      <main className="tracking-page">
+      <main className="tracking-page pub-hud">
         <div className="empty-state card">
           <span className="loading-dot" />
           <h2>Carregando pedido...</h2>
@@ -117,7 +119,7 @@ export function OrderTrackingClient({ code }: OrderTrackingClientProps) {
   }
 
   return (
-    <main className="tracking-page">
+    <main className="tracking-page pub-hud" style={storeThemeStyle(order?.storePrimaryColor, order?.storeSecondaryColor)}>
       <header className="tracking-header">
         <Link className="tracking-back" href="/">
           ← To-No-Rango

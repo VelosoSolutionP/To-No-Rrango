@@ -140,7 +140,9 @@ public sealed record OrderTrackingDto(
     long DiscountInCents = 0,
     string? TableLabel = null,
     string? CourierName = null,
-    bool HasDeliveryIssue = false)
+    bool HasDeliveryIssue = false,
+    string? StorePrimaryColor = null,
+    string? StoreSecondaryColor = null)
 {
     public static OrderTrackingDto From(Order order) => new(
         order.Code,

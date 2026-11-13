@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono, Sora } from "next/font/google";
 import "./globals.css";
+import "./hud-public.css";
 
 const body = Inter({ subsets: ["latin"], variable: "--font-body" });
 const display = Sora({ subsets: ["latin"], variable: "--font-display" });

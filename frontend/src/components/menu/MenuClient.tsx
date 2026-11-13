@@ -1,5 +1,6 @@
 "use client";
 
+import { storeThemeStyle, useStoreTheme } from "@/lib/storeTheme";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { api, formatBRL } from "@/lib/api";
@@ -60,6 +61,7 @@ function formatOpening(value: string) {
 }
 
 export function MenuClient({ menu }: MenuClientProps) {
+  useStoreTheme(menu.establishment.primaryColor, menu.establishment.secondaryColor);
   const { establishment } = menu;
   const [cart, setCart] = useState<CartLine[]>([]);
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
@@ -173,7 +175,7 @@ export function MenuClient({ menu }: MenuClientProps) {
   }
 
   return (
-    <div className="menu-shell">
+    <div className="menu-shell pub-hud" style={storeThemeStyle(menu.establishment.primaryColor, menu.establishment.secondaryColor)}>
       <header className="store-hero">
         {establishment.coverUrl ? (
           <img alt="" className="store-cover" src={establishment.coverUrl} />
