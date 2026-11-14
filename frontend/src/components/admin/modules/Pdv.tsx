@@ -905,7 +905,7 @@ function TablesView({
                 onClick={() => onSelect(label)}
                 type="button"
               >
-                <i aria-hidden="true" className="table-3d"><i className="table-top" /><i className="table-chairs" /></i>
+                <i aria-hidden="true" className="table-neon"><i className="tn-rings" /><i className="tn-desk" /><i className="tn-chair" /></i>
                 <strong>{label}</strong>
                 {info ? (
                   <>
