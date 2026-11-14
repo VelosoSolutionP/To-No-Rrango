@@ -146,12 +146,12 @@ public sealed class Order : AggregateRoot
 
         if (item.TenantId != TenantId || item.EstablishmentId != EstablishmentId)
         {
-            throw new InvalidOperationException("Item does not belong to this establishment.");
+            throw new InvalidOperationException("Este item não é desta loja.");
         }
 
         if (!item.IsActive || !item.IsAvailable)
         {
-            throw new InvalidOperationException($"Item '{item.Name}' is not available.");
+            throw new InvalidOperationException($"O item '{item.Name}' não está disponível agora.");
         }
 
         var selectedIds = optionIds?.ToHashSet() ?? new HashSet<Guid>();
@@ -166,14 +166,14 @@ public sealed class Order : AggregateRoot
             if (chosen.Count < group.MinSelections || chosen.Count > group.MaxSelections)
             {
                 throw new InvalidOperationException(
-                    $"Option group '{group.Name}' requires between {group.MinSelections} and {group.MaxSelections} selections.");
+                    Choose(group.Name, group.MinSelections, group.MaxSelections));
             }
 
             foreach (var option in chosen)
             {
                 if (!option.IsAvailable)
                 {
-                    throw new InvalidOperationException($"Option '{option.Name}' is not available.");
+                    throw new InvalidOperationException($"A opção '{option.Name}' não está disponível agora.");
                 }
 
                 selectedOptions.Add((group.Name, option.Name, option.PriceInCents));
@@ -182,7 +182,7 @@ public sealed class Order : AggregateRoot
 
         if (selectedIds.Any(id => !knownOptionIds.Contains(id)))
         {
-            throw new InvalidOperationException("One or more selected options do not belong to the item.");
+            throw new InvalidOperationException("Uma das opções escolhidas não é deste item.");
         }
 
         var unitPrice = item.PriceInCents + selectedOptions.Sum(option => option.PriceInCents);
@@ -414,4 +414,12 @@ public sealed class Order : AggregateRoot
         SubtotalInCents = _items.Sum(item => item.TotalInCents);
         TotalInCents = checked(SubtotalInCents - DiscountInCents + DeliveryFeeInCents);
     }
+
+    private static string Choose(string group, int min, int max) => (min, max) switch
+    {
+        (1, 1) => $"Escolha uma opção em '{group}'.",
+        _ when min == max => $"Escolha {min} opções em '{group}'.",
+        (0, _) => $"Escolha no máximo {max} opções em '{group}'.",
+        _ => $"Escolha de {min} a {max} opções em '{group}'.",
+    };
 }

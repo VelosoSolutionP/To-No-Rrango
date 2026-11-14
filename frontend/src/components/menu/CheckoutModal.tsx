@@ -28,12 +28,25 @@ const fulfillmentLabels: Record<FulfillmentType, string> = {
   DineIn: "Consumo no local",
 };
 
-const paymentLabels: Record<PaymentMethod, string> = {
-  Pix: "Pix",
-  Cash: "Dinheiro",
-  CardOnDelivery: "Cartão na entrega",
-  Online: "Cartão online",
+const handOver: Record<FulfillmentType, string> = {
+  Delivery: "na entrega",
+  Pickup: "na retirada",
+  DineIn: "no balcão",
 };
+
+/** Pix only shows a QR code right away when the store has Mercado Pago on; otherwise it is paid in person. */
+function paymentLabel(option: PaymentMethod, fulfillment: FulfillmentType, pixOnline: boolean): string {
+  switch (option) {
+    case "Pix":
+      return pixOnline ? "Pix (QR Code agora)" : `Pix ${handOver[fulfillment]}`;
+    case "Cash":
+      return "Dinheiro";
+    case "CardOnDelivery":
+      return `Cartão ${handOver[fulfillment]}`;
+    default:
+      return "Cartão online";
+  }
+}
 
 function firstFulfillment(establishment: Establishment): FulfillmentType {
   if (establishment.isDeliveryEnabled) return "Delivery";
@@ -363,10 +376,13 @@ export function CheckoutModal({ establishment, lines, onClose, onSuccess, tableL
                     onChange={() => setPaymentMethod(option)}
                     type="radio"
                   />
-                  <strong>{paymentLabels[option]}</strong>
+                  <strong>{paymentLabel(option, fulfillmentType, Boolean(options?.pixOnline))}</strong>
                 </label>
               ))}
             </div>
+            {paymentMethod === "Pix" && options && !options.pixOnline ? (
+              <p className="muted">Esta loja ainda não gera Pix pelo site: o pagamento é feito {handOver[fulfillmentType]}.</p>
+            ) : null}
           </fieldset>
 
           <label className="field">

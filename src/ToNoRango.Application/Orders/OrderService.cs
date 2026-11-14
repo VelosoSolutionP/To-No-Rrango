@@ -63,7 +63,11 @@ public sealed class OrderService(
                     "O estabelecimento está fechado agora. Horários:\n" + Domain.Establishments.OpeningSchedule.Describe(establishment.OpeningHours)));
             }
 
-            if (!IsFulfillmentEnabled(establishment, request.FulfillmentType))
+            // The toggles shape the online menu; the team at the counter or the tables serves however the store works.
+            // A table QR code is printed by the store itself, so ordering from it is serving at the table.
+            var atTable = request.FulfillmentType == FulfillmentType.DineIn && !string.IsNullOrWhiteSpace(request.TableLabel);
+
+            if (!IsStaff(channel) && !atTable && !IsFulfillmentEnabled(establishment, request.FulfillmentType))
             {
                 return Result<OrderTrackingDto>.Failure(
                     AppErrors.Validation("Esta modalidade de atendimento não está disponível."));
