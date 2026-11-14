@@ -26,6 +26,10 @@ services:
       # Consulta de produtos por código de barras; sem usuário, o botão avisa que não está configurado.
       Gtin__Username: "${TNR_GTIN_USUARIO:-}"
       Gtin__Password: "${TNR_GTIN_SENHA:-}"
+      # Conta Mercado Pago da Veloso (a mesma do ZEST): vale para toda loja sem conta propria.
+      MercadoPago__AccessToken: "${TNR_MP_ACCESS_TOKEN:-}"
+      MercadoPago__PublicKey: "${TNR_MP_PUBLIC_KEY:-}"
+      MercadoPago__WebhookSecret: "${TNR_MP_WEBHOOK_SECRET:-}"
       # Com o container fiscal ligado, só ele envia os webhooks: TNR_FISCAL_WORKER_NA_API=false no .env.
       FiscalApi__RunWorker: "${TNR_FISCAL_WORKER_NA_API:-true}"
 

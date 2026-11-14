@@ -59,6 +59,11 @@ public static class DependencyInjection
             client.DefaultRequestHeaders.UserAgent.ParseAdd("ToNoRango/1.0 (+https://to-no-rango.velososolution.com.br)");
         });
 
+        services.AddSingleton(new ToNoRango.Application.Payments.PlatformPaymentAccount(
+            configuration["MercadoPago:AccessToken"],
+            configuration["MercadoPago:PublicKey"],
+            configuration["MercadoPago:WebhookSecret"]));
+
         services.AddHttpClient<IPaymentGateway, MercadoPagoGateway>(client =>
         {
             client.BaseAddress = new Uri(configuration["MercadoPago:BaseUrl"] ?? "https://api.mercadopago.com/");

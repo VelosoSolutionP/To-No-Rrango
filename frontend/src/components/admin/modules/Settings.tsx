@@ -12,6 +12,7 @@ interface Props {
 
 interface PaymentSettings {
   hasAccessToken: boolean;
+  usesPlatformAccount?: boolean;
   hasWebhookSecret: boolean;
   publicKey: string | null;
   isPixEnabled: boolean;
@@ -67,6 +68,9 @@ function Payments({ http, establishmentId }: Props) {
 
   return (
     <form className="card module-form" key={String(settings.data.isPixEnabled) + settings.data.publicKey} onSubmit={submit}>
+      {settings.data.usesPlatformAccount ? (
+        <p className="module-note">Pix e cartão já funcionam pela conta Mercado Pago da Veloso Solution (a mesma do ZEST). Preencha abaixo só se a loja quiser receber na conta dela.</p>
+      ) : null}
       <Input autoComplete="off" label={`Access Token ${settings.data.hasAccessToken ? "(já salvo; preencha para trocar)" : "*"}`} name="accessToken" type="password" />
       <Input defaultValue={settings.data.publicKey ?? ""} label="Public Key (necessária para cartão)" name="publicKey" />
       <Input autoComplete="off" label={`Assinatura do webhook ${settings.data.hasWebhookSecret ? "(já salva)" : ""}`} name="webhookSecret" type="password" />

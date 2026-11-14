@@ -22,7 +22,17 @@ public sealed record PaymentSettingsDto(
     string? PublicKey,
     bool IsPixEnabled,
     bool IsCardEnabled,
-    string? WebhookUrl);
+    string? WebhookUrl,
+    bool UsesPlatformAccount = false);
+
+/// <summary>
+/// The Veloso Solution Mercado Pago account, the same one the ZEST charges with. Every store that has not
+/// linked its own account charges Pix and card through it.
+/// </summary>
+public sealed record PlatformPaymentAccount(string? AccessToken, string? PublicKey, string? WebhookSecret)
+{
+    public bool IsConfigured => !string.IsNullOrWhiteSpace(AccessToken);
+}
 
 public sealed record CheckoutOptionsDto(bool PixOnline, bool CardOnline, string? PublicKey, bool HasDeliveryZones, bool CheckoutLink = false);
 
@@ -72,7 +82,8 @@ public sealed class PaymentService(
     IAppUrls urls,
     IOrderEvents events,
     IUnitOfWork unitOfWork,
-    IClock clock)
+    IClock clock,
+    PlatformPaymentAccount platform)
 {
     private static readonly TimeSpan GatewayPollInterval = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan CheckoutLifetime = TimeSpan.FromHours(2);
@@ -92,7 +103,7 @@ public sealed class PaymentService(
 
         var settings = await settingsRepository.FirstOrDefaultAsync(item => item.EstablishmentId == establishmentId, cancellationToken);
 
-        return ToDto(establishmentId, settings);
+        return ToDto(establishmentId, settings) with { UsesPlatformAccount = settings?.EncryptedAccessToken is null && platform.IsConfigured };
     }
 
     public Task<Result<PaymentSettingsDto>> SaveSettingsAsync(Guid establishmentId, PaymentSettingsRequest request, CancellationToken cancellationToken) =>
@@ -128,7 +139,7 @@ public sealed class PaymentService(
 
     public async Task<CheckoutOptionsDto> GetCheckoutOptionsAsync(Guid tenantId, Guid establishmentId, bool hasZones, CancellationToken cancellationToken)
     {
-        var settings = await settingsRepository.FirstOrDefaultAsync(item => item.EstablishmentId == establishmentId, cancellationToken);
+        var settings = await SettingsOfAsync(establishmentId, cancellationToken);
         var allowed = await modules.IsAllowedAsync(tenantId, Modules.Pagamentos, cancellationToken);
 
         return new CheckoutOptionsDto(
@@ -256,7 +267,7 @@ public sealed class PaymentService(
                 return Result<PaymentDto?>.Failure(OrderNotFound);
             }
 
-            var settings = await settingsRepository.FirstOrDefaultAsync(item => item.EstablishmentId == order.EstablishmentId, cancellationToken);
+            var settings = await SettingsOfAsync(order.EstablishmentId, cancellationToken);
 
             if (settings?.EncryptedAccessToken is null || string.IsNullOrWhiteSpace(request.PaymentId))
             {
@@ -387,7 +398,7 @@ public sealed class PaymentService(
                 return PaymentDto.From(latest[0]);
             }
 
-            var settings = await settingsRepository.FirstOrDefaultAsync(item => item.EstablishmentId == order.EstablishmentId, cancellationToken);
+            var settings = await SettingsOfAsync(order.EstablishmentId, cancellationToken);
 
             if (settings?.EncryptedAccessToken is null)
             {
@@ -429,7 +440,7 @@ public sealed class PaymentService(
         CancellationToken cancellationToken) =>
         Guarded.RunAsync<bool>(async () =>
         {
-            var settings = await settingsRepository.FirstOrDefaultAsync(item => item.EstablishmentId == establishmentId, cancellationToken);
+            var settings = await SettingsOfAsync(establishmentId, cancellationToken);
 
             if (settings?.EncryptedAccessToken is null || string.IsNullOrWhiteSpace(dataId))
             {
@@ -517,7 +528,7 @@ public sealed class PaymentService(
 
             if (payment is not null)
             {
-                var settings = await settingsRepository.FirstOrDefaultAsync(item => item.EstablishmentId == order.EstablishmentId, cancellationToken);
+                var settings = await SettingsOfAsync(order.EstablishmentId, cancellationToken);
 
                 if (settings?.EncryptedAccessToken is null)
                 {
@@ -650,11 +661,39 @@ public sealed class PaymentService(
             return (null, null, AppErrors.Validation("Pagamento online indisponível neste estabelecimento."));
         }
 
-        var settings = await settingsRepository.FirstOrDefaultAsync(item => item.EstablishmentId == order.EstablishmentId, cancellationToken);
+        var settings = await SettingsOfAsync(order.EstablishmentId, cancellationToken);
 
         return settings is null
             ? (null, null, AppErrors.Validation("Pagamento online indisponível neste estabelecimento."))
             : (order, settings, null);
+    }
+
+    /// <summary>The store's own Mercado Pago account; without one, the Veloso account (never saved, built per call).</summary>
+    private async Task<PaymentSettings?> SettingsOfAsync(Guid establishmentId, CancellationToken cancellationToken)
+    {
+        var own = await settingsRepository.FirstOrDefaultAsync(item => item.EstablishmentId == establishmentId, cancellationToken);
+
+        if (own?.EncryptedAccessToken is not null || !platform.IsConfigured)
+        {
+            return own;
+        }
+
+        var tenantId = own?.TenantId ?? (await establishments.GetByIdAsync(establishmentId, cancellationToken))?.TenantId;
+
+        if (tenantId is null)
+        {
+            return own;
+        }
+
+        var shared = new PaymentSettings(tenantId.Value, establishmentId, clock.UtcNow);
+        shared.Update(
+            protector.Protect(platform.AccessToken!.Trim()),
+            string.IsNullOrWhiteSpace(platform.WebhookSecret) ? null : protector.Protect(platform.WebhookSecret.Trim()),
+            platform.PublicKey,
+            isPixEnabled: true,
+            isCardEnabled: true,
+            clock.UtcNow);
+        return shared;
     }
 
     private PaymentSettingsDto ToDto(Guid establishmentId, PaymentSettings? settings) => new(
