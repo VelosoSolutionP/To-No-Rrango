@@ -99,6 +99,12 @@ public sealed class MercadoPagoGateway(HttpClient http, ILogger<MercadoPagoGatew
             ["payer"] = new JsonObject { ["email"] = charge.PayerEmail }
         };
 
+        if (charge.ExpiresAt is { } expiresAt)
+        {
+            // Mercado Pago refuses the payment after this moment, so an expired QR can never be paid.
+            body["date_of_expiration"] = expiresAt.ToOffset(TimeSpan.FromHours(-3)).ToString("yyyy-MM-dd'T'HH:mm:ss.fffzzz", CultureInfo.InvariantCulture);
+        }
+
         AddNotificationUrl(body, charge.NotificationUrl);
 
         return SendAsync(HttpMethod.Post, "v1/payments", accessToken, body, charge.IdempotencyKey, cancellationToken);

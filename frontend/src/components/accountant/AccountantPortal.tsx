@@ -1,5 +1,6 @@
 "use client";
 
+import { DialogHost } from "../admin/Dialog";
 import "../admin/admin.css";
 import "../admin/admin-theme.css";
 import "../admin/admin-neon.css";
@@ -196,6 +197,7 @@ function Desk({ session, onSignOut, onFirm }: { session: PortalSession; onSignOu
 
   return (
     <div className={`vx ${navOpen ? "is-open" : ""}`}>
+      <DialogHost />
       <aside className="vx-side">
         <button className="vx-brand link-button" onClick={() => open(null)} type="button">
           <span className="vx-mark">TR</span>

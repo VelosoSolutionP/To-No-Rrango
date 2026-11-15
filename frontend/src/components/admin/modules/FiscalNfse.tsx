@@ -1,5 +1,6 @@
 "use client";
 
+import { promptDialog } from "../Dialog";
 import { type FormEvent, useState } from "react";
 import { formatBRL, formatDateTime, type AdminHttp } from "@/lib/admin-api";
 import { StatusChip } from "../DataTable";
@@ -106,8 +107,8 @@ export function FiscalNfseView({ http, establishmentId }: { http: AdminHttp; est
     });
   }
 
-  function cancel(note: ServiceNote) {
-    const reason = window.prompt("Justificativa do cancelamento (15 a 255 letras):");
+  async function cancel(note: ServiceNote) {
+    const reason = await promptDialog({ title: `Cancelar a NFS-e ${note.series}/${note.number}?`, label: "Justificativa", minLength: 15, maxLength: 255, multiline: true, confirmLabel: "Cancelar NFS-e", cancelLabel: "Manter", tone: "danger" });
 
     if (reason) {
       void action.run(() => http.post(`${base}/${note.id}/cancel`, { reason }));

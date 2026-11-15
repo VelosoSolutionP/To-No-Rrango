@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog, promptDialog } from "./Dialog";
 import { useEffect, useMemo, useState } from "react";
 import { formatBRL, formatDateTime } from "@/lib/admin-api";
 import type { AdminOrder, OrderStatus } from "@/lib/types";
@@ -110,7 +111,7 @@ export function AdminOrders({
     let reason: string | null = null;
 
     if (status === "Cancelled") {
-      const answer = window.prompt(`Motivo do cancelamento de ${order.code}:`);
+      const answer = await promptDialog({ title: `Cancelar o pedido ${order.code}?`, label: "Motivo do cancelamento", placeholder: "Ex.: item em falta", maxLength: 200, confirmLabel: "Cancelar pedido", cancelLabel: "Manter pedido", tone: "danger" });
       if (!answer?.trim()) {
         return;
       }
@@ -369,9 +370,7 @@ export function AdminOrders({
                   className="link-button"
                   disabled={isBusy}
                   onClick={() => {
-                    if (window.confirm(`Estornar o pagamento de ${selected.code}?`)) {
-                      void runPayment(selected, onRefund);
-                    }
+                    void confirmDialog({ title: `Estornar o pagamento de ${selected.code}?`, message: "O valor volta para o cliente pelo Mercado Pago.", confirmLabel: "Estornar", tone: "danger" }).then((ok) => { if (ok) void runPayment(selected, onRefund); });
                   }}
                   type="button"
                 >

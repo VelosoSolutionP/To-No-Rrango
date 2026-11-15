@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "../Dialog";
 import { type FormEvent, useState } from "react";
 import { formatDateTime, type AdminHttp } from "@/lib/admin-api";
 import { StatusChip } from "../DataTable";
@@ -123,10 +124,10 @@ export function FiscalAccountantView({ http, establishmentId }: { http: AdminHtt
     });
   }
 
-  function revoke(link: AccountantLink) {
+  async function revoke(link: AccountantLink) {
     const who = link.firmName ?? link.invitedEmail;
 
-    if (window.confirm(`Tirar o acesso de ${who}? Ele deixa de ver esta loja na hora e as chaves de API que ele criou param de funcionar.`)) {
+    if ((await confirmDialog({ title: `Tirar o acesso de ${who}?`, message: `Ele deixa de ver esta loja na hora e as chaves de API que ele criou param de funcionar.`, confirmLabel: "Tirar", tone: "danger" }))) {
       void action.run(() => http.del(`${base}/links/${link.id}`));
     }
   }

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { PixCountdown } from "@/components/PixCountdown";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, formatBRL } from "@/lib/api";
 import type { CheckoutOptions, OrderPayment, OrderTracking } from "@/lib/types";
 
@@ -168,6 +169,12 @@ export function OrderPaymentPanel({ order, onPaid }: OrderPaymentPanelProps) {
     };
   }, [onPaid, options?.publicKey, order.code, order.totalInCents, wantsCard]);
 
+  // When the QR code runs out, the button to generate a new one comes back.
+  const expirePix = useCallback(() => {
+    setPayment(null);
+    setError("O QR Code expirou. Gere outro para pagar.");
+  }, []);
+
   async function generatePix() {
     setBusy(true);
     setError(null);
@@ -218,6 +225,7 @@ export function OrderPaymentPanel({ order, onPaid }: OrderPaymentPanelProps) {
             // eslint-disable-next-line @next/next/no-img-element
             <img alt="QR Code do Pix" src={`data:image/png;base64,${pix.pixQrCodeBase64}`} />
           ) : null}
+          <PixCountdown expiresAt={pix.expiresAt} onExpire={expirePix} />
           <p className="muted">Escaneie o QR Code ou use o Pix copia e cola. A confirmação é automática.</p>
           <button className="secondary-button" onClick={copyPix} type="button">
             {copied ? "Código copiado!" : "Copiar código Pix"}

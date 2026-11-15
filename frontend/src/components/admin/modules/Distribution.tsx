@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "../Dialog";
 import { type FormEvent, useMemo, useState } from "react";
 import { formatBRL, type AdminHttp } from "@/lib/admin-api";
 import type { AdminOrder } from "@/lib/types";
@@ -223,7 +224,7 @@ export function Distribution({
             { icon: "edit", label: "Editar", onClick: (row) => setEditingCourier(row) },
             { icon: "whatsappSend", label: "Chamar no WhatsApp", tone: "accent", onClick: (row) => window.open(`https://wa.me/${row.phone.replace(/\D/g, "").replace(/^(?!55)/, "55")}`, "_blank", "noopener") },
             { icon: "power", label: "Reativar", hidden: (row) => row.isActive, onClick: (row) => void action.run(() => http.put(`/couriers/${row.id}`, { ...row, isActive: true })) },
-            { icon: "trash", label: "Inativar", tone: "danger", hidden: (row) => !row.isActive, onClick: (row) => window.confirm(`Inativar ${row.name}?`) && void action.run(() => http.put(`/couriers/${row.id}`, { ...row, isActive: false })) },
+            { icon: "trash", label: "Inativar", tone: "danger", hidden: (row) => !row.isActive, onClick: (row) => void confirmDialog({ title: `Inativar ${row.name}?`, confirmLabel: "Inativar", tone: "danger" }).then((ok) => ok && action.run(() => http.put(`/couriers/${row.id}`, { ...row, isActive: false }))) },
           ]}
           columns={[
             { key: "name", title: "Entregador", value: (row) => row.name, render: (row) => <span className="cell-main"><span className="avatar">🛵</span><div><strong>{row.name}</strong><small>{formatPhone(row.phone)}</small></div></span> },

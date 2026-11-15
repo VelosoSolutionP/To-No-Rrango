@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "../Dialog";
 import { type FormEvent, useMemo, useState } from "react";
 import { formatBRL, type AdminHttp } from "@/lib/admin-api";
 import { DataTable, FormDrawer, StatusChip } from "../DataTable";
@@ -138,8 +139,8 @@ export function Finance({ http, establishmentId }: { http: AdminHttp; establishm
     <DataTable
       actions={[
         { icon: "check", label: type === "Receivable" ? "Baixar (recebido)" : "Baixar (pago)", tone: "accent", hidden: (row) => row.status !== "Open", onClick: (row) => setSettling(row) },
-        { icon: "undo", label: "Estornar baixa", hidden: (row) => row.status !== "Settled" || row.source !== "Manual", onClick: (row) => window.confirm("Estornar a baixa deste título?") && void action.run(() => http.post(`/financial-entries/${row.id}/reopen`)) },
-        { icon: "trash", label: "Cancelar título", tone: "danger", hidden: (row) => row.status !== "Open" || row.source !== "Manual", onClick: (row) => window.confirm(`Cancelar "${row.description}"?`) && void action.run(() => http.post(`/financial-entries/${row.id}/cancel`)) },
+        { icon: "undo", label: "Estornar baixa", hidden: (row) => row.status !== "Settled" || row.source !== "Manual", onClick: (row) => void confirmDialog({ title: "Estornar a baixa deste título?", confirmLabel: "Estornar", tone: "danger" }).then((ok) => ok && action.run(() => http.post(`/financial-entries/${row.id}/reopen`))) },
+        { icon: "trash", label: "Cancelar título", tone: "danger", hidden: (row) => row.status !== "Open" || row.source !== "Manual", onClick: (row) => void confirmDialog({ title: `Cancelar "${row.description}"?`, confirmLabel: "Cancelar", tone: "danger" }).then((ok) => ok && action.run(() => http.post(`/financial-entries/${row.id}/cancel`))) },
       ]}
       columns={[
         { key: "doc", title: "Documento", value: (row) => row.documentNumber ?? "", render: (row) => <span className="mono">{row.documentNumber ?? "—"}</span>, hideOnMobile: true },

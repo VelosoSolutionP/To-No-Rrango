@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog, promptDialog } from "./Dialog";
 import { useEffect, useMemo, useState } from "react";
 import { formatBRL, formatDateTime } from "@/lib/admin-api";
 import { prepLabels, type AdminOrder, type OrderStatus } from "@/lib/types";
@@ -183,7 +184,7 @@ export function OrdersBoard({
   }
 
   async function cancel(order: AdminOrder) {
-    const reason = window.prompt("Motivo do cancelamento:");
+    const reason = await promptDialog({ title: `Cancelar o pedido ${order.code}?`, label: "Motivo do cancelamento", placeholder: "Ex.: item em falta", maxLength: 200, confirmLabel: "Cancelar pedido", cancelLabel: "Manter pedido", tone: "danger" });
     if (reason?.trim()) {
       await run(order.id, () => onUpdateStatus(order.id, "Cancelled", reason.trim()));
     }
@@ -398,7 +399,7 @@ export function OrdersBoard({
                 </button>
               ) : null}
               {onRefund && selected.paymentStatus === "Paid" && selected.paymentMethod === "Online" ? (
-                <button className="link-button" disabled={busy === selected.id} onClick={() => window.confirm("Estornar o pagamento online?") && void run(selected.id, () => onRefund(selected.id))} type="button">
+                <button className="link-button" disabled={busy === selected.id} onClick={() => void confirmDialog({ title: "Estornar o pagamento online?", message: "O valor volta para o cliente pelo Mercado Pago.", confirmLabel: "Estornar", tone: "danger" }).then((ok) => { if (ok) void run(selected.id, () => onRefund(selected.id)); })} type="button">
                   Estornar
                 </button>
               ) : null}

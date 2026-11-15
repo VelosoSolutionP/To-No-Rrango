@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog, promptDialog } from "../Dialog";
 import { type FormEvent, useState } from "react";
 import { formatBRL, type AdminHttp } from "@/lib/admin-api";
 import { FiscalAccountantView } from "./FiscalAccountant";
@@ -245,20 +246,18 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory, draft 
       .then((done) => done && setNfeFor(null));
   }
 
-  function correctNote(note: FiscalDocument) {
-    const text = window.prompt(`Carta de correção da NF-e ${note.number} (15 a 1000 caracteres).\nNão corrige valores, impostos, destinatário nem datas.`);
+  async function correctNote(note: FiscalDocument) {
+    const text = await promptDialog({ title: `Carta de correção da NF-e ${note.number}`, message: "Não corrige valores, impostos, destinatário nem datas.", label: "Texto da correção", minLength: 15, maxLength: 1000, multiline: true, confirmLabel: "Enviar correção" });
     if (!text) {
       return;
     }
     void dfeAction.run(() => http.post(`${base}/fiscal/documents/${note.id}/correction`, { text }));
   }
 
-  function cancelNote(note: FiscalDocument) {
-    const reason = window.prompt("Justificativa do cancelamento (de 15 a 255 caracteres):");
-    if (reason && reason.trim().length >= 15) {
-      void dfeAction.run(() => http.post(`${base}/fiscal/documents/${note.id}/cancel`, { reason: reason.trim() }));
-    } else if (reason) {
-      window.alert("A justificativa precisa ter pelo menos 15 caracteres.");
+  async function cancelNote(note: FiscalDocument) {
+    const reason = await promptDialog({ title: `Cancelar a nota ${note.number}?`, message: "O cancelamento vai para a SEFAZ e não tem volta.", label: "Justificativa", minLength: 15, maxLength: 255, multiline: true, confirmLabel: "Cancelar nota", cancelLabel: "Manter nota", tone: "danger" });
+    if (reason) {
+      void dfeAction.run(() => http.post(`${base}/fiscal/documents/${note.id}/cancel`, { reason }));
     }
   }
 
@@ -437,7 +436,7 @@ export function Fiscal({ http, establishmentId, modules, onOpenInventory, draft 
               Certificado: <strong>{dfe.data.certificateSubject}</strong>
               <br />
               Vence em {dfe.data.certificateExpiresAt ? new Date(dfe.data.certificateExpiresAt).toLocaleDateString("pt-BR") : "—"}{" "}
-              <button className="link-button" disabled={dfeAction.busy} onClick={() => window.confirm("Remover o certificado desta loja?") && void dfeAction.run(() => http.del(`${base}/fiscal/certificate`))} type="button">Remover</button>
+              <button className="link-button" disabled={dfeAction.busy} onClick={() => void confirmDialog({ title: "Remover o certificado desta loja?", message: "Sem certificado, as notas param de sair até você enviar outro.", confirmLabel: "Remover", tone: "danger" }).then((ok) => ok && dfeAction.run(() => http.del(`${base}/fiscal/certificate`)))} type="button">Remover</button>
             </p>
           ) : (
             <p className="muted">Nenhum certificado enviado. Ele fica guardado criptografado e só é aberto na hora de assinar.</p>

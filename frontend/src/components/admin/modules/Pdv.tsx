@@ -1,6 +1,8 @@
 "use client";
 
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { PixCountdown } from "@/components/PixCountdown";
+import { confirmDialog, promptDialog } from "../Dialog";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { formatBRL, formatDateTime, type AdminHttp } from "@/lib/admin-api";
 import { api } from "@/lib/api";
 import type { AdminOrder, CheckoutOptions, MenuItem, OrderPayment, PaymentMethod, PublicMenu } from "@/lib/types";
@@ -965,7 +967,7 @@ function TablesView({
                 <button
                   className="primary-button primary-button-full money-button pos-finish"
                   disabled={busy}
-                  onClick={() => window.confirm(`Fechar a conta da mesa ${selected} em ${methodLabels[method]}?`) && void onClose(selected, method).then((done) => done && onSelect(null))}
+                  onClick={() => void confirmDialog({ title: `Fechar a conta da mesa ${selected}?`, message: `${formatBRL(current.totalInCents)} recebidos em ${methodLabels[method]}.`, confirmLabel: "Fechar conta" }).then((ok) => ok && onClose(selected, method).then((done) => done && onSelect(null)))}
                   type="button"
                 >
                   Fechar conta · {formatBRL(current.totalInCents)}
@@ -1052,7 +1054,7 @@ function CashPanel({
   }
 
   async function cancelSale(orderId: string) {
-    const reason = window.prompt("Motivo do cancelamento da venda:");
+    const reason = await promptDialog({ title: "Cancelar esta venda?", message: "O valor sai do caixa e a venda fica registrada como cancelada.", label: "Motivo do cancelamento", placeholder: "Ex.: cliente desistiu", maxLength: 200, confirmLabel: "Cancelar venda", cancelLabel: "Manter venda", tone: "danger" });
     if (reason?.trim()) {
       await run(() => http.post(`${base}/pdv/sales/${orderId}/cancel`, { reason: reason.trim() }));
     }
@@ -1154,7 +1156,20 @@ function Charge({ order, base, http, onPaid, onCancelled }: { order: AdminOrder;
   const [cardUrl, setCardUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [expired, setExpired] = useState(false);
   const isPix = order.paymentMethod === "Pix";
+  const expire = useCallback(() => setExpired(true), []);
+
+  async function newPix() {
+    setError(null);
+    try {
+      setPix(await api.createPix(order.code));
+      setExpired(false);
+      setCopied(false);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "Não deu para gerar outro Pix.");
+    }
+  }
 
   useEffect(() => {
     let alive = true;
@@ -1162,7 +1177,8 @@ function Charge({ order, base, http, onPaid, onCancelled }: { order: AdminOrder;
       try {
         if (isPix) {
           const created = await api.createPix(order.code).catch(() => null);
-          if (alive && created) { setPix(created); return; }
+          if (!alive) return;
+          if (created) { setPix(created); return; }
         }
         const link = await api.createCheckout(order.code);
         if (!alive) return;
@@ -1186,7 +1202,7 @@ function Charge({ order, base, http, onPaid, onCancelled }: { order: AdminOrder;
   }, [base, http, order.id, onPaid]);
 
   async function cancel() {
-    if (!window.confirm("Cancelar esta cobrança? A venda é cancelada e não entra no caixa.")) return;
+    if (!(await confirmDialog({ title: "Cancelar esta cobrança?", message: "A venda é cancelada e não entra no caixa.", confirmLabel: "Cancelar cobrança", cancelLabel: "Continuar esperando", tone: "danger" }))) return;
     try {
       await http.post(`${base}/pdv/sales/${order.id}/abandon`);
       onCancelled();
@@ -1201,8 +1217,16 @@ function Charge({ order, base, http, onPaid, onCancelled }: { order: AdminOrder;
         <div className="receipt">
           <strong className="receipt-store">{isPix ? "Pix" : "Cartão"} · {formatBRL(order.totalInCents)}</strong>
           <small>Venda #{order.code} · aguardando o Mercado Pago</small>
-          {pix?.pixQrCodeBase64 ? <img alt="QR Code Pix" src={`data:image/png;base64,${pix.pixQrCodeBase64}`} style={{ width: 240, height: 240, margin: "12px auto", display: "block", background: "#fff", padding: 8 }} /> : null}
-          {pix?.pixQrCode ? (
+          {pix && expired ? (
+            <div className="pix-expired">
+              <strong>O QR Code expirou</strong>
+              <small>Passaram 30 minutos sem pagamento. Gere outro para o cliente.</small>
+              <button className="primary-button" onClick={() => void newPix()} type="button">Gerar novo Pix</button>
+            </div>
+          ) : null}
+          {pix?.pixQrCodeBase64 && !expired ? <img alt="QR Code Pix" src={`data:image/png;base64,${pix.pixQrCodeBase64}`} style={{ width: 240, height: 240, margin: "12px auto", display: "block", background: "#fff", padding: 8 }} /> : null}
+          {pix && !expired ? <PixCountdown expiresAt={pix.expiresAt} onExpire={expire} /> : null}
+          {pix?.pixQrCode && !expired ? (
             <button className="secondary-button" onClick={() => { void navigator.clipboard?.writeText(pix.pixQrCode ?? ""); setCopied(true); }} type="button">{copied ? "Copiado" : "Copiar Pix copia e cola"}</button>
           ) : null}
           {cardUrl ? (

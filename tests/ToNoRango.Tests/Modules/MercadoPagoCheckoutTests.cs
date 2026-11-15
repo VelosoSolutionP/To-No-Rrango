@@ -76,4 +76,20 @@ public class MercadoPagoCheckoutTests
     [InlineData("xcheckout:ABC", null)]
     public void SoReferenciaDeLinkEhAdotada(string? reference, string? expected) =>
         Assert.Equal(expected, PaymentService.OrderCodeOfCheckout(reference));
+
+    [Fact]
+    public async Task Pix_VenceNoHorarioPedido_EmHorarioDeBrasilia()
+    {
+        var capture = new Capture(HttpStatusCode.Created, """{"id":7,"status":"pending","transaction_amount":25.9,"date_of_expiration":"2026-11-14T13:30:00.000-03:00","point_of_interaction":{"transaction_data":{"qr_code":"000201","qr_code_base64":"AAA"}}}""");
+        var expires = new DateTimeOffset(2026, 11, 14, 16, 30, 0, TimeSpan.Zero);
+
+        var payment = await Gateway(capture).CreatePixAsync("token", new PixCharge(2590, "Pedido ABC", "ABC", "a@b.c", "pix-1", null, expires), TestContext.Current.CancellationToken);
+
+        using var body = JsonDocument.Parse(capture.Body!);
+        Assert.Equal("2026-11-14T13:30:00.000-03:00", body.RootElement.GetProperty("date_of_expiration").GetString());
+        Assert.Equal(expires, payment.ExpiresAt);
+    }
+
+    [Fact]
+    public void Pix_DuraTrintaMinutos_OMinimoDoMercadoPago() => Assert.Equal(TimeSpan.FromMinutes(30), PaymentService.PixLifetime);
 }

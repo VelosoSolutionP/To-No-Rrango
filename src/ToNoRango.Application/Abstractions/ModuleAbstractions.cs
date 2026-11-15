@@ -109,7 +109,8 @@ public sealed record PixCharge(
     string ExternalReference,
     string PayerEmail,
     string IdempotencyKey,
-    string? NotificationUrl);
+    string? NotificationUrl,
+    DateTimeOffset? ExpiresAt = null);
 
 public sealed record CardCharge(
     long AmountInCents,

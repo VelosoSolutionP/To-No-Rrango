@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "../Dialog";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { formatBRL, formatDateTime, type AdminHttp } from "@/lib/admin-api";
 import { Empty, ErrorMessage as ErrorText, Input, ModuleHeading, SubTabs, messageOf, text, useAction, useLoad } from "./shared";
@@ -216,7 +217,7 @@ export function ConnectCard({ http, establishmentId }: Props) {
   }
 
   async function disconnect() {
-    if (!window.confirm("Desconectar este WhatsApp? A ZEST para de atender até você conectar de novo.")) {
+    if (!(await confirmDialog({ title: "Desconectar este WhatsApp?", message: "A ZEST para de atender até você conectar de novo.", confirmLabel: "Desconectar", tone: "danger" }))) {
       return;
     }
 
@@ -283,8 +284,8 @@ export function Automation({ http, establishmentId }: Props) {
   const connected = connection.data?.connected ?? false;
   const active = settings.data?.autoReply ?? false;
 
-  function turnOn() {
-    if (window.confirm("Ativar o atendimento automático? As respostas automáticas passam a ir para os clientes reais deste número.")) {
+  async function turnOn() {
+    if ((await confirmDialog({ title: "Ativar o atendimento automático?", message: "As respostas automáticas passam a ir para os clientes reais deste número.", confirmLabel: "Ativar" }))) {
       void action.run(() => http.put(`/establishments/${establishmentId}/whatsapp/automation`, { enabled: true }));
     }
   }

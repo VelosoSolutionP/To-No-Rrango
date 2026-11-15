@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "../Dialog";
 import { type FormEvent, useState } from "react";
 import { formatDateTime, type AdminHttp } from "@/lib/admin-api";
 import { Empty, ErrorMessage, ModuleHeading, text, useAction, useLoad } from "./shared";
@@ -48,7 +49,7 @@ export function ZestIa({ http, establishmentId }: { http: AdminHttp; establishme
   const connectorAction = useAction(connection.reload);
 
   async function createKey() {
-    if (connection.data?.isConnected && !window.confirm("Gerar uma chave nova desliga a anterior na hora. Continuar?")) {
+    if (connection.data?.isConnected && !(await confirmDialog({ title: "Gerar uma chave nova?", message: "A chave anterior para de funcionar na hora.", confirmLabel: "Gerar chave" }))) {
       return;
     }
 
@@ -132,7 +133,7 @@ Content-Type: application/json
         ) : null}
         <div className="zest-gap-actions">
           {connection.data?.isConnected ? (
-            <button className="link-button" disabled={connectorAction.busy} onClick={() => window.confirm("Desconectar o ZEST desta loja?") && void connectorAction.run(() => http.del(`/establishments/${establishmentId}/zest/connector`))} type="button">
+            <button className="link-button" disabled={connectorAction.busy} onClick={() => void confirmDialog({ title: "Desconectar o ZEST desta loja?", confirmLabel: "Desconectar", tone: "danger" }).then((ok) => ok && connectorAction.run(() => http.del(`/establishments/${establishmentId}/zest/connector`)))} type="button">
               Desconectar
             </button>
           ) : null}

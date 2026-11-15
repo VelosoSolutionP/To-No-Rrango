@@ -1,5 +1,6 @@
 "use client";
 
+import { DialogHost } from "./Dialog";
 import Link from "next/link";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError } from "@/lib/api";
@@ -519,6 +520,7 @@ export function AdminClient() {
   return (
     <AdminContext.Provider value={{ http, establishmentId: selectedId }}>
       <div className={`vx ${navOpen ? "is-open" : ""}`}>
+        <DialogHost />
         <aside className="vx-side">
           <Link className="vx-brand" href="/admin">
             <span className="vx-mark">TR</span>

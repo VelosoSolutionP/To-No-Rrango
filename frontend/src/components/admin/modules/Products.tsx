@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "../Dialog";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { formatBRL, type AdminHttp } from "@/lib/admin-api";
 import type { MenuItem, PublicMenu } from "@/lib/types";
@@ -157,7 +158,7 @@ export function Products({
               onClick: (row) => void action.run(() => http.patch(`/items/${row.id}/availability`, { isAvailable: false })),
             },
             { icon: "power", label: "Reativar", hidden: (row) => row.isActive, onClick: (row) => void action.run(() => http.patch(`/items/${row.id}/active`, { isActive: true })) },
-            { icon: "trash", label: "Inativar", tone: "danger", hidden: (row) => !row.isActive, onClick: (row) => window.confirm(`Inativar ${row.name}? Ele sai do cardápio e do PDV.`) && void action.run(() => http.patch(`/items/${row.id}/active`, { isActive: false })) },
+            { icon: "trash", label: "Inativar", tone: "danger", hidden: (row) => !row.isActive, onClick: (row) => void confirmDialog({ title: `Inativar ${row.name}?`, message: `Ele sai do cardápio e do PDV.`, confirmLabel: "Inativar", tone: "danger" }).then((ok) => ok && action.run(() => http.patch(`/items/${row.id}/active`, { isActive: false }))) },
           ]}
           columns={[
             {
@@ -217,7 +218,7 @@ export function Products({
           actions={[
             { icon: "edit", label: "Editar", onClick: (row) => setEditingInput(row) },
             { icon: "power", label: "Reativar", hidden: (row) => row.isActive, onClick: (row) => void action.run(() => http.put(`/stock-items/${row.id}`, { name: row.name, unit: row.unit, minimumQuantity: row.minimumQuantity, isActive: true })) },
-            { icon: "trash", label: "Inativar", tone: "danger", hidden: (row) => !row.isActive, onClick: (row) => window.confirm(`Inativar ${row.name}?`) && void action.run(() => http.put(`/stock-items/${row.id}`, { name: row.name, unit: row.unit, minimumQuantity: row.minimumQuantity, isActive: false })) },
+            { icon: "trash", label: "Inativar", tone: "danger", hidden: (row) => !row.isActive, onClick: (row) => void confirmDialog({ title: `Inativar ${row.name}?`, confirmLabel: "Inativar", tone: "danger" }).then((ok) => ok && action.run(() => http.put(`/stock-items/${row.id}`, { name: row.name, unit: row.unit, minimumQuantity: row.minimumQuantity, isActive: false }))) },
           ]}
           columns={[
             { key: "name", title: "Insumo", value: (row) => row.name, render: (row) => <span className="cell-main"><span className="avatar">{initials(row.name)}</span><div><strong>{row.name}</strong><small>unidade {row.unit}</small></div></span> },

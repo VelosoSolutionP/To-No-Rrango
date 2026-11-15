@@ -1662,3 +1662,56 @@
 .fx-finding-level { display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted, #9a9aa6); }
 .fx-finding p { margin: 4px 0 0; }
 .fx-finding-action { color: var(--nx-orange-2); font-weight: 600; }
+
+/* ───────── Modal de confirmação do painel (substitui os alertas do navegador, 14/11/2026) ───────── */
+.vx-dialog-backdrop { z-index: 90; }
+.vx .vx-dialog {
+  display: grid;
+  gap: 12px;
+  width: min(26rem, 100%);
+  padding: 26px 24px 20px;
+  text-align: center;
+  justify-items: center;
+}
+.vx .vx-dialog h2 { margin: 0; font-family: var(--display); font-size: 1.2rem; font-weight: 700; letter-spacing: -0.02em; }
+.vx .vx-dialog p { margin: 0; color: var(--vx-muted); line-height: 1.5; }
+.vx .vx-dialog-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  font-style: normal;
+  font-family: var(--display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent), 0 0 28px -6px var(--accent);
+}
+.vx .vx-dialog.is-danger .vx-dialog-icon {
+  color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 14%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--bad) 45%, transparent), 0 0 28px -6px var(--bad);
+}
+.vx .vx-dialog-field { display: grid; gap: 6px; width: 100%; text-align: left; }
+.vx .vx-dialog-field span { font-size: 13px; color: var(--vx-muted); }
+.vx .vx-dialog-field input,
+.vx .vx-dialog-field textarea {
+  width: 100%;
+  padding: 11px 13px;
+  border-radius: 12px;
+  border: 1px solid var(--vx-line-2);
+  background: var(--vx-panel);
+  color: var(--vx-text);
+  font: inherit;
+  resize: vertical;
+}
+.vx .vx-dialog-field input:focus,
+.vx .vx-dialog-field textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+.vx .vx-dialog-field small { font-size: 12px; color: var(--vx-muted); }
+.vx .vx-dialog-field small.is-ok { color: var(--ok); }
+.vx .vx-dialog-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; margin-top: 6px; }
+.vx .vx-dialog-actions button { min-height: 46px; }
+.vx .vx-dialog-actions button:disabled { opacity: 0.45; cursor: not-allowed; }
+.vx .vx-dialog-actions .danger-button { border: 0; border-radius: 12px; font-family: var(--display); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; box-shadow: 0 0 24px -8px var(--bad); }

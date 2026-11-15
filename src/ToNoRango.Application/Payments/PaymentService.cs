@@ -87,6 +87,9 @@ public sealed class PaymentService(
 {
     private static readonly TimeSpan GatewayPollInterval = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan CheckoutLifetime = TimeSpan.FromHours(2);
+
+    /// <summary>How long a Pix QR code lives; 30 minutes is the shortest Mercado Pago accepts for Pix.</summary>
+    public static readonly TimeSpan PixLifetime = TimeSpan.FromMinutes(30);
     private const string CheckoutReferencePrefix = "checkout:";
     private static readonly Error OrderNotFound = Error.NotFound("order.not_found", "Pedido não encontrado.");
     private static readonly Error GatewayUnavailable =
@@ -191,7 +194,8 @@ public sealed class PaymentService(
                         order.Code,
                         PayerEmailOf(request.PayerEmail, order),
                         $"pix-{order.Id:N}-{existing.Count}",
-                        WebhookUrlOf(order.EstablishmentId)),
+                        WebhookUrlOf(order.EstablishmentId),
+                        clock.UtcNow.Add(PixLifetime)),
                     cancellationToken);
             }
             catch (PaymentGatewayException)
@@ -210,7 +214,7 @@ public sealed class PaymentService(
                 order.TotalInCents,
                 created.PixQrCode,
                 created.PixQrCodeBase64,
-                created.ExpiresAt,
+                created.ExpiresAt ?? clock.UtcNow.Add(PixLifetime),
                 clock.UtcNow);
 
             payments.Add(payment);

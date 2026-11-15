@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "../Dialog";
 import { type FormEvent, useState } from "react";
 import { API_BASE_URL } from "@/lib/api";
 import { formatDateTime, type AdminHttp } from "@/lib/admin-api";
@@ -132,14 +133,14 @@ export function FiscalApiView({ http, establishmentId }: { http: AdminHttp; esta
     });
   }
 
-  function revoke(key: ApiKey) {
-    if (window.confirm(`Revogar a chave "${key.name}"? Quem usa ela para de emitir e consultar na hora.`)) {
+  async function revoke(key: ApiKey) {
+    if ((await confirmDialog({ title: `Revogar a chave "${key.name}"?`, message: "Quem usa ela para de emitir e consultar na hora.", confirmLabel: "Revogar", tone: "danger" }))) {
       void action.run(() => http.del(`${base}/keys/${key.id}`));
     }
   }
 
-  function removeWebhook(webhook: Webhook) {
-    if (window.confirm(`Parar de enviar eventos para ${webhook.url}?`)) {
+  async function removeWebhook(webhook: Webhook) {
+    if ((await confirmDialog({ title: `Parar de enviar eventos para ${webhook.url}?`, confirmLabel: "Parar", tone: "danger" }))) {
       void action.run(() => http.del(`${base}/webhooks/${webhook.id}`));
     }
   }

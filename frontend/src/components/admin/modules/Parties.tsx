@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "../Dialog";
 import { type FormEvent, useRef, useState } from "react";
 import { formatBRL, formatDateTime, type AdminHttp } from "@/lib/admin-api";
 import { DataTable, FormDrawer, StatusChip } from "../DataTable";
@@ -110,8 +111,9 @@ export function Customers({ http, establishmentId }: Props) {
             tone: "danger",
             hidden: (row) => row.isActive === false,
             onClick: (row) =>
-              window.confirm(row.ordersCount > 0 ? `${row.name} tem ${row.ordersCount} pedido(s): será inativado, não apagado. Continuar?` : `Excluir ${row.name}?`) &&
-              void action.run(() => http.del(`/customers/${row.id}`)),
+              void confirmDialog(row.ordersCount > 0
+                ? { title: `Inativar ${row.name}?`, message: `Tem ${row.ordersCount} pedido(s): o cadastro é inativado, não apagado.`, confirmLabel: "Inativar", tone: "danger" }
+                : { title: `Excluir ${row.name}?`, confirmLabel: "Excluir", tone: "danger" }).then((ok) => ok && action.run(() => http.del(`/customers/${row.id}`))),
           },
         ]}
         columns={[
@@ -252,7 +254,7 @@ export function Suppliers({ http, establishmentId }: Props) {
         actions={[
           { icon: "edit", label: "Editar", onClick: (row) => setEditing(row) },
           { icon: "power", label: "Reativar", hidden: (row) => row.isActive, onClick: (row) => void action.run(() => http.put(`/suppliers/${row.id}`, { ...row, isActive: true })) },
-          { icon: "trash", label: "Inativar", tone: "danger", hidden: (row) => !row.isActive, onClick: (row) => window.confirm(`Inativar ${row.tradeName ?? row.name}?`) && void action.run(() => http.del(`/suppliers/${row.id}`)) },
+          { icon: "trash", label: "Inativar", tone: "danger", hidden: (row) => !row.isActive, onClick: (row) => void confirmDialog({ title: `Inativar ${row.tradeName ?? row.name}?`, confirmLabel: "Inativar", tone: "danger" }).then((ok) => ok && action.run(() => http.del(`/suppliers/${row.id}`))) },
         ]}
         columns={[
           {
