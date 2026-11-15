@@ -275,6 +275,20 @@ public sealed class MenuService(
         return MenuItemDto.From(item);
     }
 
+    public async Task<Result<MenuItemDto>> SetItemImageAsync(Guid itemId, string? imageUrl, CancellationToken cancellationToken = default)
+    {
+        var item = await menu.GetItemAsync(itemId, cancellationToken);
+
+        if (item is null)
+        {
+            return Result<MenuItemDto>.Failure(AppErrors.NotFound("item.not_found", "Item não encontrado."));
+        }
+
+        item.SetImage(imageUrl, clock.UtcNow);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+        return MenuItemDto.From(item);
+    }
+
     public async Task<Result<MenuItemDto>> SetItemActiveAsync(
         Guid itemId,
         bool isActive,

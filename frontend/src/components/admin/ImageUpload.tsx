@@ -6,7 +6,7 @@ import { useAdmin } from "./AdminContext";
 const MAX_SIDE = 1600;
 
 /** Shrinks big phone photos in the browser, so a 12 MB picture still uploads in seconds. */
-async function prepare(file: File): Promise<Blob> {
+export async function prepare(file: File): Promise<Blob> {
   const bitmap = await createImageBitmap(file).catch(() => null);
 
   if (!bitmap) {

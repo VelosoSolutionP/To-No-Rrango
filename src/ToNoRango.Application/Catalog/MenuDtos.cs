@@ -203,6 +203,8 @@ public sealed record SetMenuAvailabilityRequest(bool IsAvailable);
 
 public sealed record SetMenuActiveRequest(bool IsActive);
 
+public sealed record SetItemImageRequest(string? ImageUrl);
+
 public sealed record CreateMenuItemRequest(
     Guid CategoryId,
     string Name,

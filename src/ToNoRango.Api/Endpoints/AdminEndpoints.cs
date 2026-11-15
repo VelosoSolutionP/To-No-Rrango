@@ -166,6 +166,10 @@ internal static class AdminEndpoints
         })
         .WithName("AlterarItemAtivo");
 
+        catalog.MapPatch("/items/{itemId:guid}/image", async (Guid itemId, SetItemImageRequest request, MenuService service, CancellationToken cancellationToken) =>
+            (await service.SetItemImageAsync(itemId, request.ImageUrl, cancellationToken)).ToHttpResult())
+        .WithName("AlterarFotoDoItem");
+
         catalog.MapPatch("/items/{itemId:guid}/availability", async (
             Guid itemId,
             SetMenuAvailabilityRequest request,

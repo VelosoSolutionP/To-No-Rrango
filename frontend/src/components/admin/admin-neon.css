@@ -1715,3 +1715,14 @@
 .vx .vx-dialog-actions button { min-height: 46px; }
 .vx .vx-dialog-actions button:disabled { opacity: 0.45; cursor: not-allowed; }
 .vx .vx-dialog-actions .danger-button { border: 0; border-radius: 12px; font-family: var(--display); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; box-shadow: 0 0 24px -8px var(--bad); }
+
+/* Fotos em lote (Produtos) */
+.vx .bulk-photos-pick { justify-self: start; cursor: pointer; }
+.vx .bulk-photos { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.vx .bulk-photos li { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 8px; border-radius: 14px; border: 1px solid var(--vx-line); background: var(--vx-panel); }
+.vx .bulk-photos li.is-done { border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
+.vx .bulk-photos li.is-failed { border-color: color-mix(in srgb, var(--bad) 45%, transparent); }
+.vx .bulk-photos img { width: 64px; height: 64px; object-fit: cover; border-radius: 10px; }
+.vx .bulk-photos li > div { display: grid; gap: 4px; min-width: 0; }
+.vx .bulk-photos small { overflow: hidden; color: var(--vx-muted); text-overflow: ellipsis; white-space: nowrap; }
+.vx .bulk-photos select { min-height: 36px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--vx-line-2); background: var(--vx-panel-2, var(--vx-panel)); color: var(--vx-text); font: inherit; }

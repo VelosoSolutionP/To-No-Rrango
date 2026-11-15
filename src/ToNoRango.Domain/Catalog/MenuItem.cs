@@ -77,6 +77,13 @@ public sealed class MenuItem : AggregateRoot
         UpdatedAt = now;
     }
 
+    /// <summary>Only the photo, for the bulk photo import of the panel.</summary>
+    public void SetImage(string? imageUrl, DateTimeOffset now)
+    {
+        ImageUrl = NormalizeOptional(imageUrl, 500, nameof(ImageUrl));
+        UpdatedAt = now;
+    }
+
     /// <summary>Starts or ends a promotion. A "de" price not above the current price ends it.</summary>
     public void SetCompareAtPrice(long? compareAtPriceInCents, DateTimeOffset now)
     {

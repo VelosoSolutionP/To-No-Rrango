@@ -1,5 +1,6 @@
 "use client";
 
+import { BulkPhotos } from "./BulkPhotos";
 import { confirmDialog } from "../Dialog";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { formatBRL, type AdminHttp } from "@/lib/admin-api";
@@ -93,6 +94,7 @@ export function Products({
   const [editing, setEditing] = useState<Row | "new" | null>(null);
   const [editingInput, setEditingInput] = useState<StockItem | "new" | null>(null);
   const [importing, setImporting] = useState(false);
+  const [photos, setPhotos] = useState(false);
 
   const rows: Row[] = useMemo(
     () => (menu?.categories ?? []).flatMap((category) => category.items.map((item) => ({ ...item, categoryName: category.name }))),
@@ -120,6 +122,7 @@ export function Products({
   return (
     <section className="admin-section">
       <ModuleHeading eyebrow="Cadastros" title="Produtos" hint="O cadastro que liga venda, composição, compra, fornecedor e tributação.">
+        <button className="secondary-button" onClick={() => setPhotos(true)} type="button">Fotos em lote</button>
         <button className="secondary-button" onClick={() => setImporting(true)} type="button">Importar por código de barras</button>
       </ModuleHeading>
       <div className="kpi-strip">
@@ -264,6 +267,8 @@ export function Products({
           stock={stock.data ?? []}
         />
       ) : null}
+
+      {photos ? <BulkPhotos base={base} http={http} menu={menu} onClose={() => setPhotos(false)} onDone={onMenuChanged} /> : null}
 
       {importing ? (
         <GtinImport base={base} hasFiscal={hasFiscal} http={http} menu={menu} onClose={() => setImporting(false)} onImported={onMenuChanged} />
