@@ -26,6 +26,7 @@ services:
       # Consulta de produtos por código de barras; sem usuário, o botão avisa que não está configurado.
       Gtin__Username: "${TNR_GTIN_USUARIO:-}"
       Gtin__Password: "${TNR_GTIN_SENHA:-}"
+      Pixabay__Key: "${TNR_PIXABAY_KEY:-}"
       # Conta Mercado Pago da Veloso (a mesma do ZEST): vale para toda loja sem conta propria.
       MercadoPago__AccessToken: "${TNR_MP_ACCESS_TOKEN:-}"
       MercadoPago__PublicKey: "${TNR_MP_PUBLIC_KEY:-}"

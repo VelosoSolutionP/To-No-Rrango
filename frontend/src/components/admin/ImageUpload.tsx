@@ -1,5 +1,6 @@
 "use client";
 
+import { PhotoPicker } from "./PhotoPicker";
 import { type ChangeEvent, type DragEvent, useRef, useState } from "react";
 import { useAdmin } from "./AdminContext";
 
@@ -30,14 +31,17 @@ interface ImageUploadProps {
   value: string;
   shape?: "photo" | "logo" | "cover";
   onChange: (url: string) => void;
+  /** When set, offers real photos from the bank searched by this text (the product name). */
+  searchTerm?: string;
 }
 
-export function ImageUpload({ label, hint, value, shape = "photo", onChange }: ImageUploadProps) {
+export function ImageUpload({ label, hint, value, shape = "photo", onChange, searchTerm }: ImageUploadProps) {
   const { http, establishmentId } = useAdmin();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [searching, setSearching] = useState(false);
 
   async function send(file: File | undefined) {
     if (!file || !http || !establishmentId) {
@@ -101,6 +105,12 @@ export function ImageUpload({ label, hint, value, shape = "photo", onChange }: I
         type="file"
       />
       {hint ? <small className="upload-hint">{hint}</small> : null}
+      {searchTerm !== undefined && http && establishmentId ? (
+        <button className="secondary-button upload-search" onClick={() => setSearching(true)} type="button">Buscar foto real</button>
+      ) : null}
+      {searching && http ? (
+        <PhotoPicker base={`/establishments/${establishmentId}`} http={http} initialQuery={searchTerm ?? ""} onClose={() => setSearching(false)} onPick={onChange} />
+      ) : null}
       {value ? (
         <div className="upload-actions">
           <button className="link-button" onClick={() => input.current?.click()} type="button">Trocar foto</button>

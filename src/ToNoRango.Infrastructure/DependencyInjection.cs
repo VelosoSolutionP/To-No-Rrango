@@ -64,6 +64,12 @@ public static class DependencyInjection
             configuration["MercadoPago:PublicKey"],
             configuration["MercadoPago:WebhookSecret"]));
 
+        services.AddHttpClient<ToNoRango.Application.Media.IPhotoSearch, PixabayPhotoSearch>(client =>
+        {
+            client.BaseAddress = new Uri("https://pixabay.com/");
+            client.Timeout = TimeSpan.FromSeconds(15);
+        });
+
         services.AddHttpClient<IPaymentGateway, MercadoPagoGateway>(client =>
         {
             client.BaseAddress = new Uri(configuration["MercadoPago:BaseUrl"] ?? "https://api.mercadopago.com/");

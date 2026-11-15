@@ -5,6 +5,7 @@ import type { AdminHttp } from "@/lib/admin-api";
 import type { PublicMenu } from "@/lib/types";
 import { FormDrawer, StatusChip } from "../DataTable";
 import { prepare } from "../ImageUpload";
+import { importPhoto, searchPhotos, type PhotoOption } from "../PhotoPicker";
 import { ErrorMessage } from "./shared";
 
 interface Item {
@@ -53,6 +54,7 @@ export function BulkPhotos({ http, base, menu, onClose, onDone }: { http: AdminH
     () => (menu?.categories ?? []).flatMap((category) => category.items.map((item) => ({ id: item.id, name: item.name, imageUrl: item.imageUrl ?? null }))),
     [menu],
   );
+  const [mode, setMode] = useState<"bank" | "files">("bank");
   const [pairs, setPairs] = useState<Pair[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,6 +100,11 @@ export function BulkPhotos({ http, base, menu, onClose, onDone }: { http: AdminH
 
   return (
     <FormDrawer onClose={onClose} subtitle="Produtos" title="Fotos em lote" wide>
+      <div className="pay-methods" role="group" aria-label="De onde vêm as fotos">
+        <button className={mode === "bank" ? "is-active" : ""} onClick={() => setMode("bank")} type="button">Fotos reais prontas</button>
+        <button className={mode === "files" ? "is-active" : ""} onClick={() => setMode("files")} type="button">Minhas fotos</button>
+      </div>
+      {mode === "bank" ? <FillFromBank base={base} http={http} items={items} onDone={onDone} /> : (
       <div className="drawer-form">
         <p className="muted">
           Dê a cada foto o nome do produto (ex.: <code>Pizza Margherita Grande.jpg</code>) e selecione todas de uma vez. O sistema liga cada foto ao produto
@@ -141,6 +148,135 @@ export function BulkPhotos({ http, base, menu, onClose, onDone }: { http: AdminH
           )}
         </div>
       </div>
+      )}
     </FormDrawer>
+  );
+}
+
+interface Fill {
+  item: Item;
+  options: PhotoOption[];
+  picked: number;
+  state: "searching" | "ready" | "none" | "sending" | "done" | "failed";
+  message?: string;
+}
+
+/** For every product still without a picture: the best real photo, with others one click away. */
+function FillFromBank({ http, base, items, onDone }: { http: AdminHttp; base: string; items: Item[]; onDone: () => Promise<void> }) {
+  const missing = useMemo(() => items.filter((item) => !item.imageUrl), [items]);
+  const [fills, setFills] = useState<Fill[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const update = (id: string, change: Partial<Fill>) => setFills((current) => current.map((fill) => (fill.item.id === id ? { ...fill, ...change } : fill)));
+
+  async function searchAll() {
+    setBusy(true);
+    setError(null);
+    setFills(missing.map((item) => ({ item, options: [], picked: 0, state: "searching" })));
+
+    for (const item of missing) {
+      try {
+        const result = await searchPhotos(http, base, item.name);
+        if (!result.configured) {
+          setError("A busca de fotos ainda não está ligada neste servidor (falta a chave do Pixabay).");
+          break;
+        }
+        if (result.busy) {
+          update(item.id, { state: "failed", message: "Banco de fotos ocupado. Clique em “Buscar de novo” daqui a pouco." });
+          continue;
+        }
+        update(item.id, { options: result.photos.slice(0, 8), state: result.photos.length ? "ready" : "none", message: undefined });
+      } catch {
+        update(item.id, { state: "none" });
+      }
+    }
+
+    setBusy(false);
+  }
+
+  async function apply() {
+    setBusy(true);
+    setError(null);
+    let failures = 0;
+
+    for (const fill of fills) {
+      if (fill.state !== "ready") continue;
+      update(fill.item.id, { state: "sending" });
+      try {
+        const url = await importPhoto(http, base, fill.options[fill.picked]);
+        await http.patch(`/items/${fill.item.id}/image`, { imageUrl: url });
+        update(fill.item.id, { state: "done" });
+      } catch (failure) {
+        failures++;
+        update(fill.item.id, { state: "failed", message: failure instanceof Error ? failure.message : "Falhou." });
+      }
+    }
+
+    await onDone();
+    setBusy(false);
+    if (failures) setError(`${failures} foto(s) não foram aplicadas. Tente de novo nessas.`);
+  }
+
+  const ready = fills.filter((fill) => fill.state === "ready").length;
+
+  if (missing.length === 0 && fills.length === 0) {
+    return <div className="drawer-form"><p className="muted">Todos os produtos já têm foto. Para trocar uma, abra o produto e use “Buscar foto real”.</p></div>;
+  }
+
+  return (
+    <div className="drawer-form">
+      <div className="fill-head">
+        <p className="muted">{missing.length} produto(s) sem foto. O sistema busca uma foto real para cada um; troque pela miniatura que combinar mais e aplique.</p>
+        <button className="secondary-button" disabled={busy} onClick={() => void searchAll()} type="button">{fills.length ? "Buscar de novo" : "Buscar fotos reais"}</button>
+      </div>
+
+      {fills.length ? (
+        <ul className="fill-list">
+          {fills.map((fill) => (
+            <li className={`is-${fill.state}`} key={fill.item.id}>
+              {fill.options.length ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img alt="" className="fill-main" src={fill.options[fill.picked].previewUrl} />
+              ) : <span className="fill-main" />}
+              <div>
+                <div className="fill-head">
+                  <strong>{fill.item.name}</strong>
+                  {fill.state === "done" ? <StatusChip tone="ok">Aplicada</StatusChip>
+                    : fill.state === "sending" ? <StatusChip tone="warn">Salvando…</StatusChip>
+                    : fill.state === "searching" ? <StatusChip tone="muted">Buscando…</StatusChip>
+                    : fill.state === "none" ? <StatusChip tone="muted">Nada achado</StatusChip>
+                    : fill.state === "failed" ? <StatusChip tone="bad">Falhou</StatusChip>
+                    : null}
+                </div>
+                <div className="fill-alt">
+                  {fill.options.map((option, index) => (
+                    <button className={index === fill.picked ? "is-picked" : ""} disabled={busy || fill.state === "done"} key={option.id} onClick={() => update(fill.item.id, { picked: index, state: "ready" })} title={option.tags} type="button">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img alt={option.tags} loading="lazy" src={option.previewUrl} />
+                    </button>
+                  ))}
+                </div>
+                {fill.options.length ? (
+                  <button className="link-button" disabled={busy || fill.state === "done"} onClick={() => update(fill.item.id, { state: fill.state === "ready" ? "none" : "ready" })} type="button">
+                    {fill.state === "ready" ? "Não usar foto neste" : fill.state === "none" ? "Usar foto neste" : ""}
+                  </button>
+                ) : null}
+                {fill.message ? <small className="form-error">{fill.message}</small> : null}
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      <ErrorMessage message={error} />
+      {fills.length ? (
+        <div className="drawer-actions">
+          <button className="primary-button" disabled={busy || ready === 0} onClick={() => void apply()} type="button">
+            {busy ? "Trabalhando…" : `Aplicar ${ready} foto(s)`}
+          </button>
+        </div>
+      ) : null}
+    </div>
   );
 }

@@ -100,6 +100,32 @@ internal static class ModuleEndpoints
             return Results.Ok(new { url = $"{baseUrl}/api/public/media/{uploaded.Value.Id}" });
         }).DisableAntiforgery();
 
+        // Real product photos (Pixabay): search by the product name, then copy the chosen one into our own media.
+        var photos = admin.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager);
+
+        photos.MapGet($"{Establishment}/photos/search", async (Guid establishmentId, string q, PhotoSearchService service, CancellationToken ct) =>
+            Results.Ok(await service.SearchAsync(q, ct)));
+
+        photos.MapPost($"{Establishment}/photos/import", async (Guid establishmentId, ImportPhotoRequest request, HttpRequest http, IAppUrls urls, IPhotoSearch bank, MediaService media, CancellationToken ct) =>
+        {
+            var bytes = await bank.DownloadAsync(request.Url, ct);
+
+            if (bytes is null)
+            {
+                return Results.Problem(title: "media.photo_unavailable", detail: "Não consegui baixar esta foto. Escolha outra.", statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            var uploaded = await media.UploadAsync(establishmentId, bytes, ct);
+
+            if (uploaded.IsFailure)
+            {
+                return uploaded.ToHttpResult();
+            }
+
+            var baseUrl = urls.PublicApiUrl ?? $"{http.Scheme}://{http.Host}";
+            return Results.Ok(new { url = $"{baseUrl}/api/public/media/{uploaded.Value.Id}" });
+        });
+
         MapUsers(admin.MapGroup("/users").RequireRoles(UserRole.Owner));
 
         // Integration hub: every connection of the store and its health, in one read.

@@ -336,6 +336,7 @@ function ProductDrawer({
 }) {
   const [tab, setTab] = useState<"general" | "price" | "fiscal" | "recipe" | "supply">("general");
   const [imageUrl, setImageUrl] = useState(product?.imageUrl ?? "");
+  const [nameDraft, setNameDraft] = useState(product?.name ?? "");
   const [price, setPrice] = useState(product ? money(product.priceInCents) : "");
   const [recipe, setRecipe] = useState<RecipeLine[]>([]);
   const [recipeLoaded, setRecipeLoaded] = useState(false);
@@ -452,7 +453,7 @@ function ProductDrawer({
       <form className="drawer-form" onSubmit={save} ref={formRef}>
         <div hidden={tab !== "general"}>
           <div className="drawer-form">
-            <label className="field"><span>Nome *</span><input defaultValue={product?.name ?? ""} maxLength={120} name="name" required /></label>
+            <label className="field"><span>Nome *</span><input defaultValue={product?.name ?? ""} maxLength={120} name="name" onChange={(event) => setNameDraft(event.target.value)} required /></label>
             <div className="field-row">
               <label className="field">
                 <span>Categoria *</span>
@@ -474,7 +475,7 @@ function ProductDrawer({
             </div>
             {lookup.message ? <p className={lookup.tone === "warn" ? "form-error" : "muted"}>{lookup.message}</p> : null}
             <label className="field"><span>Descrição</span><textarea defaultValue={product?.description ?? ""} maxLength={500} name="description" /></label>
-            <ImageUpload hint="Foto quadrada ou deitada, com boa luz, vende mais." label="Foto" onChange={setImageUrl} value={imageUrl} />
+            <ImageUpload hint="Foto quadrada ou deitada, com boa luz, vende mais." label="Foto" onChange={setImageUrl} searchTerm={nameDraft} value={imageUrl} />
             <label className="module-check"><input defaultChecked={product?.isAvailable ?? true} name="isAvailable" type="checkbox" /> <span>Disponível para venda</span></label>
           </div>
         </div>
