@@ -1191,15 +1191,53 @@ function Charge({ order, base, http, onPaid, onCancelled }: { order: AdminOrder;
     return () => { alive = false; };
   }, [order.code, isPix]);
 
+  // The parent re-renders all the time; the latest callback lives in a ref so the polling never restarts.
+  const paidRef = useRef(onPaid);
+  paidRef.current = onPaid;
+  const [checking, setChecking] = useState(false);
+  const [lastCheck, setLastCheck] = useState<Date | null>(null);
+  const done = useRef(false);
+
+  const check = useCallback(async () => {
+    if (done.current) return;
+    try {
+      const result = await http.post<{ order: AdminOrder }>(`${base}/pdv/sales/${order.id}/settle`);
+      setLastCheck(new Date());
+      if (result.order.paymentStatus === "Paid" && !done.current) {
+        done.current = true;
+        paidRef.current(result.order);
+      }
+    } catch { /* keeps waiting */ }
+  }, [base, http, order.id]);
+
   useEffect(() => {
-    const timer = window.setInterval(async () => {
-      try {
-        const result = await http.post<{ order: AdminOrder }>(`${base}/pdv/sales/${order.id}/settle`);
-        if (result.order.paymentStatus === "Paid") onPaid(result.order);
-      } catch { /* keeps waiting */ }
-    }, 3000);
+    const timer = window.setInterval(() => void check(), 3000);
     return () => window.clearInterval(timer);
-  }, [base, http, order.id, onPaid]);
+  }, [check]);
+
+  async function checkNow() {
+    setChecking(true);
+    await check();
+    setChecking(false);
+    if (!done.current) setError("O Mercado Pago ainda não confirmou. Se o cliente mostrou o comprovante, use “Já recebi”.");
+  }
+
+  /** Last resort when the confirmation does not arrive: the operator saw the money in the Mercado Pago app. */
+  async function receivedManually() {
+    const ok = await confirmDialog({
+      title: "Confirmar que o Pix caiu?",
+      message: "Use só se você viu o pagamento no app do Mercado Pago ou no comprovante do cliente. A venda entra no caixa como Pix.",
+      confirmLabel: "Já recebi",
+    });
+    if (!ok) return;
+    try {
+      const result = await http.post<{ order: AdminOrder }>(`${base}/pdv/orders/${order.id}/receive`, { paymentMethod: order.paymentMethod });
+      done.current = true;
+      paidRef.current(result.order);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "Não deu para registrar.");
+    }
+  }
 
   async function cancel() {
     if (!(await confirmDialog({ title: "Cancelar esta cobrança?", message: "A venda é cancelada e não entra no caixa.", confirmLabel: "Cancelar cobrança", cancelLabel: "Continuar esperando", tone: "danger" }))) return;
@@ -1237,9 +1275,11 @@ function Charge({ order, base, http, onPaid, onCancelled }: { order: AdminOrder;
           ) : null}
           {!pix && !cardUrl && !error ? <small>Gerando a cobrança…</small> : null}
           <ErrorMessage message={error} />
-          <small><span className="loading-dot" /> Confirma sozinho quando o pagamento for aprovado.</small>
+          <small><span className="loading-dot" /> Confirma sozinho quando o pagamento for aprovado{lastCheck ? ` · conferido às ${lastCheck.toLocaleTimeString("pt-BR")}` : ""}.</small>
         </div>
         <div className="receipt-actions">
+          <button className="secondary-button" disabled={checking} onClick={() => void checkNow()} type="button">{checking ? "Conferindo…" : "Conferir agora"}</button>
+          <button className="secondary-button" onClick={() => void receivedManually()} type="button">Já recebi</button>
           <button className="secondary-button" onClick={() => void cancel()} type="button">Cancelar cobrança</button>
         </div>
       </section>
@@ -1261,7 +1301,8 @@ function Receipt({ order, storeName, base, http, onClose }: { order: AdminOrder;
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
 
-  const phone = (order.customerPhone ?? "").replace(/\D/g, "");
+  const [typedPhone, setTypedPhone] = useState(order.customerPhone ?? "");
+  const phone = typedPhone.replace(/\D/g, "");
   const hasPhone = phone.length >= 10;
 
   function whatsapp() {
@@ -1293,6 +1334,7 @@ function Receipt({ order, storeName, base, http, onClose }: { order: AdminOrder;
     <div className="modal-backdrop receipt-backdrop" role="presentation">
       <section className="modal receipt-modal" role="dialog">
         <div className="receipt" id="receipt">
+          {order.paymentStatus === "Paid" ? <span className="receipt-paid">✓ Pagamento aprovado</span> : null}
           <strong className="receipt-store">{storeName}</strong>
           <small>Comprovante de venda · sem valor fiscal</small>
           <small>#{order.code} · {formatDateTime(order.createdAt)}</small>
@@ -1312,8 +1354,12 @@ function Receipt({ order, storeName, base, http, onClose }: { order: AdminOrder;
           <small>Obrigado pela preferência!</small>
         </div>
         {message ? <p className="muted">{message}</p> : null}
+        <label className="receipt-phone">
+          <span>WhatsApp do cliente (para mandar o comprovante)</span>
+          <input inputMode="tel" onChange={(event) => setTypedPhone(event.target.value)} placeholder="(31) 99999-9999" value={typedPhone} />
+        </label>
         <div className="receipt-actions">
-          <button className="secondary-button" disabled={!hasPhone} onClick={whatsapp} title={hasPhone ? "" : "Informe o telefone do cliente na venda"} type="button">Venda direta · WhatsApp</button>
+          <button className="secondary-button" disabled={!hasPhone} onClick={whatsapp} title={hasPhone ? "" : "Digite o WhatsApp do cliente acima"} type="button">Comprovante no WhatsApp</button>
           <button className="secondary-button" onClick={() => window.print()} type="button">Comprovante não fiscal</button>
           <button className="secondary-button" disabled={busy} onClick={() => void nfce()} type="button">{busy ? "Emitindo…" : "Emitir NFC-e"}</button>
           <button className="primary-button" onClick={onClose} type="button">Sem comprovante · nova venda (Esc)</button>

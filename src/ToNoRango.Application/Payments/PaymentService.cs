@@ -85,7 +85,7 @@ public sealed class PaymentService(
     IClock clock,
     PlatformPaymentAccount platform)
 {
-    private static readonly TimeSpan GatewayPollInterval = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan GatewayPollInterval = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan CheckoutLifetime = TimeSpan.FromHours(2);
 
     /// <summary>How long a Pix QR code lives; 30 minutes is the shortest Mercado Pago accepts for Pix.</summary>
@@ -385,51 +385,67 @@ public sealed class PaymentService(
                 return Result<PaymentDto?>.Failure(OrderNotFound);
             }
 
-            var latest = await payments.ListAsync(
+            var recent = await payments.ListAsync(
                 payment => payment.OrderId == order.Id,
                 payment => payment.CreatedAt,
                 cancellationToken,
                 descending: true,
-                take: 1);
+                take: 5);
 
-            if (latest.Count == 0)
+            if (recent.Count == 0)
             {
                 return Result<PaymentDto?>.Success(null);
             }
 
-            if (latest[0].Status != ChargeStatus.Pending || clock.UtcNow - latest[0].LastCheckedAt < GatewayPollInterval)
+            if (recent.FirstOrDefault(payment => payment.Status == ChargeStatus.Approved) is { } approved)
             {
-                return PaymentDto.From(latest[0]);
+                return PaymentDto.From(approved);
             }
 
-            var settings = await SettingsOfAsync(order.EstablishmentId, cancellationToken);
+            // Every pending charge of the order is re-read, not only the newest: the customer may have
+            // paid an earlier QR code while a newer one was on the screen.
+            var due = recent.Where(payment => payment.Status == ChargeStatus.Pending && clock.UtcNow - payment.LastCheckedAt >= GatewayPollInterval).ToList();
+            var settings = due.Count == 0 ? null : await SettingsOfAsync(order.EstablishmentId, cancellationToken);
 
             if (settings?.EncryptedAccessToken is null)
             {
-                return PaymentDto.From(latest[0]);
+                return PaymentDto.From(recent[0]);
             }
 
-            var payment = await payments.FindAsync(latest[0].Id, cancellationToken);
-            GatewayPayment remote;
+            Payment? paid = null;
 
-            try
+            foreach (var stale in due)
             {
-                remote = await gateway.GetAsync(protector.Unprotect(settings.EncryptedAccessToken), payment!.ProviderPaymentId, cancellationToken);
-            }
-            catch (PaymentGatewayException)
-            {
-                return PaymentDto.From(latest[0]);
-            }
+                var payment = await payments.FindAsync(stale.Id, cancellationToken);
+                GatewayPayment remote;
 
-            await unitOfWork.ExecuteInTransactionAsync(async token =>
-            {
-                await ApplyGatewayStateAsync(payment, order, remote, token);
-                return true;
-            }, cancellationToken);
+                try
+                {
+                    remote = await gateway.GetAsync(protector.Unprotect(settings.EncryptedAccessToken), payment!.ProviderPaymentId, cancellationToken);
+                }
+                catch (PaymentGatewayException)
+                {
+                    payment!.MarkChecked(clock.UtcNow);
+                    await unitOfWork.SaveChangesAsync(cancellationToken);
+                    continue;
+                }
+
+                await unitOfWork.ExecuteInTransactionAsync(async token =>
+                {
+                    await ApplyGatewayStateAsync(payment, order, remote, token);
+                    return true;
+                }, cancellationToken);
+
+                if (payment.Status == ChargeStatus.Approved)
+                {
+                    paid = payment;
+                    break;
+                }
+            }
 
             await events.PublishAsync(order.Code);
 
-            return PaymentDto.From(payment);
+            return paid is not null ? PaymentDto.From(paid) : PaymentDto.From((await payments.FindAsync(recent[0].Id, cancellationToken))!);
         });
 
     /// <summary>

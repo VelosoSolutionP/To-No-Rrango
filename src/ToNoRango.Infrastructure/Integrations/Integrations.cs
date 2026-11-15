@@ -203,9 +203,21 @@ public sealed class MercadoPagoGateway(HttpClient http, ILogger<MercadoPagoGatew
         CancellationToken cancellationToken)
     {
         using var response = await ExchangeAsync(method, path, accessToken, body, idempotencyKey, cancellationToken);
-        using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(cancellationToken), cancellationToken: cancellationToken);
+        var text = await response.Content.ReadAsStringAsync(cancellationToken);
 
-        return Parse(document.RootElement);
+        try
+        {
+            using var document = JsonDocument.Parse(text);
+            var payment = Parse(document.RootElement);
+            logger.LogInformation("Mercado Pago {Method} {Path}: payment {Id} is {Status}", method.Method, path, payment.Id, payment.Status);
+            return payment;
+        }
+        catch (Exception exception) when (exception is JsonException or KeyNotFoundException or InvalidOperationException or FormatException)
+        {
+            // Never again a silent failure: an unreadable answer is logged and treated as "no answer".
+            logger.LogError(exception, "Mercado Pago answer on {Path} could not be read: {Body}", path, text.Length > 600 ? text[..600] : text);
+            throw new PaymentGatewayException("Mercado Pago answer could not be read.", exception);
+        }
     }
 
     private async Task<HttpResponseMessage> ExchangeAsync(
