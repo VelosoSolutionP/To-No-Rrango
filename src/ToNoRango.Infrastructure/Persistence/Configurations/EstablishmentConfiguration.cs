@@ -16,6 +16,7 @@ public sealed class EstablishmentConfiguration : IEntityTypeConfiguration<Establ
         builder.Property(establishment => establishment.Slug).HasMaxLength(80).IsRequired();
         builder.Property(establishment => establishment.Description).HasMaxLength(500);
         builder.Property(establishment => establishment.LogoUrl).HasMaxLength(500);
+        builder.Property(establishment => establishment.ManagerPinHash).HasMaxLength(200);
         builder.Property(establishment => establishment.CoverUrl).HasMaxLength(500);
         builder.Property(establishment => establishment.Phone).HasMaxLength(30);
         builder.Property(establishment => establishment.WhatsApp).HasMaxLength(30);

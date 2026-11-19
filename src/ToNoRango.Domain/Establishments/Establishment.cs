@@ -125,6 +125,18 @@ public sealed class Establishment : AggregateRoot
         UpdatedAt = now;
     }
 
+    /// <summary>
+    /// Hash of the manager PIN: the "senha do gerente" asked at the checkout before changing an order
+    /// that already has its value closed. Null while the store has not set one.
+    /// </summary>
+    public string? ManagerPinHash { get; private set; }
+
+    public void SetManagerPin(string? pinHash, DateTimeOffset now)
+    {
+        ManagerPinHash = string.IsNullOrWhiteSpace(pinHash) ? null : pinHash;
+        UpdatedAt = now;
+    }
+
     public void SetOpeningHours(string? openingHours, bool acceptsOrdersWhenClosed, DateTimeOffset now)
     {
         OpeningHours = OpeningSchedule.Normalize(openingHours);

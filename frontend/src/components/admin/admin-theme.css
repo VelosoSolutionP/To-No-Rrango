@@ -283,6 +283,18 @@ i.is-served { background: var(--ok); }
 .receive-card header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .receive-card header small { color: var(--vx-muted); }
 .receive-total { font-family: var(--display); font-size: 1.5rem; }
+.receive-items { list-style: none; margin: 4px 0; padding: 8px 0; display: grid; gap: 4px; border-top: 1px dashed var(--vx-line); border-bottom: 1px dashed var(--vx-line); font-size: .9rem; }
+.receive-items li { display: flex; justify-content: space-between; gap: 10px; }
+.receive-items small { color: var(--vx-muted); }
+.receive-closed { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.receive-closed small { color: var(--vx-muted); font-weight: 700; }
+.pos-title { display: grid; gap: 2px; }
+.pos-title strong { font-family: var(--display); font-size: 1.25rem; }
+.pos-extra { width: min(560px, 94vw); display: grid; gap: 12px; max-height: 92vh; overflow: auto; }
+.pos-extra-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.pos-extra-list small { color: var(--vx-muted); margin-left: 4px; }
+.pos-extra-pin { display: grid; gap: 4px; max-width: 220px; }
+.pos-extra-pin input { letter-spacing: .4em; font-size: 1.2rem; text-align: center; }
 
 .drawer-wide { width: min(560px, 100vw); }
 .cash-panel { display: grid; gap: 12px; }

@@ -80,6 +80,11 @@ internal static class OperationEndpoints
         cashiers.MapPost($"{Establishment}/pdv/orders/{{orderId:guid}}/receive", async (Guid establishmentId, Guid orderId, ReceiveOrderRequest request, HttpContext http, PdvService service, CancellationToken ct) =>
             (await service.ReceiveAsync(establishmentId, orderId, request, http.Actor(), ct)).ToHttpResult());
 
+        // Pedido do WhatsApp ou do cardápio chega com valor fechado: incluir algo só com a senha do gerente.
+        cashiers.MapPost($"{Establishment}/pdv/orders/{{orderId:guid}}/items", async (Guid establishmentId, Guid orderId, ExtraItemsRequest request, HttpContext http, PdvService service, CancellationToken ct) =>
+            (await service.AddExtraItemsAsync(establishmentId, orderId, request, http.Actor(), ct)).ToHttpResult())
+            .RequireRateLimiting("login");
+
         cashiers.MapGet($"{Establishment}/tables", async (Guid establishmentId, PdvService service, CancellationToken ct) =>
             (await service.ListTablesAsync(establishmentId, ct)).ToHttpResult());
 
@@ -93,6 +98,17 @@ internal static class OperationEndpoints
         operations.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager)
             .MapPost($"{Establishment}/pdv/sales/{{orderId:guid}}/cancel", async (Guid establishmentId, Guid orderId, CancelSaleRequest request, HttpContext http, PdvService service, CancellationToken ct) =>
                 (await service.CancelSaleAsync(establishmentId, orderId, request, http.Actor(), ct)).ToHttpResult());
+
+        // A senha do gerente: o caixa pede antes de mudar um pedido de valor fechado.
+        var pinManagers = operations.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager);
+
+        pinManagers.MapGet($"{Establishment}/manager-pin", async (Guid establishmentId, IEstablishmentRepository establishments, CancellationToken ct) =>
+            await establishments.GetByIdAsync(establishmentId, ct) is { } establishment
+                ? Results.Ok(new { configured = establishment.ManagerPinHash is not null })
+                : Results.NotFound());
+
+        pinManagers.MapPut($"{Establishment}/manager-pin", async (Guid establishmentId, ManagerPinRequest request, PdvService service, CancellationToken ct) =>
+            (await service.SetManagerPinAsync(establishmentId, request, ct)).ToHttpResult());
 
         operations.MapGroup(string.Empty).RequireRoles(UserRole.Owner, UserRole.Manager)
             .MapGet($"{Establishment}/ratings", async (Guid establishmentId, int? days, RatingService service, CancellationToken ct) =>

@@ -101,6 +101,7 @@ export function Pdv({
   orders,
   canManage,
   onChanged,
+  variant = "checkout",
 }: {
   http: AdminHttp;
   establishmentId: string;
@@ -108,6 +109,8 @@ export function Pdv({
   orders: AdminOrder[];
   canManage: boolean;
   onChanged: () => Promise<void>;
+  /** "tables": the waiter's screen (launch to the kitchen, no register needed); "checkout": receives and closes bills. */
+  variant?: "checkout" | "tables";
 }) {
   const base = `/establishments/${establishmentId}`;
   const overview = useLoad(() => http.get<Overview>(`${base}/pdv`), [base]);
@@ -136,6 +139,55 @@ export function Pdv({
   }, [base]);
 
   const toReceive = orders.filter((order) => order.paymentStatus === "Pending" && order.status !== "Cancelled" && order.channel !== "Pdv" && !order.tableLabel);
+
+  async function launchComanda(label: string, payload: unknown) {
+    const done = await action.run(() => http.post(`${base}/tables/${encodeURIComponent(label)}/orders`, payload));
+    if (done) {
+      setTable(label);
+      setComanda(null);
+    }
+    return done;
+  }
+
+  // Mesas: o garçom lança a comanda e ela vai direto para a cozinha. Não depende do caixa aberto:
+  // a conta só é fechada no Checkout.
+  if (variant === "tables") {
+    return (
+      <section className="pos">
+        <header className="pos-bar">
+          <div className="pos-title">
+            <strong>Mesas</strong>
+            <small className="muted">Lance a comanda: vai direto para a cozinha. A conta fecha no Checkout.</small>
+          </div>
+        </header>
+        <ErrorMessage message={tables.error ?? action.error} />
+        {comanda ? (
+          <SaleView
+            busy={action.busy}
+            canManage={canManage}
+            comanda={comanda}
+            customers={customers.data ?? []}
+            delivery={false}
+            menu={menu}
+            onBack={() => setComanda(null)}
+            online={online}
+            onSell={(payload) => launchComanda(comanda, payload)}
+          />
+        ) : (
+          <TablesView
+            busy={action.busy}
+            mode="launch"
+            onAdd={(label) => setComanda(label)}
+            onClose={async () => false}
+            onSelect={setTable}
+            selected={table}
+            slug={menu?.establishment.slug ?? null}
+            tables={tables.data ?? []}
+          />
+        )}
+      </section>
+    );
+  }
 
   if (overview.loading && !overview.data) {
     return <p className="muted">Carregando caixa…</p>;
@@ -184,11 +236,12 @@ export function Pdv({
 
       {!session ? (
         <OpenCash busy={action.busy} onOpen={(cents) => action.run(() => http.post(`${base}/pdv/open`, { openingAmountInCents: cents }))} />
-      ) : mode === "tables" && !comanda ? (
+      ) : mode === "tables" ? (
         <TablesView
           slug={menu?.establishment.slug ?? null}
           busy={action.busy}
-          onAdd={(label) => setComanda(label)}
+          mode="close"
+          onAdd={() => undefined}
           onClose={(label, method) => action.run(() => http.post(`${base}/tables/${encodeURIComponent(label)}/close`, { paymentMethod: method }))}
           onSelect={setTable}
           selected={table}
@@ -197,6 +250,8 @@ export function Pdv({
       ) : mode === "receive" ? (
         <ReceiveView
           busy={action.busy}
+          menu={menu}
+          onAddItems={(orderId, managerPin, items) => action.run(() => http.post(`${base}/pdv/orders/${orderId}/items`, { managerPin, items }))}
           onReceive={(orderId, method) => action.run(() => http.post(`${base}/pdv/orders/${orderId}/receive`, { paymentMethod: method }))}
           orders={toReceive}
         />
@@ -204,21 +259,13 @@ export function Pdv({
         <SaleView
           busy={action.busy}
           canManage={canManage}
-          comanda={mode === "tables" ? comanda : null}
+          comanda={null}
           customers={customers.data ?? []}
           delivery={mode === "delivery"}
           menu={menu}
           onBack={() => setComanda(null)}
           online={online}
           onSell={async (payload) => {
-            if (mode === "tables" && comanda) {
-              const done = await action.run(() => http.post(`${base}/tables/${encodeURIComponent(comanda)}/orders`, payload));
-              if (done) {
-                setTable(comanda);
-                setComanda(null);
-              }
-              return done;
-            }
             let sold: AdminOrder | null = null;
             const done = await action.run(async () => {
               sold = (await http.post<{ order: AdminOrder }>(`${base}/pdv/sales`, payload)).order;
@@ -842,11 +889,14 @@ function TablesView({
   tables,
   selected,
   busy,
+  mode,
   onSelect,
   onAdd,
   onClose,
 }: {
   slug: string | null;
+  /** launch: tela do garçom (todas as mesas, lança comanda); close: Checkout (só mesas com conta, fecha a conta). */
+  mode: "launch" | "close";
   tables: OpenTable[];
   selected: string | null;
   busy: boolean;
@@ -858,10 +908,12 @@ function TablesView({
   const [method, setMethod] = useState<PaymentMethod>("Cash");
   const open = new Map(tables.map((item) => [item.table, item]));
   const numbered = Math.max(DEFAULT_TABLES, ...tables.map((item) => Number(item.table)).filter((value) => Number.isFinite(value)));
-  const labels = [
-    ...Array.from({ length: numbered }, (_, index) => String(index + 1)),
-    ...tables.map((item) => item.table).filter((label) => !/^\d+$/.test(label)),
-  ];
+  const labels = mode === "close"
+    ? tables.map((item) => item.table)
+    : [
+        ...Array.from({ length: numbered }, (_, index) => String(index + 1)),
+        ...tables.map((item) => item.table).filter((label) => !/^\d+$/.test(label)),
+      ];
   const current = selected ? open.get(selected) ?? null : null;
   const lines = current
     ? Object.values(
@@ -884,6 +936,7 @@ function TablesView({
           <span><i className="is-free" />Livre</span>
           <span><i className="is-busy" />Ocupada</span>
           <span><i className="is-served" />Tudo servido</span>
+          {mode === "launch" ? (
           <form
             onSubmit={(event) => {
               event.preventDefault();
@@ -896,7 +949,9 @@ function TablesView({
           >
             <input maxLength={20} onChange={(event) => setCustom(event.target.value)} placeholder="Outra mesa (ex.: Varanda 2)" value={custom} />
           </form>
+          ) : null}
         </div>
+        {mode === "close" && labels.length === 0 ? <p className="pos-empty">Nenhuma mesa com conta aberta. As comandas são lançadas na tela Mesas.</p> : null}
         <div className="tables-grid">
           {labels.map((label) => {
             const info = open.get(label);
@@ -925,7 +980,7 @@ function TablesView({
 
       <aside className="table-panel">
         {!selected ? (
-          <p className="pos-empty">Escolha uma mesa para lançar a comanda ou fechar a conta.</p>
+          <p className="pos-empty">{mode === "launch" ? "Escolha uma mesa para lançar a comanda." : "Escolha uma mesa para fechar a conta."}</p>
         ) : (
           <>
             <header>
@@ -942,15 +997,21 @@ function TablesView({
                 </li>
               ))}
             </ul>
-            <button className="primary-button primary-button-full" onClick={() => onAdd(selected)} type="button">+ Lançar itens (comanda)</button>
-            {slug ? (
+            {mode === "launch" ? <button className="primary-button primary-button-full" onClick={() => onAdd(selected)} type="button">+ Lançar itens (comanda)</button> : null}
+            {mode === "launch" && current ? (
+              <div className="pos-total">
+                <div><small>Conta parcial da mesa</small><strong>{formatBRL(current.totalInCents)}</strong></div>
+                <small>A conta é fechada no Checkout.</small>
+              </div>
+            ) : null}
+            {mode === "launch" && slug ? (
               <div className="table-qr">
                 <small>Link da mesa para o QR Code (o cliente pede pelo celular)</small>
                 <code>{`${window.location.origin}/menu/${slug}?mesa=${encodeURIComponent(selected)}`}</code>
                 <button className="link-button" onClick={() => void navigator.clipboard?.writeText(`${window.location.origin}/menu/${slug}?mesa=${encodeURIComponent(selected)}`)} type="button">Copiar link</button>
               </div>
             ) : null}
-            {current ? (
+            {mode === "close" && current ? (
               <div className="table-close">
                 <div className="pos-total">
                   <div><small>Conta da mesa</small><strong>{formatBRL(current.totalInCents)}</strong></div>
@@ -983,32 +1044,180 @@ function TablesView({
 
 /* ------------------------------------------------------------------------------------------------ */
 
-function ReceiveView({ orders, busy, onReceive }: { orders: AdminOrder[]; busy: boolean; onReceive: (orderId: string, method: PaymentMethod) => Promise<boolean> }) {
+function ReceiveView({
+  orders,
+  busy,
+  menu,
+  onReceive,
+  onAddItems,
+}: {
+  orders: AdminOrder[];
+  busy: boolean;
+  menu: PublicMenu | null;
+  onReceive: (orderId: string, method: PaymentMethod) => Promise<boolean>;
+  onAddItems: (orderId: string, managerPin: string, items: Array<{ menuItemId: string; quantity: number; notes: null; optionIds: string[] }>) => Promise<boolean>;
+}) {
+  const [adding, setAdding] = useState<AdminOrder | null>(null);
+
   return (
     <div className="pos-receive">
-      <p className="muted">Pedidos do cardápio e do WhatsApp ainda não pagos. Receba quando o cliente pagar no balcão ou o entregador acertar.</p>
+      <p className="muted">
+        Pedidos do WhatsApp e do cardápio chegam com o valor fechado com o cliente: aqui só se recebe. Incluir mais alguma coisa antes do
+        pagamento pede a senha do gerente.
+      </p>
       {orders.length === 0 ? <p className="pos-empty">Nenhum pedido aguardando pagamento.</p> : null}
       <div className="receive-grid">
-        {orders.map((order) => (
-          <article className="receive-card" key={order.id}>
-            <header>
-              <span className={`origin-tag origin-${order.channel === "WhatsApp" ? "whatsapp" : "menu"}`}>{order.channel === "WhatsApp" ? "WhatsApp" : "Cardápio"}</span>
-              <small>#{order.code.slice(-6)} · {formatDateTime(order.createdAt)}</small>
-            </header>
-            <strong>{order.customerName}</strong>
-            <span className="muted">{order.fulfillmentType === "Delivery" ? `Entrega${order.courierName ? ` · ${order.courierName}` : ""}` : "Retirada"} · escolheu {methodLabels[order.paymentMethod]}</span>
-            <b className="receive-total">{formatBRL(order.totalInCents)}</b>
-            <div className="pay-methods compact">
-              {counterMethods.map((method) => (
-                <button disabled={busy} key={method} onClick={() => void onReceive(order.id, method)} type="button">
-                  <span>{methodIcons[method]}</span>
-                  {methodLabels[method]}
-                </button>
-              ))}
-            </div>
-          </article>
-        ))}
+        {orders.map((order) => {
+          const kitchenOpen = order.status === "Pending" || order.status === "Confirmed" || order.status === "Preparing";
+          return (
+            <article className="receive-card" key={order.id}>
+              <header>
+                <span className={`origin-tag origin-${order.channel === "WhatsApp" ? "whatsapp" : "menu"}`}>{order.channel === "WhatsApp" ? "WhatsApp" : "Cardápio"}</span>
+                <small>#{order.code.slice(-6)} · {formatDateTime(order.createdAt)}</small>
+              </header>
+              <strong>{order.customerName}</strong>
+              <span className="muted">{order.fulfillmentType === "Delivery" ? `Entrega${order.courierName ? ` · ${order.courierName}` : ""}` : "Retirada"} · escolheu {methodLabels[order.paymentMethod]}</span>
+              <ul className="receive-items">
+                {order.items.map((item) => (
+                  <li key={item.id}>
+                    <span>{item.quantity}× {item.name}{item.options.length ? <small> · {item.options.map((option) => option.name).join(", ")}</small> : null}</span>
+                    <b>{formatBRL(item.totalInCents)}</b>
+                  </li>
+                ))}
+                {order.deliveryFeeInCents > 0 ? (
+                  <li className="muted"><span>Entrega</span><b>{formatBRL(order.deliveryFeeInCents)}</b></li>
+                ) : null}
+              </ul>
+              <div className="receive-closed">
+                <b className="receive-total">{formatBRL(order.totalInCents)}</b>
+                <small>🔒 Valor fechado</small>
+              </div>
+              <div className="pay-methods compact">
+                {counterMethods.map((method) => (
+                  <button disabled={busy} key={method} onClick={() => void onReceive(order.id, method)} type="button">
+                    <span>{methodIcons[method]}</span>
+                    {methodLabels[method]}
+                  </button>
+                ))}
+              </div>
+              {kitchenOpen ? (
+                <button className="link-button" disabled={busy} onClick={() => setAdding(order)} type="button">+ Adicionar item (senha do gerente)</button>
+              ) : null}
+            </article>
+          );
+        })}
       </div>
+      {adding ? (
+        <ExtraItems
+          busy={busy}
+          menu={menu}
+          onCancel={() => setAdding(null)}
+          onConfirm={async (pin, items) => {
+            const done = await onAddItems(adding.id, pin, items);
+            if (done) setAdding(null);
+            return done;
+          }}
+          order={adding}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/** O que entra num pedido de valor fechado: escolhe os itens e o gerente digita a senha. */
+function ExtraItems({
+  order,
+  menu,
+  busy,
+  onCancel,
+  onConfirm,
+}: {
+  order: AdminOrder;
+  menu: PublicMenu | null;
+  busy: boolean;
+  onCancel: () => void;
+  onConfirm: (pin: string, items: Array<{ menuItemId: string; quantity: number; notes: null; optionIds: string[] }>) => Promise<boolean>;
+}) {
+  const [search, setSearch] = useState("");
+  const [pin, setPin] = useState("");
+  const [lines, setLines] = useState<Array<{ key: string; item: MenuItem; quantity: number; optionIds: string[]; unit: number }>>([]);
+  const [choosing, setChoosing] = useState<MenuItem | null>(null);
+  const products = useMemo(
+    () => (menu?.categories ?? []).filter((category) => category.isActive).flatMap((category) => category.items).filter((item) => item.isActive && item.isAvailable),
+    [menu],
+  );
+  const found = search.trim() ? products.filter((item) => plain(item.name).includes(plain(search.trim()))).slice(0, 8) : products.slice(0, 8);
+  const extra = lines.reduce((sum, line) => sum + line.unit * line.quantity, 0);
+
+  function add(item: MenuItem, optionIds: string[]) {
+    const unit = item.priceInCents + item.optionGroups.flatMap((group) => group.options).filter((option) => optionIds.includes(option.id)).reduce((sum, option) => sum + option.priceInCents, 0);
+    const key = `${item.id}:${[...optionIds].sort().join(",")}`;
+    setLines((current) => {
+      const existing = current.find((line) => line.key === key);
+      return existing
+        ? current.map((line) => (line.key === key ? { ...line, quantity: line.quantity + 1 } : line))
+        : [...current, { key, item, quantity: 1, optionIds, unit }];
+    });
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={(event) => event.target === event.currentTarget && onCancel()} role="presentation">
+      <section className="modal pos-extra" role="dialog" aria-label="Adicionar item ao pedido">
+        <h3>Adicionar ao pedido #{order.code.slice(-6)}</h3>
+        <p className="muted">O valor foi fechado com {order.customerName}. O que entrar aqui vai para a cozinha e fica registrado no histórico com quem autorizou.</p>
+        <input autoFocus onChange={(event) => setSearch(event.target.value)} placeholder="Buscar produto" value={search} />
+        <div className="pos-extra-list">
+          {found.map((item) => (
+            <button
+              className="pos-option"
+              key={item.id}
+              onClick={() => (item.optionGroups.length ? setChoosing(item) : add(item, []))}
+              type="button"
+            >
+              {item.name} <small>{formatBRL(item.priceInCents)}</small>
+            </button>
+          ))}
+        </div>
+        <ul className="pos-lines">
+          {lines.length === 0 ? <li className="pos-empty">Nada escolhido ainda.</li> : null}
+          {lines.map((line) => (
+            <li key={line.key}>
+              <div><strong>{line.quantity}× {line.item.name}</strong></div>
+              <button className="link-button" onClick={() => setLines((current) => current.filter((entry) => entry.key !== line.key))} type="button">remover</button>
+              <b>{formatBRL(line.unit * line.quantity)}</b>
+            </li>
+          ))}
+        </ul>
+        <div className="pos-total">
+          <div><small>Novo total</small><strong>{formatBRL(order.totalInCents + extra)}</strong></div>
+          <small>Era {formatBRL(order.totalInCents)}</small>
+        </div>
+        <label className="pos-extra-pin">
+          <small>Senha do gerente</small>
+          <input autoComplete="off" inputMode="numeric" maxLength={8} onChange={(event) => setPin(event.target.value.replace(/\D/g, ""))} type="password" value={pin} />
+        </label>
+        <div className="pos-option-actions">
+          <button className="secondary-button" onClick={onCancel} type="button">Cancelar</button>
+          <button
+            className="primary-button"
+            disabled={busy || lines.length === 0 || pin.length < 4}
+            onClick={() => void onConfirm(pin, lines.map((line) => ({ menuItemId: line.item.id, quantity: line.quantity, notes: null, optionIds: line.optionIds })))}
+            type="button"
+          >
+            Autorizar e adicionar
+          </button>
+        </div>
+        {choosing ? (
+          <OptionPicker
+            item={choosing}
+            onCancel={() => setChoosing(null)}
+            onPick={(ids) => {
+              add(choosing, ids);
+              setChoosing(null);
+            }}
+          />
+        ) : null}
+      </section>
     </div>
   );
 }

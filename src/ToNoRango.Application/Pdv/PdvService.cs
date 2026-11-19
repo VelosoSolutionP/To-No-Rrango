@@ -37,6 +37,11 @@ public sealed record TableOrderRequest(string? Notes, IReadOnlyList<CreateOrderI
 
 public sealed record CloseTableRequest(PaymentMethod PaymentMethod);
 
+/// <summary>Something more on an order whose value is already closed: only with the manager PIN.</summary>
+public sealed record ExtraItemsRequest(string ManagerPin, IReadOnlyList<CreateOrderItemRequest> Items);
+
+public sealed record ManagerPinRequest(string? Pin);
+
 /// <summary>An open table: every unpaid order eaten at the place under the same table label.</summary>
 public sealed record OpenTableDto(
     string Table,
@@ -130,9 +135,102 @@ public sealed class PdvService(
     OrderLifecycle lifecycle,
     IOrderEvents events,
     IUnitOfWork unitOfWork,
-    IClock clock)
+    IClock clock,
+    IMenuRepository menu,
+    IPasswordHasher hasher)
 {
     private const string CounterCustomer = "Cliente balcão";
+
+    /// <summary>
+    /// Sets (or removes, with an empty PIN) the manager PIN of the store. Only the hash is kept.
+    /// </summary>
+    public Task<Result<bool>> SetManagerPinAsync(Guid establishmentId, ManagerPinRequest request, CancellationToken cancellationToken) =>
+        Guarded.RunAsync<bool>(async () =>
+        {
+            var establishment = await establishments.GetByIdAsync(establishmentId, cancellationToken);
+
+            if (establishment is null)
+            {
+                return Result<bool>.Failure(CommonErrors.EstablishmentNotFound);
+            }
+
+            var pin = request.Pin?.Trim() ?? string.Empty;
+
+            if (pin.Length > 0 && (pin.Length is < 4 or > 8 || !pin.All(char.IsAsciiDigit)))
+            {
+                return Result<bool>.Failure(AppErrors.Validation("A senha do gerente tem de 4 a 8 números."));
+            }
+
+            establishment.SetManagerPin(pin.Length == 0 ? null : hasher.Hash(pin), clock.UtcNow);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return pin.Length > 0;
+        });
+
+    /// <summary>
+    /// The value of a WhatsApp or menu order was closed with the customer, so the checkout only receives it.
+    /// Adding something before the payment needs the manager PIN; the new items go to the kitchen and the
+    /// history records it.
+    /// </summary>
+    public Task<Result<OrderDto>> AddExtraItemsAsync(Guid establishmentId, Guid orderId, ExtraItemsRequest request, string operatorName, CancellationToken cancellationToken) =>
+        Guarded.RunAsync<OrderDto>(() => unitOfWork.ExecuteInTransactionAsync<Result<OrderDto>>(async token =>
+        {
+            var establishment = await establishments.GetByIdAsync(establishmentId, token);
+
+            if (establishment is null)
+            {
+                return Result<OrderDto>.Failure(CommonErrors.EstablishmentNotFound);
+            }
+
+            if (establishment.ManagerPinHash is null)
+            {
+                return Result<OrderDto>.Failure(AppErrors.Validation("Cadastre a senha do gerente em Configurações antes de alterar um pedido fechado."));
+            }
+
+            if (string.IsNullOrWhiteSpace(request.ManagerPin) || !hasher.Verify(request.ManagerPin.Trim(), establishment.ManagerPinHash))
+            {
+                return Result<OrderDto>.Failure(AppErrors.Validation("Senha do gerente incorreta."));
+            }
+
+            if (request.Items is not { Count: > 0 })
+            {
+                return Result<OrderDto>.Failure(AppErrors.Validation("Escolha o que adicionar."));
+            }
+
+            var order = await orders.GetByIdAsync(orderId, token);
+
+            if (order is null || order.EstablishmentId != establishmentId)
+            {
+                return Result<OrderDto>.Failure(AppErrors.NotFound("order.not_found", "Pedido não encontrado."));
+            }
+
+            if (!order.AcceptsExtraItems)
+            {
+                return Result<OrderDto>.Failure(AppErrors.Validation("Este pedido já saiu da cozinha ou já foi pago. Lance o que faltou como venda nova no Balcão."));
+            }
+
+            var stations = (await menu.ListCategoriesAsync(establishmentId, includeInactive: true, token))
+                .ToDictionary(category => category.Id, category => category.Station);
+            var added = new List<OrderItem>();
+
+            foreach (var line in request.Items)
+            {
+                var item = await menu.GetItemAsync(line.MenuItemId, token);
+
+                if (item is null || item.EstablishmentId != establishmentId || !item.IsActive)
+                {
+                    return Result<OrderDto>.Failure(AppErrors.Validation("Um dos itens não está disponível neste estabelecimento."));
+                }
+
+                added.Add(order.AddItem(item, line.Quantity, line.Notes, line.OptionIds, stations.GetValueOrDefault(item.CategoryId, PrepStation.Kitchen)));
+            }
+
+            order.RecordExtraItems(added, operatorName, clock.UtcNow);
+            await lifecycle.DeductExtraItemsAsync(order, added, operatorName, token);
+            await unitOfWork.SaveChangesAsync(token);
+            await events.PublishAsync(order.Code);
+
+            return OrderDto.From(order);
+        }, cancellationToken));
 
     public async Task<Result<PdvOverviewDto>> GetAsync(Guid establishmentId, CancellationToken cancellationToken)
     {

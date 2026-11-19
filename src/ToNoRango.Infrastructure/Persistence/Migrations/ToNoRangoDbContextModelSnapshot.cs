@@ -470,6 +470,10 @@ namespace ToNoRango.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("ManagerPinHash")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<long>("MinimumOrderInCents")
                         .HasColumnType("bigint");
 

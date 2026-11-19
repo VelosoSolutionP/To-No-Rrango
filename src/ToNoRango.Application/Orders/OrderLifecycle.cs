@@ -103,10 +103,26 @@ public sealed class OrderLifecycle(
             return;
         }
 
-        var menuItemIds = order.Items.Select(item => item.MenuItemId).Distinct().ToList();
+        // Sem ficha técnica nada sai do estoque e o pedido continua sem baixa, como antes.
+        if (await DeductItemsAsync(order, order.Items, changedBy, now, cancellationToken))
+        {
+            order.MarkStockDeducted(now);
+        }
+    }
+
+    /// <summary>
+    /// Items added after the order was confirmed: the stock of the rest already left, so only these go.
+    /// Before confirmation nothing happens here; the confirmation takes the whole order.
+    /// </summary>
+    public Task DeductExtraItemsAsync(Order order, IReadOnlyCollection<OrderItem> added, string? changedBy, CancellationToken cancellationToken) =>
+        order.StockDeductedAt is null ? Task.CompletedTask : DeductItemsAsync(order, added, changedBy, clock.UtcNow, cancellationToken);
+
+    private async Task<bool> DeductItemsAsync(Order order, IReadOnlyCollection<OrderItem> items, string? changedBy, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var menuItemIds = items.Select(item => item.MenuItemId).Distinct().ToList();
         var lines = await recipes.ListAsync(line => menuItemIds.Contains(line.MenuItemId), line => line.Id, cancellationToken, take: 2000);
 
-        var totals = order.Items
+        var totals = items
             .SelectMany(item => lines
                 .Where(line => line.MenuItemId == item.MenuItemId)
                 .Select(line => (line.StockItemId, Quantity: line.Quantity * item.Quantity)))
@@ -115,7 +131,7 @@ public sealed class OrderLifecycle(
 
         if (totals.Count == 0)
         {
-            return;
+            return false;
         }
 
         var stockIds = totals.Keys.ToList();
@@ -139,7 +155,7 @@ public sealed class OrderLifecycle(
                 now));
         }
 
-        order.MarkStockDeducted(now);
+        return true;
     }
 
     private async Task RestoreStockAsync(Order order, string? changedBy, DateTimeOffset now, CancellationToken cancellationToken)

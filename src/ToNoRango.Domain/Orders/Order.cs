@@ -208,6 +208,38 @@ public sealed class Order : AggregateRoot
         return orderItem;
     }
 
+    /// <summary>The kitchen can still prepare something new: the order has not left it yet.</summary>
+    public bool AcceptsExtraItems =>
+        Status is OrderStatus.Pending or OrderStatus.Confirmed or OrderStatus.Preparing && PaymentStatus == PaymentStatus.Pending;
+
+    /// <summary>
+    /// Items added after the value was closed (WhatsApp or menu), authorized by the manager at the checkout.
+    /// They enter the kitchen queue at once when the order is already there, and the history keeps who allowed it.
+    /// </summary>
+    public void RecordExtraItems(IReadOnlyCollection<OrderItem> added, string authorizedBy, DateTimeOffset now)
+    {
+        if (Status != OrderStatus.Pending)
+        {
+            foreach (var item in added)
+            {
+                item.RaiseTo(ItemPrepStatus.Queued, now);
+            }
+        }
+
+        var names = string.Join(", ", added.Select(item => $"{item.Quantity}x {item.Name}"));
+        var note = $"Adicionado no checkout com senha do gerente: {names}";
+        _statusHistory.Add(new OrderStatusHistory(
+            TenantId,
+            EstablishmentId,
+            Id,
+            Status,
+            Status,
+            now,
+            authorizedBy,
+            note.Length > 300 ? note[..297] + "..." : note));
+        UpdatedAt = now;
+    }
+
     public bool CanTransitionTo(OrderStatus target) => target switch
     {
         OrderStatus.Confirmed => Status == OrderStatus.Pending,

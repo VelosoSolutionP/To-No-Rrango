@@ -48,7 +48,7 @@ import { Products } from "./modules/Products";
 import { Icon } from "./Icon";
 import { Settings } from "./modules/Settings";
 
-type Tab = "overview" | "orders" | "kitchen" | "pdv" | "distribution" | "products" | "menu" | "customers" | "suppliers" | "inventory" | "finance" | "fiscal" | "reports" | "zest" | "integrations" | "settings";
+type Tab = "overview" | "orders" | "kitchen" | "tables" | "pdv" | "distribution" | "products" | "menu" | "customers" | "suppliers" | "inventory" | "finance" | "fiscal" | "reports" | "zest" | "integrations" | "settings";
 
 const roleName: Record<UserRole, string> = { Owner: "Dono", Manager: "Gerente", Attendant: "Atendente", Kitchen: "Cozinha" };
 
@@ -59,6 +59,7 @@ const tabs: Array<{ id: Tab; group: string; label: string; roles: UserRole[]; mo
   { id: "overview", group: "Operação", label: "Visão geral", roles: ["Owner", "Manager", "Attendant"] },
   { id: "orders", group: "Operação", label: "Pedidos", roles: everyone, modules: ["pedidos"] },
   { id: "kitchen", group: "Operação", label: "Cozinha", roles: everyone, modules: ["pedidos"] },
+  { id: "tables", group: "Operação", label: "Mesas", roles: ["Owner", "Manager", "Attendant"], modules: ["pedidos"] },
   { id: "pdv", group: "Operação", label: "Checkout", roles: ["Owner", "Manager", "Attendant"], modules: ["pedidos"] },
   { id: "distribution", group: "Operação", label: "Distribuição", roles: ["Owner", "Manager", "Attendant"], modules: ["pedidos"] },
   { id: "products", group: "Cadastros", label: "Produtos", roles: management, modules: ["cardapio"] },
@@ -86,7 +87,7 @@ const products: Array<{ id: Product; label: string; icon: string }> = [
   { id: "zest", label: "ZEST", icon: "zest" },
 ];
 const tabIcons: Record<Tab, string> = {
-  overview: "overview", orders: "orders", kitchen: "kitchen", pdv: "pos", distribution: "truck",
+  overview: "overview", orders: "orders", kitchen: "kitchen", tables: "table", pdv: "pos", distribution: "truck",
   products: "box", menu: "menu", customers: "customers", suppliers: "parties",
   inventory: "inventory", finance: "finance", fiscal: "fiscal", reports: "reports", zest: "zest", integrations: "plug", settings: "settings",
 };
@@ -272,7 +273,7 @@ export function AdminClient() {
   }, [selectedId, session]);
 
   useEffect(() => {
-    if (!session || !selectedId || (tab !== "orders" && tab !== "kitchen" && tab !== "overview" && tab !== "pdv" && tab !== "distribution")) {
+    if (!session || !selectedId || (tab !== "orders" && tab !== "kitchen" && tab !== "overview" && tab !== "pdv" && tab !== "tables" && tab !== "distribution")) {
       return;
     }
 
@@ -614,6 +615,7 @@ export function AdminClient() {
             ) : null}
 
             {tab === "kitchen" && hasEstablishment ? <Kitchen error={mutationError ?? dataError} onAdvance={updateOrderStatus} onAdvanceItem={http ? advanceItem : undefined} orders={orders} /> : null}
+            {tab === "tables" && hasEstablishment && http ? <Pdv canManage={canManage} establishmentId={selectedId} http={http} menu={menu} onChanged={refreshOrders} orders={orders} variant="tables" /> : null}
             {tab === "pdv" && hasEstablishment && http ? <Pdv canManage={canManage} establishmentId={selectedId} http={http} menu={menu} onChanged={refreshOrders} orders={orders} /> : null}
             {tab === "fiscal" && hasEstablishment && http ? (
               <Fiscal

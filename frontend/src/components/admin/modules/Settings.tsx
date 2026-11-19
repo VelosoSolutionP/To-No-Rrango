@@ -214,12 +214,54 @@ function Users({ http }: { http: AdminHttp }) {
   );
 }
 
+/** Senha do gerente: o Checkout pede antes de incluir algo num pedido de valor fechado (WhatsApp/cardápio). */
+function ManagerPin({ http, establishmentId }: Props) {
+  const state = useLoad(() => http.get<{ configured: boolean }>(`/establishments/${establishmentId}/manager-pin`), [establishmentId]);
+  const action = useAction(state.reload);
+  const [saved, setSaved] = useState<string | null>(null);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const element = event.currentTarget;
+    const form = new FormData(element);
+    const pin = text(form, "pin") ?? "";
+    const again = text(form, "again") ?? "";
+
+    if (pin !== again) {
+      setSaved("As duas senhas não batem.");
+      return;
+    }
+
+    const done = await action.run(() => http.put(`/establishments/${establishmentId}/manager-pin`, { pin }));
+    if (done) {
+      element.reset();
+      setSaved(pin ? "Senha do gerente salva." : "Senha do gerente removida.");
+    }
+  }
+
+  return (
+    <form className="card module-form" onSubmit={submit}>
+      <p className="module-note">
+        Pedidos do WhatsApp e do cardápio chegam ao Checkout com o valor fechado com o cliente. Para incluir mais alguma coisa antes do
+        pagamento, o caixa precisa desta senha. Use de 4 a 8 números e passe só para quem pode autorizar.
+      </p>
+      <p className="muted">{state.data ? (state.data.configured ? "🔒 Senha cadastrada." : "Nenhuma senha cadastrada: pedido fechado não pode ser alterado no Checkout.") : null}</p>
+      <Input autoComplete="new-password" inputMode="numeric" label={state.data?.configured ? "Nova senha (vazio remove)" : "Senha do gerente"} maxLength={8} name="pin" pattern="\d{4,8}|" type="password" />
+      <Input autoComplete="new-password" inputMode="numeric" label="Repita a senha" maxLength={8} name="again" type="password" />
+      <button className="primary-button" disabled={action.busy} type="submit">Salvar</button>
+      {saved ? <p className="muted module-note">{saved}</p> : null}
+      <ErrorText message={action.error ?? state.error} />
+    </form>
+  );
+}
+
 export function Settings({ company, modules, isOwner, http, establishmentId }: { company: ReactNode; modules: string[]; isOwner: boolean; http: AdminHttp | null; establishmentId: string }) {
-  type View = "company" | "integrations" | "users";
+  type View = "company" | "integrations" | "manager" | "users";
   const ready = http !== null && establishmentId !== "";
   const options: Array<{ value: View; label: string }> = [
     { value: "company", label: "Empresa" },
     ...(ready && modules.includes("pagamentos") ? [{ value: "integrations" as View, label: "Pagamentos e integrações" }] : []),
+    ...(ready ? [{ value: "manager" as View, label: "Senha do gerente" }] : []),
     ...(ready && isOwner ? [{ value: "users" as View, label: "Usuários e permissões" }] : []),
   ];
   const [view, setView] = useState<View>("company");
@@ -230,6 +272,7 @@ export function Settings({ company, modules, isOwner, http, establishmentId }: {
       <SubTabs onChange={setView} options={options} value={view} />
       {view === "company" ? company : null}
       {view === "integrations" && http ? <Payments establishmentId={establishmentId} http={http} /> : null}
+      {view === "manager" && http ? <ManagerPin establishmentId={establishmentId} http={http} /> : null}
       {view === "users" && isOwner && http ? <Users http={http} /> : null}
     </section>
   );
