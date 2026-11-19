@@ -282,7 +282,7 @@ export function OrdersBoard({
                       </div>
                       <div className="ticket-who">
                         <strong>{order.tableLabel ? `Mesa ${order.tableLabel}` : order.customerName}</strong>
-                        <span>{order.tableLabel ? (order.waiterName ? `Garçom ${order.waiterName}` : "Pedido pelo QR") : where(order)}</span>
+                        <span>{order.tableLabel ? "Mesa ZEST" : where(order)}</span>
                       </div>
                       <ul className="ticket-items">
                         {order.items.slice(0, 3).map((item) => (

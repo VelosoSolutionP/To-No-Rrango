@@ -1434,75 +1434,28 @@
   pointer-events: none;
 }
 
-/* Tampo: placa larga com cantos curvos e borda de neon. */
-.vx .tn-desk {
-  position: absolute;
-  top: 6px;
-  left: 4px;
-  right: 4px;
-  height: 22px;
-  border-radius: 14px 14px 10px 10px;
-  border: 2px solid var(--tn);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--tn) 22%, #1b1530), #120e20);
-  box-shadow: 0 0 12px var(--tn-soft), 0 0 2px var(--tn), inset 0 0 10px color-mix(in srgb, var(--tn) 25%, transparent);
+/* Planta da mesa vista de cima: tampo com quatro cadeiras, no neon do estado da mesa. */
+.vx .table-neon .tn-top {
+  fill: color-mix(in srgb, var(--tn) 16%, #120e20);
+  stroke: var(--tn);
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 6px var(--tn-soft));
 }
 
-/* Pés em arco nos dois lados, abertos para dentro. */
-.vx .tn-desk::before,
-.vx .tn-desk::after {
-  content: "";
-  position: absolute;
-  top: 18px;
-  width: 26px;
-  height: 34px;
-  border: 2px solid var(--tn);
-  background: color-mix(in srgb, var(--tn) 10%, #100c1c);
-  box-shadow: 0 0 10px var(--tn-soft);
+.vx .table-neon .tn-seat {
+  fill: color-mix(in srgb, var(--tn) 38%, #1a1428);
+  stroke: var(--tn);
+  stroke-width: 2;
 }
 
-.vx .tn-desk::before {
-  left: -2px;
-  border-right: 0;
-  border-radius: 18px 0 0 18px;
+.vx .table-neon .tn-shine {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.16);
+  stroke-width: 2;
+  stroke-linecap: round;
 }
 
-.vx .tn-desk::after {
-  right: -2px;
-  border-left: 0;
-  border-radius: 0 18px 18px 0;
-}
-
-/* Cadeira: encosto arredondado na frente da mesa. */
-.vx .tn-chair {
-  position: absolute;
-  z-index: 2;
-  left: 50%;
-  top: 40px;
-  width: 30px;
-  height: 26px;
-  margin-left: -15px;
-  border-radius: 12px 12px 6px 6px;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--tn) 45%, #2a2140), #1a1428);
-  box-shadow: 0 0 10px var(--tn-soft), inset 0 2px 2px rgba(255, 255, 255, 0.18);
-}
-
-/* Anéis de luz no chão, embaixo da cadeira. */
-.vx .tn-rings {
-  position: absolute;
-  left: 50%;
-  top: 62px;
-  width: 92px;
-  height: 26px;
-  margin-left: -46px;
-  border-radius: 50%;
-  background: repeating-radial-gradient(ellipse at center, transparent 0 5px, color-mix(in srgb, var(--tn) 70%, transparent) 5px 6px, transparent 6px 10px);
-  -webkit-mask: radial-gradient(ellipse at center, #000 40%, transparent 72%);
-  mask: radial-gradient(ellipse at center, #000 40%, transparent 72%);
-  filter: drop-shadow(0 0 4px var(--tn));
-  opacity: 0.85;
-}
-
-.vx .table-island.is-busy .tn-rings {
+.vx .table-island.is-busy .tn-seat {
   animation: tn-pulse 2.4s ease-in-out infinite;
 }
 
@@ -1511,18 +1464,18 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .vx .table-island.is-busy .tn-rings { animation: none; }
+  .vx .table-island.is-busy .tn-seat { animation: none; }
 }
 
 /* Número da mesa aceso no tampo. */
 .vx .table-island > strong {
   position: absolute;
-  top: 20px;
+  top: 51px;
   left: 0;
   right: 0;
   z-index: 3;
   color: #fff;
-  font-size: 1.05rem;
+  font-size: 1.3rem;
   line-height: 22px;
   text-align: center;
   text-shadow: 0 0 8px var(--tn), 0 0 2px var(--tn);

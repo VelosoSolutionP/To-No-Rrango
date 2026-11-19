@@ -962,7 +962,13 @@ function TablesView({
                 onClick={() => onSelect(label)}
                 type="button"
               >
-                <i aria-hidden="true" className="table-neon"><i className="tn-rings" /><i className="tn-desk" /><i className="tn-chair" /></i>
+                <svg aria-hidden="true" className="table-neon" viewBox="0 0 128 92">
+                  <rect className="tn-seat" height="13" rx="6" width="24" x="34" y="4" />
+                  <rect className="tn-seat" height="13" rx="6" width="24" x="70" y="4" />
+                  <rect className="tn-seat" height="13" rx="6" width="24" x="34" y="75" />
+                  <rect className="tn-seat" height="13" rx="6" width="24" x="70" y="75" />
+                  <rect className="tn-top" height="50" rx="12" width="88" x="20" y="21" />
+                </svg>
                 <strong>{label}</strong>
                 {info ? (
                   <>

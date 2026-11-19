@@ -28,8 +28,8 @@ const paths: Record<string, string> = {
   download: "M12 3v12m-5-5 5 5 5-5M4 21h16",
   box: "M12 3 4 7v10l8 4 8-4V7l-8-4Z",
   pos: "M4 4h16v10H4V4Zm4 16h8m-4-6v6M8 8h3m3 0h2",
-  /* Mesa redonda de pé central com duas cadeiras: a mesa do salão. */
-  table: "M4 9a8 2.6 0 1 0 16 0a8 2.6 0 1 0-16 0Zm8 2.6V20m-4 0h8M2 12v8m0-4h3.5M22 12v8m0-4h-3.5",
+  /* Mesa vista de cima com quatro cadeiras, igual à planta da tela Mesas. */
+  table: "M5.5 8h13A2.5 2.5 0 0 1 21 10.5v3a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 13.5v-3A2.5 2.5 0 0 1 5.5 8ZM7 4.5h3.5m3 0H17M7 19.5h3.5m3 0H17",
   truck: "M3 6h11v11H3V6Zm11 4h4l3 3v4h-7v-7ZM7.5 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm10 0a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z",
   tag: "M3 12V4h8l10 10-8 8L3 12Zm5-4h.01",
   pause: "M8 5v14m8-14v14",

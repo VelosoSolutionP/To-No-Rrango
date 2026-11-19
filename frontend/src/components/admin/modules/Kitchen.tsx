@@ -135,7 +135,7 @@ export function Kitchen({
                       <div className="ticket-who">
                         <strong>{order.tableLabel ? `Mesa ${order.tableLabel}` : order.customerName}</strong>
                         <span>
-                          {order.fulfillmentType === "Delivery" ? "🛵 Entrega" : order.tableLabel ? `🍽️ No salão${order.waiterName ? ` · ${order.waiterName}` : ""}` : "🛍️ Retirada"}
+                          {order.fulfillmentType === "Delivery" ? "🛵 Entrega" : order.tableLabel ? "🍽️ Mesa ZEST" : "🛍️ Retirada"}
                         </span>
                       </div>
                       <ul className="kitchen-items">
